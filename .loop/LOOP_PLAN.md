@@ -77,4 +77,5 @@ Broken verification harness (command errors twice in a row): always pause-and-as
   Launch — pilot first: `MAX_LAUNCHES=1 bash .loop/run_loop.sh`（看完一輪：record 寫入、journal append、commit 存在）→ `nohup bash .loop/run_loop.sh &`（或 tmux）walk-away · rerun to resume
 
 ## Amendments
-none
+- iter 0, 2026-08-23T11:20+08:00: §9 AGENT_CMD_JSON: claude.exe headless → codex.exe `exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox`（原因：claude CLI 在本機未登入（"Not logged in"），headless 無法認證；codex exec 實測已認證可用。引擎仍為 B、其餘不變。使用者已於 2026-08-23 授權自行運行維護）
+- iter 0, 2026-08-23T11:20+08:00: §4 追加使用者規則：絕不允許刪除 `C:\CodexProjects\SourceSeparation_GPU_FX\` 專案根目錄以外的任何檔案（已寫入 LESSONS.md SIGN）

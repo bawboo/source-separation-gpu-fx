@@ -14,7 +14,10 @@
 set -uo pipefail
 
 # ── CONFIG (from LOOP_PLAN.md §9) ───────────────────────────────────────────
-AGENT_CMD_JSON=${AGENT_CMD_JSON:-'["C:\\nvm4w\\nodejs\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe","-p","--permission-mode","acceptEdits","--allowedTools","Bash,Edit,Write,Read,Glob,Grep,Task,WebFetch,WebSearch"]'}
+# Engine CLI: codex exec (headless, authenticated on this machine).
+# claude CLI alternative (requires `claude /login` first):
+#   ["C:\\nvm4w\\nodejs\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe","-p","--permission-mode","acceptEdits","--allowedTools","Bash,Edit,Write,Read,Glob,Grep,Task,WebFetch,WebSearch"]
+AGENT_CMD_JSON=${AGENT_CMD_JSON:-'["C:\\nvm4w\\nodejs\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin\\codex.exe","exec","--skip-git-repo-check","--dangerously-bypass-approvals-and-sandbox"]'}
 # PROMPT_MODE=ref passes only a one-line bootstrap on the command line (cmd.exe
 # has an 8191-char limit — the full prompt is read from the file by the agent).
 PROMPT_MODE=${PROMPT_MODE:-ref}
