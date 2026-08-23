@@ -14,7 +14,7 @@
 set -uo pipefail
 
 # ── CONFIG (from LOOP_PLAN.md §9) ───────────────────────────────────────────
-AGENT_CMD_JSON=${AGENT_CMD_JSON:-'["C:\\nvm4w\\nodejs\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe","-p","--permission-mode","acceptEdits","--allowedTools","Bash Edit Write Read Glob Grep Task WebFetch WebSearch"]'}
+AGENT_CMD_JSON=${AGENT_CMD_JSON:-'["C:\\nvm4w\\nodejs\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe","-p","--permission-mode","acceptEdits","--allowedTools","Bash,Edit,Write,Read,Glob,Grep,Task,WebFetch,WebSearch"]'}
 # PROMPT_MODE=ref passes only a one-line bootstrap on the command line (cmd.exe
 # has an 8191-char limit — the full prompt is read from the file by the agent).
 PROMPT_MODE=${PROMPT_MODE:-ref}
@@ -92,10 +92,15 @@ cmd = json.loads(sys.argv[1])
 prompt = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8")
 mode = sys.argv[3]
 timeout = int(sys.argv[4] or "0") * 60
+BOOTSTRAP = ("Read the file .loop/ITERATION_PROMPT.md in the current directory and "
+             "follow it exactly: execute exactly ONE loop iteration, then stop "
+             "with the LOOP STATUS line.")
 if mode == "ref":
-    cmd = cmd + ["Read the file .loop/ITERATION_PROMPT.md in the current directory and follow it exactly: execute exactly ONE loop iteration, then stop with the LOOP STATUS line."]
+    # insert right after ["<exe>", "-p"] so variadic flags (--allowedTools)
+    # can never swallow the positional prompt
+    cmd = cmd[:2] + [BOOTSTRAP] + cmd[2:]
 elif mode != "stdin":
-    cmd = cmd + [prompt]
+    cmd = cmd[:2] + [prompt] + cmd[2:]
 kw = {"text": True, "encoding": "utf-8"}
 if os.name == "posix":
     kw["start_new_session"] = True
