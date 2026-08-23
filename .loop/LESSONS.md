@@ -9,3 +9,4 @@
 - SIGN (wiring): 上游 repo https://github.com/openmirlab/melband-roformer-infer（MIT）；registry 在其 `src/mel_band_roformer/data/melband_models.json`；預設下載快取為 `~/.cache/melband-roformer-infer/`——需將其導向本專案快取目錄（環境變數 `MELBAND_ROFORMER_MODELS_PATH` 或 `--models_dir`）。
 - SIGN (user, 2026-08-23): 絕對不允許刪除 `C:\CodexProjects\SourceSeparation_GPU_FX\` 專案根目錄以外的任何檔案（包含 ~/.cache、temp 等）；專案內也僅限 `verify\roformer-cache\` 的權重檔可刪。
 - SIGN (iter 5): A4 只有在真實 RoFormer worker 路由也完成並有證據後才能翻為 pass；catalog 載入與選擇本身只是可驗證基礎。
+- SIGN (iter 8): 用 Bash 工具（Git Bash/MSYS）執行 `.loop\checks\*.cmd` 時，`cmd /c "..."` 的 `/c` 會被 MSYS 誤轉成路徑、整個指令被吞掉——只會跳出互動式 cmd banner、不執行任何內容，且 exit code 仍是 0（極易誤判為成功但其實什麼都沒跑）。一律改用 `cmd //c "..."`（雙斜線跳脫路徑轉換）才會真的執行 cheap.cmd／full.cmd。

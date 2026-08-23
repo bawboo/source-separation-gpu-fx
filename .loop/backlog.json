@@ -43,10 +43,10 @@
   {
     "id": "A6",
     "title": "下載管理：按需下載＋SHA-256 驗證＋滾動快取上限 3 個（C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache）＋自動清理，含測試",
-    "passes": false,
+    "passes": true,
     "priority": 6,
     "source": "plan",
-    "evidence": null
+    "evidence": "iter 8: worker/roformer_cache.py ensure_cached()/evict_oldest() wired into worker/roformer_worker.py main(); tests/test_roformer_cache.py 8/8 unit tests PASS (download-when-missing, skip-when-verified, redownload-on-corruption, raise+delete-on-persistent-mismatch, rolling cap=3 eviction of oldest by mtime, LRU touch protects re-requested entry, direct evict_oldest); live real-network proof: python worker/roformer_cache.py --model roformer-model-melband-roformer-guitar-by-becruily downloaded 45,142,183 bytes from huggingface.co and verified sha256=83472bbf...2a83c against manifest (exit 0), re-run was instant/no re-download; full production path proof: htfx-roformer python worker/roformer_worker.py --model roformer-model-melband-roformer-guitar-by-becruily produced valid 48000 Hz/96000-frame/stereo/FLOAT/finite Guitar+Other stems from the cached checkpoint (exit 0, outputs in verify/output/roformer-cache-integration/); cache_dir_entries=[melband-roformer-kim-vocals, roformer-model-melband-roformer-guitar-by-becruily] stayed at 2<=3 (no eviction due yet, cap enforcement proven deterministically by unit tests; real 4th-model eviction will occur naturally once M-ENUM per-model downloads accumulate in later iterations)"
   },
   {
     "id": "A7",

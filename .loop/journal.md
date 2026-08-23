@@ -292,3 +292,45 @@ SCOPE_EXIT=0
 **Note:** A5 已由本輪獨立 cheap-tier editor smoke 證明並翻為 pass；下一輪依 priority 轉向 A6 下載管理。
 
 ---
+
+## Iteration 8 — 2026-08-23T20:29:58+08:00
+**Hypothesis:** 若新增 `worker/roformer_cache.py`（依 manifest 的 SHA-256 做按需下載驗證＋以目錄 mtime 做滾動快取上限 3 個的自動清理）並在 `worker/roformer_worker.py` 的 CLI `main()` 中串接為必經路徑，A6 應可翻為 pass，因為下載管理與既有真實分離流程共用同一條生產路徑，並有單元測試＋一次真實網路下載＋一次真實端到端分離佐證。
+**Change-set:** 新增 `worker/roformer_cache.py`（`ensure_cached()`／`evict_oldest()`／`http_downloader()`／CLI）；`worker/roformer_worker.py` 的 `main()` 新增 `--manifest`／`--max-cached` 參數並在呼叫 `separate_file` 前呼叫 `_ensure_model_cached()`（manifest 未收錄的舊有預設模型會安靜略過，交由上游 session 自行下載，不受快取上限影響）；新增 `tests/test_roformer_cache.py`（8 個測試：缺檔下載、已驗證則跳過、快取檔案損毀時重下載、重下載仍失敗則刪檔並拋錯、未知 model id 拋 KeyError、滾動快取上限 3 個淘汰最舊、touch 保護最近使用項目不被淘汰、`evict_oldest()` 直接呼叫語意）；`.loop/checks/cheap_extra.cmd` 新增一行執行該測試檔（append-only，僅擴充既有擴充點）。
+**Unit tests:** `python tests\test_roformer_cache.py -v`（exit 0）
+```text
+test_downloads_when_missing_and_verifies_sha256 ... ok
+test_evict_oldest_direct_call_respects_keep_count ... ok
+test_raises_and_deletes_when_redownload_still_mismatches ... ok
+test_redownloads_when_cached_file_is_corrupt ... ok
+test_rolling_cache_evicts_oldest_beyond_cap ... ok
+test_skips_download_when_already_verified ... ok
+test_touching_an_existing_model_protects_it_from_eviction ... ok
+test_unknown_model_id_raises_key_error ... ok
+Ran 8 tests in 0.299s
+OK
+```
+**真實下載＋SHA-256 佐證：** `python worker\roformer_cache.py --model roformer-model-melband-roformer-guitar-by-becruily --cache-dir C:\CodexProjects\SourceSeparation_GPU_FX\verify\roformer-cache --max-cached 3`（exit 0；真的從 huggingface.co 下載 45,142,183 bytes，sha256=`83472bbf...2a83c` 與 manifest 相符）；重跑同一指令 0.42 秒完成、無下載呼叫（快取已驗證，跳過）。
+**真實端到端分離佐證（生產路徑）：** `htfx-roformer` env 下 `python worker\roformer_worker.py --input verify\fixtures\test_48k_2s.wav --output-dir verify\output\roformer-cache-integration --model roformer-model-melband-roformer-guitar-by-becruily --models-dir verify\roformer-cache --device cpu`（exit 0）——下載並 SHA-256 驗證了 config（upstream 自身邏輯，非 checkpoint 快取上限管轄範圍）、CPU 推論完成、輸出 `Guitar`／`Other` 兩個 stem，皆為 48000 Hz／96000 frames／stereo／FLOAT／finite（與輸入 2 秒 48 kHz fixture 時長一致）。快取此時為 `[melband-roformer-kim-vocals, roformer-model-melband-roformer-guitar-by-becruily]`（2 ≤ 3，未觸發真實淘汰；淘汰邏輯已由單元測試決定性證明，真實第 4 個模型下載觸發的淘汰將隨後續 iteration 的 M-ENUM 逐一下載自然發生，未強行於本輪下載第 3、4 個大型權重以免超出 iteration 時間／磁碟預算）。
+**Verification:** `cmd //c .loop\checks\cheap.cmd`（exit 0；Bash 工具下需用 `cmd //c` 而非 `cmd /c`，見下方 lesson）
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s
+OK
+Ran 2 tests in 0.085s
+OK
+Ran 8 tests in 0.126s
+OK
+CHEAP_EXIT=0
+```
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 36 changed path(s) within policy
+```
+**Criteria:** C1: fail（iteration 8 非 full cadence，A7/A8/A9/A10/M-ENUM 仍未完成） · C2: fail（仍有未完成 backlog） · C3: pass
+**Metric:** 7 個 backlog item passing（best so far: 7；improved: true）
+**Decision:** continue
+**Lesson:** 在本 Bash 工具（Git Bash/MSYS）下呼叫 `cmd /c "..."` 時，MSYS 會把 `/c` 誤判為路徑並吃掉整個指令（實測只會開出一個互動式 cmd banner，不執行任何內容，且 exit code 仍是 0，非常容易被誤判為「成功」）；必須改用 `cmd //c "..."`（雙斜線跳脫 MSYS 路徑轉換）才會真的執行。已寫入 LESSONS.md。
+**Note:** A6 已由 cache manager＋單元測試＋真實下載＋真實端到端分離證明並翻為 pass；下一輪依 priority 轉向 A7 輸出 UX（各類別 2-stem 輸出命名與 Export 流程）。
+
+---

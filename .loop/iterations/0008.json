@@ -1,0 +1,29 @@
+{
+  "iteration": 8,
+  "timestamp": "2026-08-23T20:29:58+08:00",
+  "hypothesis": "若新增 worker/roformer_cache.py（依 manifest 的 SHA-256 做按需下載驗證＋以目錄 mtime 做滾動快取上限 3 個的自動清理）並在 worker/roformer_worker.py 的 CLI main() 中串接為必經路徑，A6 應可翻為 pass，因為下載管理與既有真實分離流程共用同一條生產路徑，並有單元測試＋一次真實網路下載＋一次真實端到端分離佐證。",
+  "files_touched": [
+    "worker/roformer_cache.py",
+    "worker/roformer_worker.py",
+    "tests/test_roformer_cache.py",
+    ".loop/checks/cheap_extra.cmd",
+    ".loop/backlog.json",
+    ".loop/iterations/0008.json",
+    ".loop/journal.md",
+    ".loop/LESSONS.md",
+    ".loop/state.json"
+  ],
+  "commands": [
+    {"cmd": "python tests/test_roformer_cache.py -v", "exit_code": 0, "timed_out": false},
+    {"cmd": "python worker/roformer_cache.py --model roformer-model-melband-roformer-guitar-by-becruily --cache-dir verify/roformer-cache --max-cached 3 (live download+verify)", "exit_code": 0, "timed_out": false},
+    {"cmd": "python worker/roformer_cache.py --model roformer-model-melband-roformer-guitar-by-becruily --cache-dir verify/roformer-cache --max-cached 3 (re-run, cached/no re-download)", "exit_code": 0, "timed_out": false},
+    {"cmd": "htfx-roformer python worker/roformer_worker.py --model roformer-model-melband-roformer-guitar-by-becruily --device cpu (full production path through cache manager)", "exit_code": 0, "timed_out": false},
+    {"cmd": "cmd //c .loop\\checks\\cheap.cmd", "exit_code": 0, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 7, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}

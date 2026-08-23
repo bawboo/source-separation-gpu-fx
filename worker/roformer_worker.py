@@ -101,6 +101,28 @@ def separate_file(
     }
 
 
+def _ensure_model_cached(model_name: str, models_dir: Path, manifest_path: Path, max_cached: int) -> None:
+    """Best-effort cache priming: honors the rolling cap for manifest-listed models.
+
+    Models absent from the manifest (e.g. the legacy default) fall through to
+    the upstream session's own on-demand download, unaffected by the cap.
+    """
+    from roformer_cache import CacheVerificationError, ensure_cached, http_downloader
+
+    try:
+        ensure_cached(
+            model_name,
+            cache_dir=models_dir,
+            manifest_path=manifest_path,
+            downloader=http_downloader,
+            max_cached=max_cached,
+        )
+    except KeyError:
+        pass
+    except CacheVerificationError as exc:
+        raise RuntimeError(f"RoFormer cache verification failed for {model_name}: {exc}") from exc
+
+
 def main() -> int:
     configure_utf8_stream(sys.stdout)
     configure_utf8_stream(sys.stderr)
@@ -110,7 +132,17 @@ def main() -> int:
     parser.add_argument("--model", default="melband-roformer-kim-vocals")
     parser.add_argument("--models-dir", type=Path, required=True)
     parser.add_argument("--device", default="auto")
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=Path(__file__).resolve().parents[1] / "assets" / "models" / "roformer-manifest.json",
+    )
+    parser.add_argument("--max-cached", type=int, default=3)
     args = parser.parse_args()
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    _ensure_model_cached(args.model, args.models_dir, args.manifest, args.max_cached)
+
     print(json.dumps(separate_file(
         args.input,
         args.output_dir,
