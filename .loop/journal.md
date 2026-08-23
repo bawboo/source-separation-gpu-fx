@@ -361,3 +361,43 @@ SCOPE_EXIT=0
 **Decision:** continue
 **Lesson:** 本 Bash 工具（Git Bash/MSYS）下，`cmd //c` 之後若把 `.loop\checks\cheap.cmd` 這類含反斜線的路徑寫成不加引號或雙反斜線跳脫，MSYS 仍會把每個 `\<letter>` 當成跳脫序列吃掉反斜線本身（例如 `.loop\checks\cheap.cmd` 或 `.loop\checks\cheap.cmd` 都會被吃成 `.loopcheckscheap.cmd`，導致 cmd 找不到檔案、但因為是 `%~dp0` 之類的相對路徑錯誤，實際會回報找不到指令且 exit code 非 0，不像先前 lesson 提到的「單獨 `/c` 誤轉路徑」那樣偽裝成功）；必須用「單引號」包住整個路徑（例如 `cmd //c '.loop\checks\cheap.cmd'`）才能讓反斜線原樣傳給 cmd.exe。已寫入 LESSONS.md。另外，本次也確認 PowerShell 工具在此 headless/自動化情境下對 `cmd /c ...`／`& script.cmd` 這類外部命令一律回報「contains multiple operations ... requires approval」而無法執行（可能是因為 LOOP_PLAN §9 AGENT_CMD_JSON 的 `--allowedTools` 只列了 `Bash`、未列 `PowerShell`）；本迴圈的所有建置/驗證指令一律用 Bash 工具＋單引號路徑呼叫 `cmd //c`，不要嘗試 PowerShell 工具跑 `.loop/checks/*.cmd`。
 **Note:** A7 已由 recovery 重驗（含 8 類別 fixture 與真實分離/Export 佐證）證明並翻為 pass；下一輪依 priority 轉向 A8（新增 `htdemucs_roformer_smoke` CMake target 並納入 full tier）。
+
+## Iteration 10 — 2026-08-23
+
+**Inherited baseline:** 工作樹在 iter-9 checkpoint（b812e00）之上又有未提交變更：`CMakeLists.txt`（新增 `htdemucs_roformer_smoke` target）與新檔 `tests/roformer_smoke.cpp`（對應 A8 的完整實作），視為前一個 agent 於協定第 10-12 步前 crash-mid-write 的 handoff breakage。本輪迭代號為 10（5 的倍數），依協定本就必須跑 full tier，因此直接以 full tier 重驗這個繼承的 change-set 作為基線。
+**Hypothesis:** 若先以 full tier 重驗這個繼承的 A8 change-set（不當作本輪自己的效果），再視結果修正真正的根因（而非放寬斷言），A8 應可轉為 pass，因為底層匯出管線（`stemExportLoop` 一律以 `kSampleRate=44100` 寫出，與 A7/A9 既有測試已間接證明的行為一致，也是 `CLAUDE.md` 記載的既定不變量「44.1 kHz 模型與匯出不受影響」），只是新測試本身的斷言寫錯（誤把匯出取樣率等同來源 48 kHz）。
+**Files touched:** `tests/roformer_smoke.cpp`（修正 sample-rate 斷言：`48'000.0` → `HTDemucsGpuFXAudioProcessor::kSampleRate`，並同步修正尾端輸出的 `roformer_sample_rate` 欄位）；`CMakeLists.txt`（繼承，未再修改，僅重驗）；`.loop/backlog.json`、`.loop/iterations/0010.json`、`.loop/journal.md`、`.loop/LESSONS.md`、`.loop/state.json`（loop 控制面）。
+**Verification（第一次，繼承現狀原樣重驗）:** `cmd //c '.loop\checks\full.cmd'`（exit 1）
+```text
+=== ui_configuration_smoke ===
+...roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+=== media_io_smoke ===
+audio_import=true quick_vocals=true quick_accompany=true raw_stem_unchanged=true mix_controls=true video_import=true mp4_replace_audio=true mp4_bytes=31942 PASS
+=== record_mode_smoke (auto/GPU) ===
+backend=auto recorded_seconds=1.00426 preview_seconds=1.00426 progress=1 inference_ms=206.445 ... PASS=true
+=== roformer_smoke ===
+roformer_smoke fatal: RoFormer smoke: exported stem sample rate drifted from the source
+```
+根因排查：以 `ffprobe` 直接檢視本輪產生的匯出檔 `verify/output/roformer-smoke/export-*/test_48k_2s_vocals.wav`，實際為 `pcm_f32le, 44100 Hz, 2 channels, duration=2.000000s`——時長正確保留，但取樣率固定在插件內部處理率 `kSampleRate=44100`，而非來源 fixture 的 48000 Hz。這與既有 `htdemucs_record_mode_smoke`／`htdemucs_media_io_smoke` 及 `CLAUDE.md` 記載的既定不變量（44.1 kHz 模型與匯出一律不受來源取樣率影響）完全一致，證明是新測試本身的斷言假設錯誤，不是匯出管線的迴歸。修正 `tests/roformer_smoke.cpp` 把預期改為 `HTDemucsGpuFXAudioProcessor::kSampleRate`（44100）。
+**Verification（修正後重跑）:** `cmd //c '.loop\checks\full.cmd'`（exit 0）
+```text
+=== ui_configuration_smoke ===
+...roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+=== media_io_smoke ===
+audio_import=true quick_vocals=true quick_accompany=true raw_stem_unchanged=true mix_controls=true video_import=true mp4_replace_audio=true mp4_bytes=31942 PASS
+=== record_mode_smoke (auto/GPU) ===
+backend=auto recorded_seconds=1.00426 preview_seconds=1.00426 progress=1 inference_ms=194.593 ... PASS=true
+=== roformer_smoke ===
+roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/instrumental roformer_export_naming=true roformer_sample_rate=44100 roformer_channels=2 roformer_bit_depth=32float roformer_finite=true PASS
+```
+**Backlog checker:** `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"`（exit 1 — A10/M-ENUM 仍未完成）
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 40 changed path(s) within policy
+SCOPE_EXIT=0
+```
+**Criteria:** C1: pass（full tier 全綠，含新的 roformer smoke）· C2: fail（A10、M-ENUM 仍未完成）· C3: pass
+**Metric:** 10 個 backlog item passing（best so far: 10；improved: true，A8＋A9 本輪轉 pass）
+**Decision:** continue
+**Lesson:** 這個專案的匯出管線（HTDemucs 與 RoFormer 共用）一律以插件內部固定處理率 `HTDemucsGpuFXAudioProcessor::kSampleRate`（44100 Hz）寫出匯出檔，與來源媒體的取樣率（例如本次 fixture 的 48 kHz）無關——這是 `CLAUDE.md` 記載的既定不變量（「44.1 kHz 模型與匯出不受影響」），未來任何新測試斷言匯出檔取樣率時，必須比對 `kSampleRate`，不可假設等於來源取樣率；只有「時長」需要與來源一致，取樣率不用。已寫入 LESSONS.md。
+**Note:** A8／A9 本輪由 recovery＋根因修正＋full tier 重驗證明並翻為 pass；C1 本輪首次轉 pass。下一輪依 priority 轉向 A10（README.md 新增 RoFormer 章節）與 M-ENUM（依 manifest 產生 M001..M099 per-model backlog 項目）。

@@ -281,6 +281,17 @@ if(HTFX_BUILD_PLUGIN)
         juce::juce_audio_utils
     )
 
+    add_executable(htdemucs_roformer_smoke tests/roformer_smoke.cpp)
+    target_include_directories(htdemucs_roformer_smoke PRIVATE plugin)
+    target_compile_features(htdemucs_roformer_smoke PRIVATE cxx_std_20)
+    if(MSVC)
+        target_compile_options(htdemucs_roformer_smoke PRIVATE /utf-8)
+    endif()
+    target_link_libraries(htdemucs_roformer_smoke PRIVATE
+        HTDemucsGpuFX
+        juce::juce_audio_utils
+    )
+
     add_executable(htdemucs_transport_epoch_smoke tests/transport_epoch_smoke.cpp)
     target_include_directories(htdemucs_transport_epoch_smoke PRIVATE plugin)
     target_compile_features(htdemucs_transport_epoch_smoke PRIVATE cxx_std_20)

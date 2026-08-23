@@ -59,18 +59,18 @@
   {
     "id": "A8",
     "title": "新增 htdemucs_roformer_smoke CMake target（tests/roformer_smoke.cpp）且 PASS，納入 full tier",
-    "passes": false,
+    "passes": true,
     "priority": 8,
     "source": "plan",
-    "evidence": null
+    "evidence": "iter 10: recovered inherited CMakeLists.txt target + tests/roformer_smoke.cpp (real C++ RoFormer route: catalog 99/57 audited, unknown-model rejection, model selection retained, beginMediaImport/beginSeparation, 2-stem preview, category-correct stem labels via getStemLabel(), beginStemExport with category-named files, decoded-WAV assertions on the exported bytes); first run failed on a wrong test assumption (expected 48000 Hz == source rate instead of the plugin's fixed 44.1 kHz processing rate) — fixed the assertion to check HTDemucsGpuFXAudioProcessor::kSampleRate; cmd //c .loop\\checks\\full.cmd (exit 0): === roformer_smoke === roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/instrumental roformer_export_naming=true roformer_sample_rate=44100 roformer_channels=2 roformer_bit_depth=32float roformer_finite=true PASS; ffprobe on the exported WAV independently confirmed pcm_f32le 44100 Hz stereo duration=2.000000s"
   },
   {
     "id": "A9",
     "title": "回歸：htdemucs_record_mode_smoke／htdemucs_media_io_smoke／htdemucs_ui_configuration_smoke 全 PASS（.loop/checks/full.cmd）",
-    "passes": false,
+    "passes": true,
     "priority": 9,
     "source": "plan",
-    "evidence": null
+    "evidence": "iter 10: cmd //c .loop\\checks\\full.cmd (exit 0) — all three regression smoke tests printed PASS with no degradation: === ui_configuration_smoke === ...roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS; === media_io_smoke === audio_import=true quick_vocals=true quick_accompany=true raw_stem_unchanged=true mix_controls=true video_import=true mp4_replace_audio=true mp4_bytes=31942 PASS; === record_mode_smoke (auto/GPU) === backend=auto recorded_seconds=1.00426 preview_seconds=1.00426 progress=1 mix_controls=true status=Ready to preview · htdemucs · GPU PASS=true"
   },
   {
     "id": "A10",

@@ -180653,3 +180653,53 @@ ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/
 [driver] agent process exited rc=1
 [driver] usage/rate limit detected — sleeping 1200s then retrying (not counted as a failed launch)
 [driver] iteration 9 launching  2026-08-23T21:12:56+0800
+Checkpoint committed successfully. Iteration 9 complete: backlog metric improved from 7 to 8 (A7 now passes).
+
+**LOOP STATUS: running — iter-9 converted A7 to pass by recovering and independently re-verifying inherited RoFormer category-correct stem-naming/export change-set (cheap tier + scope check green); backlog 8/12 passing, decision=continue**
+[driver] agent process exited rc=0
+[scope] OK �X 38 changed path(s) within policy
+[driver] iteration 10 launching  2026-08-23T21:20:30+0800
+[driver] iteration 10 launching  2026-08-23T21:32:44+0800
+Reading additional input from stdin...
+2026-08-23T13:33:04.419005Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 97 column 5
+OpenAI Codex v0.144.1
+--------
+workdir: C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a02ed3-2be1-7e93-bd63-b9637aeee967
+--------
+user
+Read the file .loop/ITERATION_PROMPT.md in the current directory and follow it exactly: execute exactly ONE loop iteration, then stop with the LOOP STATUS line.
+ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 27th, 2026 5:07 PM.
+ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 27th, 2026 5:07 PM.
+[driver] agent process exited rc=1
+[driver] usage/rate limit detected — sleeping 1200s then retrying (not counted as a failed launch)
+Waiting on the background full-tier build/verification run (or the scheduled check-in) before continuing the iteration protocol.
+[driver] agent process exited rc=0
+[driver] usage/rate limit detected — sleeping 1200s then retrying (not counted as a failed launch)
+[driver] iteration 10 launching  2026-08-23T21:53:31+0800
+Reading additional input from stdin...
+2026-08-23T13:53:32.752364Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 97 column 5
+OpenAI Codex v0.144.1
+--------
+workdir: C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a02ee5-f469-7d93-83b0-83e25f43c565
+--------
+user
+Read the file .loop/ITERATION_PROMPT.md in the current directory and follow it exactly: execute exactly ONE loop iteration, then stop with the LOOP STATUS line.
+ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 27th, 2026 5:07 PM.
+ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 27th, 2026 5:07 PM.
+[driver] agent process exited rc=1
+[driver] usage/rate limit detected — sleeping 1200s then retrying (not counted as a failed launch)
+[driver] iteration 10 launching  2026-08-23T21:54:30+0800
