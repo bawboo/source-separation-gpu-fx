@@ -2,6 +2,7 @@
 
 #include <juce_events/juce_events.h>
 
+#include <algorithm>
 #include <cmath>
 #include <chrono>
 #include <functional>
@@ -159,6 +160,65 @@ int run() {
             "RoFormer preview lost its model identity");
     require(std::abs(processor->getPreviewDurationSeconds() - 2.0) < 0.02,
             "RoFormer preview duration mismatch");
+
+    // Category-agnostic naming: the label deriver reads the upstream worker's
+    // own "<input>_<output_id>.wav" filenames, so it must resolve every
+    // 2-stem category's naming convention correctly, not just vocals.
+    const juce::File syntheticDir =
+        juce::File::getSpecialLocation(juce::File::tempDirectory);
+    const struct {
+        const char* filename;
+        const char* expected;
+    } categoryFixtures[] = {
+        {"input_vocals.wav", "vocals"},          // vocals
+        {"input_instrumental.wav", "instrumental"},  // instrumental/karaoke residual
+        {"input_dry.wav", "dry"},                // dereverb/denoise target
+        {"input_reverb.wav", "reverb"},          // dereverb residual
+        {"input_noise.wav", "noise"},            // denoise residual
+        {"input_other.wav", "other"},            // instvoc residual
+        {"input_guitar.wav", "guitar"},          // guitar category
+        {"input_aspiration.wav", "aspiration"},  // aspiration category
+    };
+    for (const auto& fixture_ : categoryFixtures) {
+        const auto derived = HTDemucsGpuFXAudioProcessor::deriveRoformerStemLabel(
+            syntheticDir.getChildFile(fixture_.filename), "input");
+        require(derived == juce::String(fixture_.expected),
+                "RoFormer stem label derivation mismatch for a category fixture");
+    }
+
+    require(processor->getStemLabel(0).isNotEmpty() &&
+                processor->getStemLabel(1).isNotEmpty(),
+            "RoFormer stem labels missing after a real separation");
+    const auto stemLabel0 = processor->getStemLabel(0).toLowerCase();
+    const auto stemLabel1 = processor->getStemLabel(1).toLowerCase();
+    require((stemLabel0 == "vocals" || stemLabel1 == "vocals") &&
+                (stemLabel0 == "instrumental" || stemLabel1 == "instrumental"),
+            "RoFormer vocals-category preview did not label vocals/instrumental");
+    require(stemLabel0 != "drums" && stemLabel1 != "drums" &&
+                stemLabel0 != "bass" && stemLabel1 != "bass",
+            "RoFormer stems incorrectly kept HTDemucs source names");
+
+    const auto stemExportDir =
+        roformerOutput.getChildFile("stem-export-" + juce::Uuid().toString());
+    require(stemExportDir.createDirectory(), "could not create RoFormer stem export directory");
+    require(processor->beginStemExport(stemExportDir, {0, 1}),
+            "RoFormer stem export did not start");
+    require(waitUntil([&processor] { return !processor->isMediaBusy(); },
+                       std::chrono::seconds(30)),
+            "RoFormer stem export timed out");
+    juce::Array<juce::File> exportedStems;
+    stemExportDir.findChildFiles(exportedStems, juce::File::findFiles, false, "*.wav");
+    require(exportedStems.size() == 2,
+            "RoFormer stem export did not produce two WAV files");
+    const bool exportedVocals = std::any_of(
+        exportedStems.begin(), exportedStems.end(),
+        [](const juce::File& file) { return file.getFileName().containsIgnoreCase("vocals"); });
+    const bool exportedInstrumental = std::any_of(
+        exportedStems.begin(), exportedStems.end(), [](const juce::File& file) {
+            return file.getFileName().containsIgnoreCase("instrumental");
+        });
+    require(exportedVocals && exportedInstrumental,
+            "RoFormer Export flow used incorrect (non-category) stem filenames");
 
     require(
         processor->getOperatingMode() ==
@@ -328,7 +388,9 @@ int run() {
                  " fullscreen_toggle=true roformer_cpp_route=true"
                  " roformer_stems=2 roformer_seconds=2"
                  " roformer_browser=99 categories=10 search=true"
-                 " experimental=true download_status=true PASS\n";
+                 " experimental=true download_status=true"
+                 " roformer_stem_labels=vocals/instrumental"
+                 " roformer_stem_label_categories=8 roformer_export_naming=true PASS\n";
     return 0;
 }
 

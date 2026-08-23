@@ -334,3 +334,30 @@ CHEAP_EXIT=0
 **Note:** A6 已由 cache manager＋單元測試＋真實下載＋真實端到端分離證明並翻為 pass；下一輪依 priority 轉向 A7 輸出 UX（各類別 2-stem 輸出命名與 Export 流程）。
 
 ---
+
+## Iteration 9 — 2026-08-23T21:18:42+08:00
+**Inherited baseline:** HEAD=`1f40dae`（iteration 8 checkpoint），但工作樹在 driver log 之外另有未提交的 `plugin/PluginProcessor.cpp`／`plugin/PluginProcessor.h`／`tests/ui_configuration_smoke.cpp` 變更——內容完整實作 A7（依上游 worker 輸出檔名 `<input>_<output_id>.wav` 推導類別正確的 2-stem 命名，取代固定 htdemucs 來源順序假設，套用到 UI 按鈕標籤與 Export 匯出檔名）。視為前一個 agent 於協定第 10–12 步（journal／state／checkpoint）之前 crash-mid-write 的 handoff breakage；依 protocol 第 4 步，在新增任何變更前先重跑 `cmd //c .loop\checks\cheap.cmd` 建立 baseline。
+**Hypothesis:** 若獨立重驗並 checkpoint 這個 inherited change-set（不額外添加新行為，以免把已存在的 green handoff 偽裝成本輪自己的 TDD 變更），A7 應可由本輪列印的 cheap-tier 證據翻為 pass，因為新增的 8 類別合成 fixture 推導斷言、真實分離後的 label 斷言（vocals/instrumental 而非殘留 htdemucs drums/bass）與真實 Export 檔名斷言都會在本輪重驗輸出中證實。
+**Change-set:** recovery-only。`PluginProcessor.h` 新增 `getStemLabel(int)`／`static deriveRoformerStemLabel(juce::File, juce::String)` 宣告與 `SeparationResult::stemLabels`；`PluginProcessor.cpp` 的 `separationLoop` 為每個輸出檔呼叫 `deriveRoformerStemLabel()` 並記錄 `stemLabels`，`getStemLabel()` 供 UI 按鈕文字使用（無 label 時 fallback 回 `sourceName()`），`stemExportLoop` 匯出檔名改用推導出的 label 而非固定 `sourceName()`，stem 按鈕的 `setButtonText` 改呼叫 `processor_.getStemLabel(source)`；`tests/ui_configuration_smoke.cpp` 新增 8 個合成類別 fixture（vocals/instrumental/dry/reverb/noise/other/guitar/aspiration）逐一驗證 `deriveRoformerStemLabel` 推導正確、驗證真實分離後 `getStemLabel(0/1)` 為 vocals/instrumental 且非 htdemucs 殘留命名、驗證真實 `beginStemExport` 產生 2 個以類別命名的 WAV 檔，並在 smoke PASS 行追加 `roformer_stem_labels=`／`roformer_stem_label_categories=`／`roformer_export_naming=` 欄位。
+**Verification:** `cmd //c .loop\checks\cheap.cmd`（正式重驗 exit 0）
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.004s
+OK
+Ran 2 tests in 0.088s
+OK
+Ran 8 tests in 0.110s
+OK
+CHEAP_EXIT=0
+```
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 37 changed path(s) within policy
+SCOPE_EXIT=0
+```
+**Criteria:** C1: fail（iteration 9 非 full cadence，A8/A9/A10/M-ENUM 仍未完成） · C2: fail（仍有未完成 backlog） · C3: pass
+**Metric:** 8 個 backlog item passing（best so far: 8；improved: true）
+**Decision:** continue
+**Lesson:** 本 Bash 工具（Git Bash/MSYS）下，`cmd //c` 之後若把 `.loop\checks\cheap.cmd` 這類含反斜線的路徑寫成不加引號或雙反斜線跳脫，MSYS 仍會把每個 `\<letter>` 當成跳脫序列吃掉反斜線本身（例如 `.loop\checks\cheap.cmd` 或 `.loop\checks\cheap.cmd` 都會被吃成 `.loopcheckscheap.cmd`，導致 cmd 找不到檔案、但因為是 `%~dp0` 之類的相對路徑錯誤，實際會回報找不到指令且 exit code 非 0，不像先前 lesson 提到的「單獨 `/c` 誤轉路徑」那樣偽裝成功）；必須用「單引號」包住整個路徑（例如 `cmd //c '.loop\checks\cheap.cmd'`）才能讓反斜線原樣傳給 cmd.exe。已寫入 LESSONS.md。另外，本次也確認 PowerShell 工具在此 headless/自動化情境下對 `cmd /c ...`／`& script.cmd` 這類外部命令一律回報「contains multiple operations ... requires approval」而無法執行（可能是因為 LOOP_PLAN §9 AGENT_CMD_JSON 的 `--allowedTools` 只列了 `Bash`、未列 `PowerShell`）；本迴圈的所有建置/驗證指令一律用 Bash 工具＋單引號路徑呼叫 `cmd //c`，不要嘗試 PowerShell 工具跑 `.loop/checks/*.cmd`。
+**Note:** A7 已由 recovery 重驗（含 8 類別 fixture 與真實分離/Export 佐證）證明並翻為 pass；下一輪依 priority 轉向 A8（新增 `htdemucs_roformer_smoke` CMake target 並納入 full tier）。

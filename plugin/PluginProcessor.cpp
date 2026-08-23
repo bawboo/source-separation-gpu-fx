@@ -1367,11 +1367,13 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
             result->sampleCount = left.size();
             result->modelName = configuration.modelName;
             result->stems.assign(4 * left.size(), 0.0f);
+            const auto inputStem = inputFile.getFileNameWithoutExtension();
             for (int source = 0; source < outputFiles.size(); ++source) {
+                const auto& outputFile = outputFiles.getReference(source);
                 std::vector<float> stemLeft;
                 std::vector<float> stemRight;
                 if (!readAudioFileAtProjectRate(
-                        outputFiles.getReference(source), stemLeft, stemRight, error) ||
+                        outputFile, stemLeft, stemRight, error) ||
                     stemLeft.size() != left.size() || stemRight.size() != left.size()) {
                     separationState_.store(
                         SeparationState::error, std::memory_order_release);
@@ -1386,6 +1388,15 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                           result->stems.begin() + leftPlane * left.size());
                 std::copy(stemRight.begin(), stemRight.end(),
                           result->stems.begin() + rightPlane * left.size());
+                // The upstream worker names each file "<input>_<output_id>.wav",
+                // where output_id is the model's own category-correct stem name
+                // (vocals/instrumental, dry/reverb, dry/noise, ...); deriving the
+                // label from that filename -- rather than assuming a fixed
+                // Demucs-style source order -- keeps naming correct regardless
+                // of which two stems a given category produces or what order the
+                // filesystem enumerates them in.
+                result->stemLabels.push_back(
+                    deriveRoformerStemLabel(outputFile, inputStem).toStdString());
             }
             result->originalLeft = std::move(left);
             result->originalRight = std::move(right);
@@ -1698,6 +1709,28 @@ juce::String HTDemucsGpuFXAudioProcessor::sourceName(int sourceIndex) {
     return sourceIndex >= 0 && sourceIndex < kMaxSources
                ? juce::String(names[static_cast<std::size_t>(sourceIndex)])
                : "Stem " + juce::String(sourceIndex + 1);
+}
+
+juce::String HTDemucsGpuFXAudioProcessor::deriveRoformerStemLabel(
+    const juce::File& outputFile, const juce::String& inputStem) {
+    auto label = outputFile.getFileNameWithoutExtension();
+    const auto prefix = inputStem + "_";
+    if (label.startsWithIgnoreCase(prefix)) {
+        label = label.substring(prefix.length());
+    }
+    return label.toLowerCase();
+}
+
+juce::String HTDemucsGpuFXAudioProcessor::getStemLabel(int sourceIndex) const {
+    const auto result = previewResult_.load(std::memory_order_acquire);
+    if (result != nullptr && sourceIndex >= 0 &&
+        sourceIndex < static_cast<int>(result->stemLabels.size()) &&
+        !result->stemLabels[static_cast<std::size_t>(sourceIndex)].empty()) {
+        const auto label = juce::String::fromUTF8(
+            result->stemLabels[static_cast<std::size_t>(sourceIndex)].c_str());
+        return label.substring(0, 1).toUpperCase() + label.substring(1);
+    }
+    return sourceName(sourceIndex);
 }
 
 juce::String HTDemucsGpuFXAudioProcessor::getMediaStatusText() const {
@@ -2170,8 +2203,15 @@ void HTDemucsGpuFXAudioProcessor::stemExportLoop(
             const int source = sourceIndices[item];
             const auto leftPlane = static_cast<std::size_t>(source) * 2;
             const auto rightPlane = leftPlane + 1;
+            const auto label =
+                source >= 0 &&
+                        source < static_cast<int>(result->stemLabels.size()) &&
+                        !result->stemLabels[static_cast<std::size_t>(source)].empty()
+                    ? juce::String::fromUTF8(
+                          result->stemLabels[static_cast<std::size_t>(source)].c_str())
+                    : sourceName(source).toLowerCase();
             const auto output = outputDirectory.getChildFile(
-                baseName + "_" + sourceName(source).toLowerCase() + ".wav");
+                baseName + "_" + label + ".wav");
             if (!writeFloatWav(
                     output,
                     result->stems.data() + leftPlane * result->sampleCount,
@@ -2879,7 +2919,7 @@ public:
         for (int source = 0; source < HTDemucsGpuFXAudioProcessor::kMaxSources;
              ++source) {
             stemButtons_[static_cast<std::size_t>(source)].setButtonText(
-                HTDemucsGpuFXAudioProcessor::sourceName(source));
+                processor_.getStemLabel(source));
             stemButtons_[static_cast<std::size_t>(source)].setToggleState(
                 source < sourceCount, juce::dontSendNotification);
             addAndMakeVisible(stemButtons_[static_cast<std::size_t>(source)]);

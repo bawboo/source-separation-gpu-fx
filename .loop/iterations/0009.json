@@ -1,0 +1,24 @@
+{
+  "iteration": 9,
+  "timestamp": "2026-08-23T21:18:42+08:00",
+  "hypothesis": "工作樹在上一個 checkpoint（1f40dae, iter-8）之上遺留了未提交的 plugin/PluginProcessor.{cpp,h} 與 tests/ui_configuration_smoke.cpp 變更，內容完整實作 A7（依上游 worker 輸出檔名推導類別正確的 2-stem 命名，取代固定 htdemucs 來源順序假設，並套用到按鈕標籤與 Export 檔名）；視為前一個 agent 於協定第 10-12 步前 crash-mid-write 的 handoff breakage。若先以 cheap tier 獨立重驗這個 inherited change-set 為 green，再原樣 checkpoint（不額外添加新行為），A7 應可翻為 pass，因為新增的 8 類別合成 fixture 與真實分離後的 label／Export 檔名斷言都會在本輪的重驗輸出中證實。",
+  "files_touched": [
+    "plugin/PluginProcessor.cpp",
+    "plugin/PluginProcessor.h",
+    "tests/ui_configuration_smoke.cpp",
+    ".loop/backlog.json",
+    ".loop/iterations/0009.json",
+    ".loop/journal.md",
+    ".loop/LESSONS.md",
+    ".loop/state.json"
+  ],
+  "commands": [
+    {"cmd": "cmd //c .loop\\checks\\cheap.cmd", "exit_code": 0, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 8, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}

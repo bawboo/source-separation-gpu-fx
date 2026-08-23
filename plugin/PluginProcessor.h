@@ -170,6 +170,9 @@ public:
     bool selectRoformerModel(const juce::String& modelId);
     [[nodiscard]] juce::String getSelectedRoformerModel() const;
     [[nodiscard]] static juce::String sourceName(int sourceIndex);
+    [[nodiscard]] juce::String getStemLabel(int sourceIndex) const;
+    [[nodiscard]] static juce::String deriveRoformerStemLabel(
+        const juce::File& outputFile, const juce::String& inputStem);
 
     void applyUserConfiguration();
     bool beginRecording();
@@ -227,6 +230,10 @@ private:
         std::vector<float> stems;
         std::vector<float> originalLeft;
         std::vector<float> originalRight;
+        // Per-source category-correct stem id (e.g. "vocals", "dry", "noise"),
+        // aligned by index with `stems`; empty for models with fixed source
+        // names (htdemucs), where sourceName()/getStemLabel() fall back.
+        std::vector<std::string> stemLabels;
     };
 
     struct MixSettings {

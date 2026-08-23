@@ -51,10 +51,10 @@
   {
     "id": "A7",
     "title": "輸出 UX：各類別（vocals/instrumental/karaoke/dereverb/denoise…）2-stem 輸出命名與 Export 流程正確",
-    "passes": false,
+    "passes": true,
     "priority": 7,
     "source": "plan",
-    "evidence": null
+    "evidence": "iter 9: recovered inherited change-set — PluginProcessor::deriveRoformerStemLabel() 由上游 worker 輸出檔名 <input>_<output_id>.wav 推導類別正確的 stem 名稱（不假設固定 htdemucs 來源順序）；separationLoop 為每個 stem 記錄 stemLabels；getStemLabel() 供 UI 按鈕顯示；stemExportLoop 匯出檔名改用推導出的 label；cmd //c .loop\\checks\\cheap.cmd (exit 0): standalone+ui_configuration_smoke 建置成功，8 個合成類別 fixture（vocals/instrumental/dry/reverb/noise/other/guitar/aspiration）label 推導全對，真實 RoFormer 分離後 getStemLabel(0/1)=vocals/instrumental（非殘留的 htdemucs drums/bass 命名），真實 Export flow 產生 2 個 WAV 檔並正確命名為 *_vocals.wav/*_instrumental.wav；smoke 輸出行印出 roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS；roformer manifest 99/57/42 PASS；8 個 cache 單元測試 PASS。"
   },
   {
     "id": "A8",
