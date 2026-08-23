@@ -11,10 +11,10 @@
   {
     "id": "A2",
     "title": "從上游 registry 產生 assets/models/roformer-manifest.json（99 項，含 name/category/url/sha256/size/audited 旗標）且 tools/validate_roformer_manifest.py 驗證退出碼 0",
-    "passes": false,
+    "passes": true,
     "priority": 2,
     "source": "plan",
-    "evidence": null
+    "evidence": "iter 2: cmd /c .loop\\checks\\cheap.cmd (exit 0; manifest validator: 99 models, 57 audited, 42 experimental PASS)"
   },
   {
     "id": "A3",
