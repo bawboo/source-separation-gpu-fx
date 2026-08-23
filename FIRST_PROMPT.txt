@@ -1,0 +1,13 @@
+這是一個從另一台 Windows 電腦移交過來的 HTDemucs GPU FX 專案。請把目前資料夾視為專案根目錄，先完整閱讀 AGENTS.md、CODEX_HANDOFF.md、README.md、docs/RELEASING_WINDOWS.md 與 THIRD_PARTY_NOTICES.md，再開始動作。
+
+第一階段只做接手驗證，不要 push、發佈 Release、設定 remote、重構，或覆蓋 third_party/JUCE、third_party/demucs、模型和 runtime。這份移交包沒有 .git metadata；third_party 內是已可用、且 JUCE patch 已套用的 vendored 工作樹。assets/models/*.th 與 dist/windows-web/*.zip 是私人本機移機資產，禁止加入公開 Git history 或公開上傳。
+
+請依序完成：
+1. 檢查 TRANSFER_BINARY_SHA256.txt 內所有大型檔案的大小與 SHA-256。
+2. 盤點這台電腦的 Windows、Visual Studio C++ Build Tools、CMake、Python/PyTorch、Inno Setup、NVIDIA GPU/driver；缺少的項目只報告，不要未經同意安裝。
+3. 從 CMakeLists.txt 或產生的 .vcxproj 確認完整 target 名稱，再建置 standalone 與 smoke tests；不可猜測 target。
+4. 重跑 htdemucs_record_mode_smoke、htdemucs_media_io_smoke、htdemucs_ui_configuration_smoke，並保留現有 sample-rate 修正與「不再卡在 1%」修正。
+5. 若 CUDA 環境可用，在沒有 HTFX 開發環境變數的條件下，以正式 CUDA worker 對短音檔做一次 GUI Export Vocals only，確認模型載入時顯示 indeterminate/loading、worker ready 後顯示 block progress，最後驗證輸出是 44.1 kHz、時長不變、stereo、32-bit float WAV。
+
+完成後請用繁體中文回報：環境盤點、校驗結果、實際執行的建置/測試命令、通過與失敗項目、失敗根因，以及下一步是否已適合重建正式 Windows Web Installer。除非我另外下令，先不要建立或上傳 GitHub repository，也不要公開模型權重或 runtime。
+

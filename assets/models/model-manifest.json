@@ -1,0 +1,87 @@
+{
+  "registry_version": 2,
+  "default_model": "htdemucs",
+  "official_source": "https://github.com/facebookresearch/demucs",
+  "download_host_allowlist": ["dl.fbaipublicfiles.com"],
+  "models": {
+    "htdemucs": {
+      "display_name": "HTDemucs",
+      "description": "Default four-stem Hybrid Transformer Demucs model.",
+      "install_policy": "during_install",
+      "sources": ["drums", "bass", "other", "vocals"],
+      "files": ["955717e8-8726e21a.th"]
+    },
+    "htdemucs_ft": {
+      "display_name": "HTDemucs Fine-tuned",
+      "description": "Four-model fine-tuned ensemble. Downloads and activates as one transaction.",
+      "install_policy": "on_demand",
+      "sources": ["drums", "bass", "other", "vocals"],
+      "files": [
+        "f7e0c4bc-ba3fe64a.th",
+        "d12395a8-e57c48e6.th",
+        "92cfc3b6-ef3bcb9c.th",
+        "04573f0d-f3cf25b2.th"
+      ]
+    },
+    "htdemucs_6s": {
+      "display_name": "HTDemucs 6 Sources",
+      "description": "Experimental six-source model with guitar and piano.",
+      "install_policy": "on_demand",
+      "sources": ["drums", "bass", "other", "vocals", "guitar", "piano"],
+      "files": ["5c90dfd2-34c22ccb.th"]
+    },
+    "hdemucs_mmi": {
+      "display_name": "Hybrid Demucs MMI",
+      "description": "Four-stem Hybrid Demucs baseline.",
+      "install_policy": "on_demand",
+      "sources": ["drums", "bass", "other", "vocals"],
+      "files": ["75fc33f5-1941ce65.th"]
+    }
+  },
+  "artifacts": {
+    "04573f0d-f3cf25b2.th": {
+      "bytes": 84141271,
+      "sha256": "f3cf25b222c4eed7cd49dd8b2c9597d50c18bd154090f7b919cfa5f93cf22c49",
+      "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/04573f0d-f3cf25b2.th"
+    },
+    "5c90dfd2-34c22ccb.th": {
+      "bytes": 54996327,
+      "sha256": "34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd",
+      "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/5c90dfd2-34c22ccb.th"
+    },
+    "75fc33f5-1941ce65.th": {
+      "bytes": 167407275,
+      "sha256": "1941ce654b11df4132b9f4eae408556b4c83fad6fe26b4bc0dbcb36b975befb3",
+      "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/75fc33f5-1941ce65.th"
+    },
+    "92cfc3b6-ef3bcb9c.th": {
+      "bytes": 84141271,
+      "sha256": "ef3bcb9c8b40d14ae5d51b6db2587339cc12c6b77c0be151ce6d69002e087bf2",
+      "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/92cfc3b6-ef3bcb9c.th"
+    },
+    "955717e8-8726e21a.th": {
+      "bytes": 84141911,
+      "sha256": "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4",
+      "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/955717e8-8726e21a.th"
+    },
+    "d12395a8-e57c48e6.th": {
+      "bytes": 84141271,
+      "sha256": "e57c48e6b0e38af4f7118d7bd08c49f0a0c0edf7d09143bdd902ea0d237303e6",
+      "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/d12395a8-e57c48e6.th"
+    },
+    "f7e0c4bc-ba3fe64a.th": {
+      "bytes": 84141271,
+      "sha256": "ba3fe64ae8ef66ac9a4857222ce48efbdc5eb3ad375cb79dd13debee5aaa4066",
+      "url": "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/f7e0c4bc-ba3fe64a.th"
+    }
+  },
+  "sha256": {
+    "04573f0d-f3cf25b2.th": "f3cf25b222c4eed7cd49dd8b2c9597d50c18bd154090f7b919cfa5f93cf22c49",
+    "5c90dfd2-34c22ccb.th": "34c22ccb381c6f9fdbf324f04e1e2fe21aaaf293f5ded163a162697ff9a02ddd",
+    "75fc33f5-1941ce65.th": "1941ce654b11df4132b9f4eae408556b4c83fad6fe26b4bc0dbcb36b975befb3",
+    "92cfc3b6-ef3bcb9c.th": "ef3bcb9c8b40d14ae5d51b6db2587339cc12c6b77c0be151ce6d69002e087bf2",
+    "955717e8-8726e21a.th": "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4",
+    "d12395a8-e57c48e6.th": "e57c48e6b0e38af4f7118d7bd08c49f0a0c0edf7d09143bdd902ea0d237303e6",
+    "f7e0c4bc-ba3fe64a.th": "ba3fe64ae8ef66ac9a4857222ce48efbdc5eb3ad375cb79dd13debee5aaa4066"
+  }
+}

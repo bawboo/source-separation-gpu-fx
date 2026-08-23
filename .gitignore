@@ -1,0 +1,48 @@
+# Build output and generated packages
+/build/
+/Release/
+/dist/
+/results/
+/.pytest_cache/
+**/__pycache__/
+*.py[cod]
+*.pdb
+*.obj
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+*.zip
+*.partial
+
+# Model packages and pretrained weights are never source-controlled.
+*.th
+*.nm
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Local tools, caches and machine-specific paths
+/.vs/
+/.vscode/
+/.idea/
+/.venv/
+/third_party/reaper*-install.exe
+htfx-python.txt
+htfx-ffmpeg.txt
+ffmpeg-path.txt
+
+# Historical local validation artifacts (not part of the public source tree)
+/claude-review-*.txt
+/*_REPORT.md
+/M[1-5]_REPORT.md
+/MACOS_PORTABLE_BUILD.md
+/tools/HTDemucs-Standalone-Verify.wsb
+/tools/run_m*.ps1
+/tools/package_standalone.ps1
+/tools/package_m5.ps1
+/tools/diagnose_model_paths.py
+/tools/golden_compare.py
+/tools/soak_test.py

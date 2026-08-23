@@ -1,0 +1,68 @@
+diff --git a/modules/juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h b/modules/juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h
+--- a/modules/juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h
++++ b/modules/juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h
+@@ -41,6 +41,10 @@
+ namespace juce
+ {
+ 
++#if JUCE_WINDOWS && HTFX_ENABLE_MME_AUDIO
++std::unique_ptr<AudioIODeviceType> createHTFXMMEAudioIODeviceType();
++#endif
++
+ //==============================================================================
+ /**
+     An object that creates and plays a standalone instance of an AudioProcessor.
+@@ -595,6 +599,14 @@ private:
+                             const String& preferredDefaultDeviceName,
+                             const AudioDeviceManager::AudioDeviceSetup* preferredSetupOptions)
+     {
++       #if JUCE_WINDOWS && HTFX_ENABLE_MME_AUDIO
++        // Force JUCE to register its native WASAPI/DirectSound types before
++        // appending WinMM. addAudioDeviceType() on an empty manager would
++        // otherwise suppress creation of all built-in device types.
++        ignoreUnused (deviceManager.getAvailableDeviceTypes());
++        deviceManager.addAudioDeviceType (createHTFXMMEAudioIODeviceType());
++       #endif
++
+         deviceManager.addAudioCallback (this);
+         deviceManager.addMidiInputDeviceCallback ({}, &player);
+ 
+diff --git a/modules/juce_audio_plugin_client/juce_audio_plugin_client_Standalone.cpp b/modules/juce_audio_plugin_client/juce_audio_plugin_client_Standalone.cpp
+--- a/modules/juce_audio_plugin_client/juce_audio_plugin_client_Standalone.cpp
++++ b/modules/juce_audio_plugin_client/juce_audio_plugin_client_Standalone.cpp
+@@ -75,6 +75,21 @@ public:
+         options.osxLibrarySubFolder = "Application Support";
+        #if JUCE_LINUX || JUCE_BSD
+         options.folderName          = "~/.config";
++       #elif JUCE_WINDOWS && HTFX_PORTABLE_STANDALONE_SETTINGS
++        options.folderName          = File::getSpecialLocation (File::currentExecutableFile)
++                                          .getParentDirectory()
++                                          .getChildFile ("PortableData")
++                                          .getFullPathName();
++       #elif JUCE_MAC && HTFX_PORTABLE_STANDALONE_SETTINGS
++        // Contents/MacOS/app -> Contents -> app bundle -> portable folder.
++        // Keeping settings beside the bundle preserves its code signature.
++        options.folderName          = File::getSpecialLocation (File::currentExecutableFile)
++                                          .getParentDirectory()
++                                          .getParentDirectory()
++                                          .getParentDirectory()
++                                          .getParentDirectory()
++                                          .getChildFile ("PortableData")
++                                          .getFullPathName();
+        #else
+         options.folderName          = "";
+        #endif
+@@ -87,13 +102,6 @@ public:
+ 
+     StandaloneFilterWindow* createWindow()
+     {
+-        if (Desktop::getInstance().getDisplays().displays.isEmpty())
+-        {
+-            // No displays are available, so no window will be created!
+-            jassertfalse;
+-            return nullptr;
+-        }
+-
+         return new StandaloneFilterWindow (getApplicationName(),
+                                            LookAndFeel::getDefaultLookAndFeel().findColour (ResizableWindow::backgroundColourId),
+                                            createPluginHolder());
