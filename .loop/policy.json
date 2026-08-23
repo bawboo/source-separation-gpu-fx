@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow_shell": true,
+    "allow_network": "download_only",
+    "allow_install": "conda_env_htfx-roformer_only",
+    "allow_git_commit": true,
+    "allow_delete": false,
+    "allow_subagents": true
+  },
+  "scope": {
+    "allow_paths": ["plugin/", "cpp/", "worker/", "tests/", "tools/", "assets/models/", "docs/", "CMakeLists.txt", "README.md", ".gitignore", "CLAUDE.md"],
+    "deny_paths": ["third_party/", "patches/", "dist/", "build/windows-web/", "assets/models/*.th", "assets/models/*.yaml", "assets/models/model-manifest.json", "AGENTS.md", "CODEX_HANDOFF.md", "THIRD_PARTY_NOTICES.md", "docs/RELEASING_WINDOWS.md", "TRANSFER_BINARY_SHA256.txt", ".gitattributes", ".gitmodules"]
+  }
+}
