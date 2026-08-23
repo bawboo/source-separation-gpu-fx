@@ -27,10 +27,10 @@
   {
     "id": "A4",
     "title": "C++ 整合：processor 支援 roformer 模型清單/選擇/worker 啟動；standalone 建置通過",
-    "passes": false,
+    "passes": true,
     "priority": 4,
     "source": "plan",
-    "evidence": null
+    "evidence": "iter 6: cmd /c .loop\\checks\\cheap.cmd (exit 0; real C++→RoFormer Python worker route loaded 2 FLOAT stereo stems preserving 2.0 s preview)"
   },
   {
     "id": "A5",

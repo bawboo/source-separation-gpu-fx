@@ -3,9 +3,12 @@
 #include <juce_events/juce_events.h>
 
 #include <cmath>
+#include <chrono>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -62,7 +65,56 @@ void require(bool condition, const char* message) {
     }
 }
 
+bool waitUntil(const std::function<bool()>& predicate, std::chrono::seconds timeout) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (predicate()) {
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    return predicate();
+}
+
+void waitForMedia(HTDemucsGpuFXAudioProcessor& processor) {
+    require(
+        waitUntil([&processor] { return !processor.isMediaBusy(); },
+                  std::chrono::seconds(30)),
+        "RoFormer fixture import timed out");
+}
+
+void waitForRoformerPreview(HTDemucsGpuFXAudioProcessor& processor) {
+    require(
+        waitUntil(
+            [&processor] {
+                const auto state = processor.getSeparationState();
+                return state ==
+                           HTDemucsGpuFXAudioProcessor::SeparationState::previewReady ||
+                       state == HTDemucsGpuFXAudioProcessor::SeparationState::error;
+            },
+            std::chrono::seconds(60)),
+        "RoFormer C++ route timed out");
+    require(processor.hasPreview(), "RoFormer C++ route produced no preview");
+}
+
 int run() {
+    const auto repository = juce::File::getCurrentWorkingDirectory();
+    const auto verifyRoot = repository.getParentDirectory().getChildFile("verify");
+    const auto fixture = verifyRoot.getChildFile("fixtures").getChildFile("test_48k_2s.wav");
+    const auto roformerPython = juce::File{
+        R"(C:\Users\<user>\anaconda3\envs\htfx-roformer\python.exe)"};
+    const auto roformerWorker = repository.getChildFile("worker").getChildFile("roformer_worker.py");
+    const auto roformerCache = verifyRoot.getChildFile("roformer-cache");
+    const auto roformerOutput = verifyRoot.getChildFile("output").getChildFile("roformer-cpp-integration");
+    require(fixture.existsAsFile(), "RoFormer fixture is missing");
+    require(roformerPython.existsAsFile(), "htfx-roformer Python is missing");
+    require(roformerWorker.existsAsFile(), "RoFormer worker script is missing");
+    _wputenv_s(L"HTFX_USE_FAKE_WORKER", L"");
+    _wputenv_s(L"HTFX_ROFORMER_PYTHON", roformerPython.getFullPathName().toWideCharPointer());
+    _wputenv_s(L"HTFX_ROFORMER_WORKER", roformerWorker.getFullPathName().toWideCharPointer());
+    _wputenv_s(L"HTFX_ROFORMER_MODELS_DIR", roformerCache.getFullPathName().toWideCharPointer());
+    _wputenv_s(L"HTFX_ROFORMER_OUTPUT_DIR", roformerOutput.getFullPathName().toWideCharPointer());
+
     juce::AudioProcessor::setTypeOfNextNewPlugin(
         juce::AudioProcessor::wrapperType_Standalone);
     auto processor = std::make_unique<HTDemucsGpuFXAudioProcessor>();
@@ -86,6 +138,15 @@ int run() {
             processor->getSelectedRoformerModel() ==
                 "melband-roformer-kim-vocals",
         "RoFormer selection was not retained");
+    require(processor->beginMediaImport(fixture), "RoFormer fixture import did not start");
+    waitForMedia(*processor);
+    require(processor->beginSeparation(), "RoFormer C++ route did not start");
+    waitForRoformerPreview(*processor);
+    require(processor->getActiveSourceCount() == 2, "RoFormer preview is not two-stem");
+    require(processor->previewUsesModel("melband-roformer-kim-vocals"),
+            "RoFormer preview lost its model identity");
+    require(std::abs(processor->getPreviewDurationSeconds() - 2.0) < 0.02,
+            "RoFormer preview duration mismatch");
 
     require(
         processor->getOperatingMode() ==
@@ -214,7 +275,8 @@ int run() {
                  "default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed"
                  " segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true"
                  " record_button=red media_buttons=true proportional_scale=true"
-                 " fullscreen_toggle=true PASS\n";
+                 " fullscreen_toggle=true roformer_cpp_route=true"
+                 " roformer_stems=2 roformer_seconds=2 PASS\n";
     return 0;
 }
 

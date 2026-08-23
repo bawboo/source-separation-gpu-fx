@@ -217,6 +217,51 @@ juce::File configuredRoformerManifest() {
         .getChildFile("roformer-manifest.json");
 }
 
+bool isRoformerModelName(const juce::String& modelName) {
+    return modelName.startsWith("melband-roformer-");
+}
+
+juce::File configuredRoformerPython() {
+    const auto environment =
+        juce::SystemStats::getEnvironmentVariable("HTFX_ROFORMER_PYTHON", {}).trim();
+    return environment.isNotEmpty()
+               ? juce::File(environment)
+               : juce::File(displayPath(configuredPythonPath()));
+}
+
+juce::File configuredRoformerWorker() {
+    const auto environment =
+        juce::SystemStats::getEnvironmentVariable("HTFX_ROFORMER_WORKER", {}).trim();
+    return environment.isNotEmpty()
+               ? juce::File(environment)
+               : juce::File::getCurrentWorkingDirectory()
+                     .getChildFile("worker")
+                     .getChildFile("roformer_worker.py");
+}
+
+juce::File configuredRoformerModelsDirectory() {
+    const auto environment = juce::SystemStats::getEnvironmentVariable(
+        "HTFX_ROFORMER_MODELS_DIR", {}).trim();
+    return environment.isNotEmpty()
+               ? juce::File(environment)
+               : juce::File::getCurrentWorkingDirectory()
+                     .getParentDirectory()
+                     .getChildFile("verify")
+                     .getChildFile("roformer-cache");
+}
+
+juce::File configuredRoformerOutputDirectory() {
+    const auto environment = juce::SystemStats::getEnvironmentVariable(
+        "HTFX_ROFORMER_OUTPUT_DIR", {}).trim();
+    return environment.isNotEmpty()
+               ? juce::File(environment)
+               : juce::File::getCurrentWorkingDirectory()
+                     .getParentDirectory()
+                     .getChildFile("verify")
+                     .getChildFile("output")
+                     .getChildFile("roformer-runtime");
+}
+
 std::filesystem::path configuredWorkerExecutable() {
     const auto environment =
         juce::SystemStats::getEnvironmentVariable("HTFX_WORKER_EXECUTABLE", {}).trim();
@@ -1205,6 +1250,167 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
             return;
         }
 
+        if (isRoformerModelName(juce::String::fromUTF8(configuration.modelName.c_str()))) {
+            const auto python = configuredRoformerPython();
+            const auto workerScript = configuredRoformerWorker();
+            const auto modelsDirectory = configuredRoformerModelsDirectory();
+            auto workingDirectory = configuredRoformerOutputDirectory()
+                                        .getNonexistentChildFile(
+                                            "cpp-route-" + juce::Uuid().toString(),
+                                            {}, false);
+            const auto inputFile = workingDirectory.getChildFile("input.wav");
+            const auto outputDirectory = workingDirectory.getChildFile("stems");
+            if (!python.existsAsFile() || !workerScript.existsAsFile() ||
+                !modelsDirectory.isDirectory() ||
+                !workingDirectory.createDirectory() ||
+                !outputDirectory.createDirectory()) {
+                separationState_.store(SeparationState::error, std::memory_order_release);
+                setSeparationMessage(
+                    "RoFormer Python, worker, model cache, or output directory is unavailable");
+                return;
+            }
+
+            juce::String error;
+            if (!writeFloatWav(
+                    inputFile, left.data(), right.data(), left.size(), error)) {
+                separationState_.store(SeparationState::error, std::memory_order_release);
+                setSeparationMessage(error);
+                return;
+            }
+
+            const juce::String device =
+                configuration.backend == 2
+                    ? "cpu"
+                    : configuration.backend == 3
+                          ? "mps"
+                          : configuration.backend == 1
+                                ? "cuda:" + juce::String(configuration.gpuIndex)
+                                : "auto";
+            const juce::StringArray command{
+                python.getFullPathName(),
+                workerScript.getFullPathName(),
+                "--input", inputFile.getFullPathName(),
+                "--output-dir", outputDirectory.getFullPathName(),
+                "--model", juce::String::fromUTF8(configuration.modelName.c_str()),
+                "--models-dir", modelsDirectory.getFullPathName(),
+                "--device", device};
+            juce::ChildProcess process;
+            setSeparationMessage(
+                "Loading RoFormer " +
+                juce::String::fromUTF8(configuration.modelName.c_str()) +
+                " · " + device);
+            if (!process.start(
+                    command,
+                    juce::ChildProcess::wantStdOut |
+                        juce::ChildProcess::wantStdErr)) {
+                separationState_.store(SeparationState::error, std::memory_order_release);
+                setSeparationMessage("Could not start the RoFormer Python worker");
+                return;
+            }
+
+            const auto startedAt = juce::Time::getMillisecondCounterHiRes();
+            juce::MemoryOutputStream diagnostics;
+            std::array<char, 4096> outputBuffer{};
+            separationState_.store(SeparationState::separating, std::memory_order_release);
+            separationProgress_.store(-1.0, std::memory_order_release);
+            while (process.isRunning()) {
+                if (stopToken.stop_requested()) {
+                    process.kill();
+                    separationState_.store(
+                        SeparationState::cancelled, std::memory_order_release);
+                    setSeparationMessage("RoFormer separation cancelled");
+                    return;
+                }
+                const int bytesRead = process.readProcessOutput(
+                    outputBuffer.data(), static_cast<int>(outputBuffer.size()));
+                if (bytesRead > 0) {
+                    diagnostics.write(outputBuffer.data(), static_cast<std::size_t>(bytesRead));
+                } else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                }
+            }
+            for (;;) {
+                const int bytesRead = process.readProcessOutput(
+                    outputBuffer.data(), static_cast<int>(outputBuffer.size()));
+                if (bytesRead <= 0) {
+                    break;
+                }
+                diagnostics.write(outputBuffer.data(), static_cast<std::size_t>(bytesRead));
+            }
+            if (process.getExitCode() != 0) {
+                auto message = juce::String::fromUTF8(
+                    static_cast<const char*>(diagnostics.getData()),
+                    static_cast<int>(diagnostics.getDataSize())).trim();
+                if (message.length() > 1800) {
+                    message = message.substring(message.length() - 1800);
+                }
+                separationState_.store(SeparationState::error, std::memory_order_release);
+                setSeparationMessage(
+                    "RoFormer worker failed (exit " +
+                    juce::String(process.getExitCode()) + "): " + message);
+                return;
+            }
+
+            juce::Array<juce::File> outputFiles;
+            outputDirectory.findChildFiles(
+                outputFiles, juce::File::findFiles, false, "*.wav");
+            if (outputFiles.size() != 2) {
+                separationState_.store(SeparationState::error, std::memory_order_release);
+                setSeparationMessage(
+                    "RoFormer worker returned " + juce::String(outputFiles.size()) +
+                    " WAV files; expected two stems");
+                return;
+            }
+
+            auto result = std::make_shared<SeparationResult>();
+            result->sourceCount = 2;
+            result->sampleCount = left.size();
+            result->modelName = configuration.modelName;
+            result->stems.assign(4 * left.size(), 0.0f);
+            for (int source = 0; source < outputFiles.size(); ++source) {
+                std::vector<float> stemLeft;
+                std::vector<float> stemRight;
+                if (!readAudioFileAtProjectRate(
+                        outputFiles.getReference(source), stemLeft, stemRight, error) ||
+                    stemLeft.size() != left.size() || stemRight.size() != left.size()) {
+                    separationState_.store(
+                        SeparationState::error, std::memory_order_release);
+                    setSeparationMessage(
+                        error.isNotEmpty() ? error
+                                           : "RoFormer stem duration does not match the input");
+                    return;
+                }
+                const auto leftPlane = static_cast<std::size_t>(source) * 2;
+                const auto rightPlane = leftPlane + 1;
+                std::copy(stemLeft.begin(), stemLeft.end(),
+                          result->stems.begin() + leftPlane * left.size());
+                std::copy(stemRight.begin(), stemRight.end(),
+                          result->stems.begin() + rightPlane * left.size());
+            }
+            result->originalLeft = std::move(left);
+            result->originalRight = std::move(right);
+            activeSourceCount_.store(2, std::memory_order_release);
+            resolvedBackend_.store(
+                configuration.backend == 2 ? 2 : 1, std::memory_order_release);
+            workerProcesses_.store(1, std::memory_order_release);
+            lastInferenceMilliseconds_.store(
+                juce::Time::getMillisecondCounterHiRes() - startedAt,
+                std::memory_order_release);
+            previewResult_.store(
+                std::shared_ptr<const SeparationResult>(std::move(result)),
+                std::memory_order_release);
+            previewCursor_.store(0.0, std::memory_order_release);
+            previewPlaying_.store(false, std::memory_order_release);
+            separationProgress_.store(1.0, std::memory_order_release);
+            separationState_.store(
+                SeparationState::previewReady, std::memory_order_release);
+            setSeparationMessage(
+                "Ready to preview · " +
+                juce::String::fromUTF8(configuration.modelName.c_str()) +
+                " · two stems");
+            return;
+        }
+
         htfx::GpuWorkerClient worker;
         htfx::GpuWorkerConfig workerConfig;
         workerConfig.workerExecutable = configuredWorkerExecutable();
@@ -1550,6 +1756,13 @@ void HTDemucsGpuFXAudioProcessor::setModelDownloadMessage(
 
 bool HTDemucsGpuFXAudioProcessor::isModelInstalled(
     const juce::String& modelName) const {
+    if (isRoformerModelName(modelName)) {
+        const auto modelDirectory =
+            configuredRoformerModelsDirectory().getChildFile(modelName);
+        return modelDirectory.isDirectory() &&
+               modelDirectory.getNumberOfChildFiles(
+                   juce::File::findFiles, "*.ckpt") > 0;
+    }
     const auto modelsPath = configuredModelsDirectory();
     if (modelsPath.empty()) {
         return false;

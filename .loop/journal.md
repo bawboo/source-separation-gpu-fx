@@ -224,3 +224,42 @@ backend=auto recorded_seconds=1.00426 preview_seconds=1.00426 progress=1 inferen
 **Note:** catalog／selection 子路徑已通過 TDD 與完整回歸，但 A4 尚缺真實 RoFormer worker 啟動/結果載入路由，不得翻為 pass；下一輪維持 A4 priority 完成該路由。
 
 ---
+
+## Iteration 6 — 2026-08-23T13:30:23.4959931+08:00
+**Inherited baseline:** 工作樹只有外部 driver 持續更新的 `.loop/driver.log` 與 `.loop/lastrun.log`；上一輪 record 完整且 cheap/full tier exit 0，無 crash-mid-write 跡象。Windows 使用者 `<host>\<user>` 與 repository owner 相符；branch=`loop/melband-roformer`，remote 與目標 tag 均為空，符合核准計畫。
+**Hypothesis:** 若 processor 對已選 RoFormer ID 寫入 44.1 kHz float WAV、啟動既有 Python worker，並將兩個已驗證輸出載回 preview，A4 應會通過，因為 C++ standalone 路徑將實際完成模型啟動與結果載入。
+**Change-set:** `plugin/PluginProcessor.cpp` 新增 RoFormer Python／worker／cache／output 路徑解析、已快取模型辨識、可取消的 child-process 啟動、兩 stem WAV 載入與 preview result 發佈；`tests/ui_configuration_smoke.cpp` 以真實 Kim vocals 模型和 48 kHz/2 秒 fixture 覆蓋 C++ route、兩 stem、model identity 與時長。未提前處理 A6 下載管理或 A7 輸出命名。
+**TDD RED:** 首次 `cmd /c .loop\checks\cheap.cmd`（exit 1）因測試變數命名衝突，修正後重跑（exit 1）得到預期失敗：
+```text
+ui_configuration_smoke fatal: RoFormer C++ route did not start
+```
+**TDD GREEN / Verification:** `cmd /c .loop\checks\cheap.cmd`（實作後 exit 0；正式重驗 exit 0）
+```text
+HTDemucsGpuFX_Standalone.vcxproj -> ...\Standalone\HTDemucs GPU FX.exe
+htdemucs_ui_configuration_smoke.vcxproj -> ...\htdemucs_ui_configuration_smoke.exe
+default_panel=general ... fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.002s
+OK
+Ran 2 tests in 0.076s
+OK
+```
+既有 `cheap`／`vswhere.exe` 的 `not recognized` 訊息仍為非致命環境輸出；命令實際 exit 0。
+**Focused WAV contract:** 第一次 `python -c` 因 PowerShell 引號轉義得到 `SyntaxError`（exit 1），改由 stdin script 重跑（exit 0）：
+```text
+stem_count=2
+input_instrumental.wav: rate=44100 frames=88200 channels=2 subtype=FLOAT finite=True
+input_vocals.wav: rate=44100 frames=88200 channels=2 subtype=FLOAT finite=True
+FOCUSED_EXIT=0
+```
+真實 C++ route 的輸入源為 48 kHz/96000 frames/2 秒 fixture；processor 既有匯入路徑轉為模型契約的 44.1 kHz/88200 frames，preview 仍為 2.0 秒，未改動 44.1 kHz 模型或匯出格式。
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 32 changed path(s) within policy
+```
+**Criteria:** C1: fail（iteration 6 非 full cadence，A8 等仍未完成） · C2: fail（仍有未完成 backlog） · C3: pass
+**Metric:** 5 個 backlog item passing（best so far: 5；improved: true）
+**Decision:** continue
+**Note:** A4 已由真實 C++→RoFormer worker→兩 stem preview 路徑證明並翻為 pass；下一輪依 priority 轉向 A5 model browser UI。
+
+---
