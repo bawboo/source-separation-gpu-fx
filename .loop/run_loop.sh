@@ -15,7 +15,9 @@ set -uo pipefail
 
 # ── CONFIG (from LOOP_PLAN.md §9) ───────────────────────────────────────────
 AGENT_CMD_JSON=${AGENT_CMD_JSON:-'["cmd","/c","claude","-p","--permission-mode","acceptEdits","--allowedTools","Bash Edit Write Read Glob Grep Task WebFetch WebSearch"]'}
-PROMPT_MODE=${PROMPT_MODE:-arg}
+# PROMPT_MODE=ref passes only a one-line bootstrap on the command line (cmd.exe
+# has an 8191-char limit — the full prompt is read from the file by the agent).
+PROMPT_MODE=${PROMPT_MODE:-ref}
 MAX_WALL_MINUTES=${MAX_WALL_MINUTES:-0}
 ITERATION_TIMEOUT_MINUTES=${ITERATION_TIMEOUT_MINUTES:-40}
 MAX_LAUNCHES=${MAX_LAUNCHES:-0}
@@ -90,7 +92,9 @@ cmd = json.loads(sys.argv[1])
 prompt = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8")
 mode = sys.argv[3]
 timeout = int(sys.argv[4] or "0") * 60
-if mode != "stdin":
+if mode == "ref":
+    cmd = cmd + ["Read the file .loop/ITERATION_PROMPT.md in the current directory and follow it exactly: execute exactly ONE loop iteration, then stop with the LOOP STATUS line."]
+elif mode != "stdin":
     cmd = cmd + [prompt]
 kw = {"text": True, "encoding": "utf-8"}
 if os.name == "posix":
