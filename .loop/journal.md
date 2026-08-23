@@ -401,3 +401,37 @@ SCOPE_EXIT=0
 **Decision:** continue
 **Lesson:** 這個專案的匯出管線（HTDemucs 與 RoFormer 共用）一律以插件內部固定處理率 `HTDemucsGpuFXAudioProcessor::kSampleRate`（44100 Hz）寫出匯出檔，與來源媒體的取樣率（例如本次 fixture 的 48 kHz）無關——這是 `CLAUDE.md` 記載的既定不變量（「44.1 kHz 模型與匯出不受影響」），未來任何新測試斷言匯出檔取樣率時，必須比對 `kSampleRate`，不可假設等於來源取樣率；只有「時長」需要與來源一致，取樣率不用。已寫入 LESSONS.md。
 **Note:** A8／A9 本輪由 recovery＋根因修正＋full tier 重驗證明並翻為 pass；C1 本輪首次轉 pass。下一輪依 priority 轉向 A10（README.md 新增 RoFormer 章節）與 M-ENUM（依 manifest 產生 M001..M099 per-model backlog 項目）。
+
+## iter 11 — 2026-08-23T22:35:00+08:00
+
+**Hypothesis:** A10（README.md 新增 RoFormer 章節）是目前 backlog 中優先序最高的未通過項目（priority 10，早於 M-ENUM 的 11）。新增一個涵蓋分類/稽核狀態/按需下載與滾動快取/輸出命名與取樣率不變量的 README 章節，且章節內引用的數字（99/57/42、10 個分類、快取上限 3）皆對照 `assets/models/roformer-manifest.json` 與 `worker/roformer_cache.py` 的實際內容，A10 應可翻為 pass——這是純文件性質的完成度標準，cheap tier 綠燈（既有功能未退步）即足以佐證。
+
+**Files touched:** `README.md`（新增「## MelBand RoFormer 模型（進階面板）」章節，置於「## 已知限制」之前）；`.loop/backlog.json`、`.loop/iterations/0011.json`、`.loop/journal.md`、`.loop/state.json`（loop 控制面）。
+
+**內容依據核對：**
+- 分類與統計：`python -c "..."` 讀取 `assets/models/roformer-manifest.json` 確認 99 個模型、10 個類別（vocals=24, instrumental=37, instvoc=3, karaoke=5, dereverb=8, denoise=6, crowd=1, aspiration=2, guitar=1, general=12）、57 個 audited/42 個 experimental，與 README 新章節文字一致。
+- 快取上限：`worker/roformer_cache.py` `DEFAULT_MAX_CACHED = 3`，與 README「最多同時保留 3 個」一致。
+- 取樣率不變量：呼應 iter 10 LESSONS 記載的既定事實（匯出固定 `kSampleRate`=44100 Hz，與來源取樣率無關；只有時長需一致）。
+
+**Verification:** `cmd //c '.loop\checks\cheap.cmd'`（exit 0）
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.004s
+OK
+Ran 2 tests in 0.082s
+OK
+Ran 8 tests in 0.191s
+OK
+```
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 42 changed path(s) within policy
+SCOPE_EXIT=0
+```
+**Backlog checker:** 未跑本輪未執行 full tier，故 C1/C2 仍記為 fail（本迭代非 5 的倍數，依協定僅需 cheap tier；per-item 統計以 Python 直接讀取 `.loop/backlog.json` 得 11/12 passing，僅 M-ENUM 剩下）。
+**Criteria:** C1: fail（本輪未跑 full tier，不宣稱 pass）· C2: fail（M-ENUM 仍未完成）· C3: pass
+**Metric:** 11 個 backlog item passing（best so far: 11；improved: true，A10 本輪轉 pass）
+**Decision:** continue
+**Lesson:** 無新規則（純文件性任務，未觸發新的踩坑）。
+**Note:** 下一輪目標轉向 backlog 中僅存的未過項目 M-ENUM（依 `assets/models/roformer-manifest.json` 產生 M001..M099 per-model backlog 項目：57 個 audited 逐一「下載+SHA-256→分離 fixtures→輸出規格驗證」，42 個 experimental 逐一「收錄+標註+嘗試一次並記錄成敗」）——這是全 backlog 唯一剩下的未過項目，規模大，預期需跨多個 iteration 才能完成全部 99 項；下一輪應先產生 M001..M099 的 backlog 條目本身（若尚未存在），再開始逐批處理。

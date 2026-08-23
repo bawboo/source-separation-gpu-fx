@@ -75,10 +75,10 @@
   {
     "id": "A10",
     "title": "README.md 新增 RoFormer 章節（模型分類、下載/快取行為、experimental 語意）",
-    "passes": false,
+    "passes": true,
     "priority": 10,
     "source": "plan",
-    "evidence": null
+    "evidence": "iter 11: README.md 新增「## MelBand RoFormer 模型（進階面板）」章節（置於「## 已知限制」之前），內容涵蓋：來源與授權（openmirlab/melband-roformer-infer, MIT）、10 個分類（vocals/instrumental/instvoc/karaoke/dereverb/denoise/crowd/aspiration/guitar/general，數字取自 assets/models/roformer-manifest.json 實際統計）、稽核狀態（99 個中 57 稽核/42 experimental）、按需下載＋SHA-256 驗證＋滾動快取上限 3（對應 worker/roformer_cache.py DEFAULT_MAX_CACHED=3）、輸出命名依 worker 實際 stem id 推導、匯出取樣率固定為外掛內部處理率而非來源取樣率（呼應 A7/A9/LESSONS iter10 的既定不變量）。cmd //c '.loop\\checks\\cheap.cmd' (exit 0): standalone+ui_configuration_smoke 建置成功，roformer_browser=99 categories=10 search=true experimental=true download_status=true PASS；roformer manifest 99/57/42 PASS；cache 8 個單元測試 PASS。python .loop/check_scope.py (exit 0): 42 changed path(s) within policy。"
   },
   {
     "id": "M-ENUM",

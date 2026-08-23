@@ -107,6 +107,43 @@ Repository 與 runtime ZIP 都不包含預訓練 `.th` 權重。安裝器只保�
 目前 Windows runtime 使用 GPLv3-enabled FFmpeg build。公開二進位 Release 前，
 仍需附上該 build 對應的 source/build 資訊，或改成不隨 runtime 散布 FFmpeg。
 
+## MelBand RoFormer 模型（進階面板）
+
+除了預設的 HTDemucs 之外，進階面板提供一個分類式 model browser，收錄
+[openmirlab/melband-roformer-infer](https://github.com/openmirlab/melband-roformer-infer)
+（MIT）的全部 99 個 MelBand RoFormer 分離模型。清單、URL、檔案大小與
+SHA-256 記錄在 `assets/models/roformer-manifest.json`；推論由獨立的
+Python/PyTorch worker（`worker/roformer_worker.py`）執行，透過與 HTDemucs
+相同的 shared-memory IPC 與外掛溝通，audio callback 本身不做任何模型運算。
+
+**分類與稽核狀態**
+
+- 模型依用途分成 10 個類別：`vocals`、`instrumental`、`instvoc`、
+  `karaoke`、`dereverb`、`denoise`、`crowd`、`aspiration`、`guitar`、
+  `general`。Model browser 可依類別瀏覽，也可用文字搜尋模型名稱。
+- 99 個模型中，57 個已由本專案端到端稽核（下載＋SHA-256 驗證→對測試音檔
+  分離→輸出格式驗證：時長不變、stereo、32-bit float、樣本值有限）；其餘
+  42 個尚未逐一稽核，UI 上會標註 **experimental**，代表尚未保證每個模型都
+  能穩定產生可用輸出，使用前請自行核對結果。
+
+**按需下載與快取**
+
+- 模型權重不隨安裝檔或 Repository 一起發佈；使用者在 model browser 選擇
+  尚未安裝的模型時才會觸發下載，並顯示下載狀態（下載中／已安裝／失敗）。
+- 下載完成後以 manifest 記錄的 SHA-256 驗證雜湊值，驗證失敗會重新下載，
+  持續失敗則中止並回報錯誤，不會使用損毀的權重進行推論。
+- 本機快取採滾動上限：最多同時保留 3 個已下載模型，超過上限時依最後使用
+  時間淘汰最舊的一個（`worker/roformer_cache.py`）。使用者不需手動清理，
+  但重新選用先前被淘汰的模型會重新觸發下載。
+
+**輸出命名**
+
+- 每個模型依其類別產生對應命名的 stem（例如 vocals 類別輸出
+  `<原檔名>_vocals.wav` 與 `<原檔名>_instrumental.wav`），檔名由該模型
+  worker 實際輸出的 stem id 推導，不假設固定的 HTDemucs 輸出順序。
+- 匯出檔案的取樣率固定為外掛內部處理率（44,100 Hz），與來源媒體的原始取
+  樣率無關；時長則與來源保持一致。
+
 ## 已知限制
 
 - Demucs 推論固定為 44,100 Hz stereo。

@@ -180703,3 +180703,9 @@ ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/
 [driver] agent process exited rc=1
 [driver] usage/rate limit detected — sleeping 1200s then retrying (not counted as a failed launch)
 [driver] iteration 10 launching  2026-08-23T21:54:30+0800
+Checkpoint committed successfully. This completes iteration 10 per protocol.
+
+LOOP STATUS: running — iter-10 recovered inherited htdemucs_roformer_smoke CMake target, root-caused and fixed a wrong test assumption (export sample rate ≠ source rate; pipeline always writes at fixed 44.1 kHz), full tier now exits 0 with all four smoke tests passing; A8+A9 flip to pass (10/12 backlog items green); C2 backlog checker still fails (A10, M-ENUM remain)
+[driver] agent process exited rc=0
+[scope] OK �X 41 changed path(s) within policy
+[driver] iteration 11 launching  2026-08-23T22:04:40+0800
