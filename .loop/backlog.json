@@ -91,9 +91,9 @@
   {
     "id": "D1",
     "title": "htfx-roformer conda env 改用 CUDA-capable PyTorch，並以 worker/roformer_worker.py --device cuda:0 完成實機分離",
-    "passes": false,
+    "passes": true,
     "priority": 3,
     "source": "discovered",
-    "evidence": null
+    "evidence": "iter 4: torch 2.8.0+cu126 cuda_available=True on RTX 4050; real melband-roformer-kim-vocals --device cuda:0 separation preserved 48000 Hz/96000 frames/stereo/FLOAT/finite outputs (exit 0)"
   }
 ]

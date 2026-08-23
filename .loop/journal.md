@@ -131,3 +131,53 @@ SCOPE_EXIT=0
 **Note:** A3 已由真實、SHA-256 驗證模型的 headless 分離證明；`htfx-roformer` 目前為 CPU-only torch，已另 append D1，下一輪應先補 CUDA-capable runtime 並以 `--device cuda:0` 重驗。
 
 ---
+
+## Iteration 4 — 2026-08-23T12:45:53.9633102+08:00
+**Inherited baseline:** 工作樹只有外部 driver 持續更新的 `.loop/driver.log` 與 `.loop/lastrun.log`；上一輪 record 完整且 cheap tier exit 0，無 crash-mid-write 跡象。Windows 使用者 `<host>\<user>` 與 repository owner 相符；branch=`loop/melband-roformer`，remote 與 tag 均為空，符合本 loop 不設 remote／無目標 tag。
+**Hypothesis:** 若只把 `htfx-roformer` 環境中的 CPU-only PyTorch 換成已由本機 base env 證實可用的 CUDA 12.6 wheel，D1 應會改善，因為 worker 將能在 RTX 4050 上以 `cuda:0` 完成真實模型分離。
+**Root cause evidence:** 修正前 `htfx-roformer` 為 `torch 2.13.0+cpu`、`torch.version.cuda=None`、`cuda_available=False`；同機 base env 為 `torch 2.8.0+cu126` 且 RTX 4050 可用，因此故障位於隔離環境安裝了 CPU wheel，不是 driver 或硬體。
+**Change-set:** 僅在核准的 `htfx-roformer` conda env 內以官方 cu126 index 將 torch 換成 `2.8.0+cu126`；測試輸出新增於 `verify/output/roformer-iter4/`。未修改產品原始碼。
+**Install:** `C:\Users\<user>\anaconda3\envs\htfx-roformer\python.exe -m pip install --force-reinstall torch==2.8.0 --index-url https://download.pytorch.org/whl/cu126`（exit 0）
+```text
+Downloading torch-2.8.0+cu126-cp311-cp311-win_amd64.whl (2915.5 MB)
+Successfully uninstalled torch-2.13.0
+Successfully installed ... torch-2.8.0+cu126 ...
+```
+**Focused CUDA verification:** torch visibility check＋`worker/roformer_worker.py ... --device cuda:0`（exit 0）
+```text
+torch=2.8.0+cu126
+torch_cuda=12.6
+cuda_available=True
+device_count=1
+device=NVIDIA GeForce RTX 4050 Laptop GPU
+Processing track 1/1: test_48k_2s.wav
+Elapsed time: 2.37 sec
+"sample_rate": 48000,
+"frames": 96000,
+"channels": 2,
+"subtype": "FLOAT",
+"finite": true
+```
+`vocals` 與 `instrumental` 兩個輸出均符合上述規格。
+**Verification:** `cmd /c .loop\checks\cheap.cmd`（exit 0）
+```text
+HTDemucsGpuFX_Standalone.vcxproj -> ...\Standalone\HTDemucs GPU FX.exe
+htdemucs_ui_configuration_smoke.vcxproj -> ...\htdemucs_ui_configuration_smoke.exe
+default_panel=general ... models=4 compute=Auto/CUDA/CPU/MPS ... PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s
+OK
+Ran 2 tests in 0.085s
+OK
+```
+`cheap`／`vswhere.exe` 的 `not recognized` 訊息仍為既有非致命輸出；命令實際 exit 0。
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 27 changed path(s) within policy
+```
+**Criteria:** C1: fail（iteration 4 非 full cadence） · C2: fail（其餘 backlog 未完成） · C3: pass
+**Metric:** 4 個 backlog item passing（best so far: 4；improved: true）
+**Decision:** continue
+**Note:** D1 已由 CUDA 可見性與真實模型 `cuda:0` 分離共同證明；下一輪依 priority 轉向 A4。
+
+---
