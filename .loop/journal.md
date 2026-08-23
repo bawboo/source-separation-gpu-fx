@@ -81,3 +81,53 @@ OK
 **Note:** A2 已由 cheap tier 內的本地 validator 證明；manifest 固定 upstream revision 並保存 99/57/42 統計，下一輪依 priority 轉向 A3。
 
 ---
+
+## Iteration 3 — 2026-08-23T12:32:09.5570084+08:00
+**Inherited baseline:** 工作樹只有外部 driver 持續更新的 `.loop/driver.log` 與 `.loop/lastrun.log`；上一輪 record 完整且 cheap tier exit 0，無 crash-mid-write 跡象。Windows 使用者 `<host>\<user>` 與 repository owner 相符；branch=`loop/melband-roformer`，remote 與 tag 均為空，符合本 loop 不設 remote／無目標 tag。
+**Hypothesis:** 若新增以 upstream session API 為核心、具嚴格 WAV 輸出驗證的 headless RoFormer worker，A3 應會改善，因為它能對 fixture 執行真實模型分離並以獨立檢查確認輸出契約。
+**Change-set:** 新增 `worker/roformer_worker.py`（單檔 CLI、upstream session delegation、輸出契約驗證、Windows UTF-8 console）；新增 `tests/test_roformer_worker.py`；將該測試加入 `.loop/checks/cheap_extra.cmd`。模型與輸出僅寫入核准的 `verify/roformer-cache/` 與 `verify/output/roformer-iter3/`。
+**TDD RED:** `python tests\test_roformer_worker.py -v`（exit 1）
+```text
+FileNotFoundError: ...\\worker\\roformer_worker.py
+FAILED (errors=1)
+```
+真實執行首次穩定重現 upstream download progress emoji 在 CP950 console 的 `UnicodeEncodeError`；新增 encoding regression test 後先以缺少 `configure_utf8_stream` 得到 exit 1，再實作最小修正，2 tests PASS。
+**Focused real-model verification:** `C:\Users\<user>\anaconda3\envs\htfx-roformer\python.exe worker\roformer_worker.py ... --device auto`（exit 0）
+```text
+Successfully downloaded: ...\roformer-cache\melband-roformer-kim-vocals\MelBandRoformer.ckpt
+File size: 913,106,900 bytes
+SHA256 verified: 87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e
+CUDA is not available. Falling back to CPU. This will be slow.
+Total tracks found: 1
+Processing track 1/1: test_48k_2s.wav
+Elapsed time: 15.48 sec
+"sample_rate": 48000,
+"frames": 96000,
+"channels": 2,
+"subtype": "FLOAT",
+"finite": true
+```
+輸出 `vocals` 與 `instrumental` 兩 stem 均符合上述契約。
+**Verification:** `cmd /c .loop\checks\cheap.cmd`（exit 0）
+```text
+HTDemucsGpuFX_Standalone.vcxproj -> ...\Standalone\HTDemucs GPU FX.exe
+htdemucs_ui_configuration_smoke.vcxproj -> ...\htdemucs_ui_configuration_smoke.exe
+default_panel=general ... models=4 compute=Auto/CUDA/CPU/MPS ... PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.004s
+OK
+Ran 2 tests in 0.084s
+OK
+CHEAP_EXIT=0
+```
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 26 changed path(s) within policy
+SCOPE_EXIT=0
+```
+**Criteria:** C1: fail（iteration 3 非 full cadence） · C2: fail（其餘 backlog 未完成） · C3: pass
+**Metric:** 3 個 backlog item passing（best so far: 3；improved: true）
+**Decision:** continue
+**Note:** A3 已由真實、SHA-256 驗證模型的 headless 分離證明；`htfx-roformer` 目前為 CPU-only torch，已另 append D1，下一輪應先補 CUDA-capable runtime 並以 `--device cuda:0` 重驗。
+
+---

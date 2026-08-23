@@ -19,10 +19,10 @@
   {
     "id": "A3",
     "title": "RoFormer worker 模組（worker/ 新增）可 headless 對 C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures 合成音檔完成一次分離並輸出有效 WAV（時長不變/stereo/32-bit float/有限值）",
-    "passes": false,
+    "passes": true,
     "priority": 3,
     "source": "plan",
-    "evidence": null
+    "evidence": "iter 3: real melband-roformer-kim-vocals separation (SHA-256 verified checkpoint; 48 kHz, 96000 frames, stereo FLOAT WAV, finite samples; exit 0)"
   },
   {
     "id": "A4",
@@ -86,6 +86,14 @@
     "passes": false,
     "priority": 11,
     "source": "plan",
+    "evidence": null
+  },
+  {
+    "id": "D1",
+    "title": "htfx-roformer conda env 改用 CUDA-capable PyTorch，並以 worker/roformer_worker.py --device cuda:0 完成實機分離",
+    "passes": false,
+    "priority": 3,
+    "source": "discovered",
     "evidence": null
   }
 ]

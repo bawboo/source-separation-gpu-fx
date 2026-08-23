@@ -1,0 +1,28 @@
+{
+  "iteration": 3,
+  "timestamp": "2026-08-23T12:32:09.5570084+08:00",
+  "hypothesis": "若新增以 upstream session API 為核心、具嚴格 WAV 輸出驗證的 headless RoFormer worker，A3 應會改善，因為它能對 fixture 執行真實模型分離並以獨立檢查確認輸出契約。",
+  "files_touched": [
+    "worker/roformer_worker.py",
+    "tests/test_roformer_worker.py",
+    ".loop/checks/cheap_extra.cmd",
+    "C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache/melband-roformer-kim-vocals/",
+    "C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-iter3/",
+    ".loop/backlog.json",
+    ".loop/iterations/0003.json",
+    ".loop/journal.md",
+    ".loop/state.json"
+  ],
+  "commands": [
+    {"cmd": "python tests\\test_roformer_worker.py -v", "exit_code": 1, "timed_out": false},
+    {"cmd": "python tests\\test_roformer_worker.py -v", "exit_code": 0, "timed_out": false},
+    {"cmd": "C:\\Users\\<user>\\anaconda3\\envs\\htfx-roformer\\python.exe worker\\roformer_worker.py --input C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\fixtures\\test_48k_2s.wav --output-dir C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\output\\roformer-iter3 --model melband-roformer-kim-vocals --models-dir C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\roformer-cache --device auto", "exit_code": 0, "timed_out": false},
+    {"cmd": "cmd /c .loop\\checks\\cheap.cmd", "exit_code": 0, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 3, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}
