@@ -35,6 +35,18 @@ juce::ComboBox* findCombo(
     return nullptr;
 }
 
+template <typename ComponentType>
+ComponentType* findNamedComponent(
+    const std::vector<juce::Component*>& components,
+    const juce::String& name) {
+    for (auto* component : components) {
+        if (component->getName() == name) {
+            return dynamic_cast<ComponentType*>(component);
+        }
+    }
+    return nullptr;
+}
+
 juce::Button* findButton(
     const std::vector<juce::Component*>& components,
     const juce::String& buttonText) {
@@ -221,11 +233,49 @@ int run() {
             "advanced panel control visibility mismatch");
 
     advanced->onClick();
-    require(editor->getHeight() == 678, "expanded editor size mismatch");
+    require(editor->getHeight() == 790, "expanded editor size mismatch");
     require(segment->isVisible() && model->isVisible() && compute->isVisible(),
             "Advanced options did not become visible");
     require(advanced->getButtonText() == "Advanced options v",
             "expanded disclosure label mismatch");
+
+    auto* roformerCategory = findNamedComponent<juce::ComboBox>(
+        components, "RoFormer category");
+    auto* roformerSearch = findNamedComponent<juce::TextEditor>(
+        components, "RoFormer search");
+    auto* roformerModel = findNamedComponent<juce::ComboBox>(
+        components, "RoFormer model");
+    auto* roformerStatus = findNamedComponent<juce::Label>(
+        components, "RoFormer download status");
+    require(roformerCategory != nullptr && roformerSearch != nullptr &&
+                roformerModel != nullptr && roformerStatus != nullptr,
+            "RoFormer model browser controls were not found");
+    require(roformerCategory->isVisible() && roformerSearch->isVisible() &&
+                roformerModel->isVisible() && roformerStatus->isVisible(),
+            "RoFormer model browser controls are hidden while expanded");
+    require(roformerCategory->getItemText(0) == "All categories" &&
+                roformerCategory->getNumItems() == 11,
+            "RoFormer category browser mismatch");
+    require(roformerModel->getNumItems() == 99,
+            "RoFormer browser did not expose all 99 models");
+
+    roformerCategory->setText("vocals", juce::sendNotificationSync);
+    require(roformerModel->getNumItems() == 24,
+            "RoFormer category filter did not show the 24 vocal models");
+    roformerCategory->setSelectedItemIndex(0, juce::sendNotificationSync);
+    roformerSearch->setText("melband-roformer-instv8b", true);
+    roformerSearch->onTextChange();
+    require(roformerModel->getNumItems() == 1 &&
+                roformerModel->getItemText(0).contains("[Experimental]"),
+            "RoFormer search/experimental marker mismatch");
+    roformerModel->setSelectedItemIndex(0, juce::sendNotificationSync);
+    require(processor->getSelectedRoformerModel() ==
+                "melband-roformer-instv8b",
+            "RoFormer browser selection did not reach the processor");
+    require(roformerStatus->getText().contains("Experimental") &&
+                roformerStatus->getText().contains("Not downloaded"),
+            "RoFormer download/experimental status mismatch");
+    roformerSearch->clear();
 
     compute->setSelectedItemIndex(2, juce::sendNotificationSync);
     juce::Thread::sleep(120);
@@ -276,7 +326,9 @@ int run() {
                  " segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true"
                  " record_button=red media_buttons=true proportional_scale=true"
                  " fullscreen_toggle=true roformer_cpp_route=true"
-                 " roformer_stems=2 roformer_seconds=2 PASS\n";
+                 " roformer_stems=2 roformer_seconds=2"
+                 " roformer_browser=99 categories=10 search=true"
+                 " experimental=true download_status=true PASS\n";
     return 0;
 }
 

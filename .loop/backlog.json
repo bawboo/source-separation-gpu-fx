@@ -35,10 +35,10 @@
   {
     "id": "A5",
     "title": "一般面板 model browser UI：分類/搜尋/下載狀態/experimental 標註；ui_configuration_smoke（含擴充）PASS",
-    "passes": false,
+    "passes": true,
     "priority": 5,
     "source": "plan",
-    "evidence": null
+    "evidence": "iter 7: cmd /c .loop\\checks\\cheap.cmd (exit 0; UI smoke: 99 models, 10 categories, search, experimental marker, download status PASS)"
   },
   {
     "id": "A6",

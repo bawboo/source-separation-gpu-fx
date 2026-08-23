@@ -3238,6 +3238,50 @@ public:
         };
         addAndMakeVisible(modelDownloadButton_);
 
+        roformerCategoryLabel_.setText("RoFormer category", juce::dontSendNotification);
+        roformerCategoryBox_.setName("RoFormer category");
+        roformerCategoryBox_.addItem("All categories", 1);
+        juce::StringArray roformerCategories;
+        for (const auto& model : processor_.getRoformerModels()) {
+            roformerCategories.addIfNotAlreadyThere(model.category);
+        }
+        roformerCategories.sort(true);
+        for (const auto& category : roformerCategories) {
+            roformerCategoryBox_.addItem(category, roformerCategoryBox_.getNumItems() + 1);
+        }
+        roformerCategoryBox_.setSelectedItemIndex(0, juce::dontSendNotification);
+        roformerCategoryBox_.onChange = [this] { refreshRoformerBrowser(); };
+
+        roformerSearchLabel_.setText("Search models", juce::dontSendNotification);
+        roformerSearch_.setName("RoFormer search");
+        roformerSearch_.setTextToShowWhenEmpty(
+            "Name or model ID", juce::Colours::grey);
+        roformerSearch_.onTextChange = [this] { refreshRoformerBrowser(); };
+
+        roformerModelLabel_.setText("RoFormer model", juce::dontSendNotification);
+        roformerModelBox_.setName("RoFormer model");
+        roformerModelBox_.onChange = [this] {
+            const auto index = roformerModelBox_.getSelectedItemIndex();
+            if (index >= 0 && index < static_cast<int>(visibleRoformerIds_.size())) {
+                processor_.selectRoformerModel(
+                    visibleRoformerIds_[static_cast<std::size_t>(index)]);
+            }
+            updateRoformerStatus();
+        };
+
+        roformerStatusLabel_.setText("Download status", juce::dontSendNotification);
+        roformerStatus_.setName("RoFormer download status");
+        roformerStatus_.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+        refreshRoformerBrowser();
+
+        for (auto* component : std::array<juce::Component*, 8>{
+                 &roformerCategoryLabel_, &roformerCategoryBox_,
+                 &roformerSearchLabel_, &roformerSearch_,
+                 &roformerModelLabel_, &roformerModelBox_,
+                 &roformerStatusLabel_, &roformerStatus_}) {
+            addAndMakeVisible(component);
+        }
+
         computeLabel_.setText("Compute device", juce::dontSendNotification);
 #if JUCE_MAC
         computeBox_.addItem("Auto (Apple MPS, otherwise CPU)", 1);
@@ -3388,6 +3432,10 @@ public:
             auto downloadRow = area.removeFromTop(28);
             downloadRow.removeFromLeft(150);
             modelDownloadButton_.setBounds(downloadRow.removeFromLeft(430));
+            layoutAdvancedRow(roformerCategoryLabel_, roformerCategoryBox_);
+            layoutAdvancedRow(roformerSearchLabel_, roformerSearch_);
+            layoutAdvancedRow(roformerModelLabel_, roformerModelBox_);
+            layoutAdvancedRow(roformerStatusLabel_, roformerStatus_);
             layoutAdvancedRow(computeLabel_, computeBox_);
             layoutAdvancedRow(gpuLabel_, gpuSlider_);
         }
@@ -3419,7 +3467,7 @@ private:
     }
 
     [[nodiscard]] int designHeight() const noexcept {
-        return advancedPanel_ ? (advancedVisible_ ? 678 : 540) : 260;
+        return advancedPanel_ ? (advancedVisible_ ? 790 : 540) : 260;
     }
 
     void chooseMediaFile() {
@@ -3634,12 +3682,76 @@ private:
     }
 
     void updateAdvancedVisibility() {
-        for (auto* component : std::array<juce::Component*, 8>{
+        for (auto* component : std::array<juce::Component*, 16>{
                  &segmentLabel_, &segmentBox_, &modelLabel_, &modelBox_,
+                 &roformerCategoryLabel_, &roformerCategoryBox_,
+                 &roformerSearchLabel_, &roformerSearch_,
+                 &roformerModelLabel_, &roformerModelBox_,
+                 &roformerStatusLabel_, &roformerStatus_,
                  &computeLabel_, &computeBox_, &gpuLabel_, &gpuSlider_}) {
             component->setVisible(advancedPanel_ && advancedVisible_);
         }
         modelDownloadButton_.setVisible(advancedPanel_ && advancedVisible_);
+    }
+
+    void refreshRoformerBrowser() {
+        const auto selectedId = processor_.getSelectedRoformerModel();
+        const auto category = roformerCategoryBox_.getSelectedItemIndex() <= 0
+                                  ? juce::String{}
+                                  : roformerCategoryBox_.getText();
+        const auto search = roformerSearch_.getText().trim();
+
+        roformerModelBox_.clear(juce::dontSendNotification);
+        visibleRoformerIds_.clear();
+        int selectedIndex = -1;
+        for (const auto& model : processor_.getRoformerModels()) {
+            if (category.isNotEmpty() && model.category != category) {
+                continue;
+            }
+            if (search.isNotEmpty() &&
+                !model.name.containsIgnoreCase(search) &&
+                !model.id.containsIgnoreCase(search)) {
+                continue;
+            }
+            const auto displayName = model.name +
+                                     (model.experimental
+                                          ? " [Experimental]"
+                                          : " [Audited]");
+            roformerModelBox_.addItem(
+                displayName, roformerModelBox_.getNumItems() + 1);
+            visibleRoformerIds_.push_back(model.id);
+            if (model.id == selectedId) {
+                selectedIndex = roformerModelBox_.getNumItems() - 1;
+            }
+        }
+        if (selectedIndex < 0 && !visibleRoformerIds_.empty()) {
+            selectedIndex = 0;
+        }
+        roformerModelBox_.setSelectedItemIndex(
+            selectedIndex, juce::sendNotificationSync);
+        updateRoformerStatus();
+    }
+
+    void updateRoformerStatus() {
+        const auto index = roformerModelBox_.getSelectedItemIndex();
+        if (index < 0 || index >= static_cast<int>(visibleRoformerIds_.size())) {
+            roformerStatus_.setText("No matching models", juce::dontSendNotification);
+            return;
+        }
+        const auto& id = visibleRoformerIds_[static_cast<std::size_t>(index)];
+        const auto models = processor_.getRoformerModels();
+        const auto found = std::find_if(
+            models.begin(), models.end(),
+            [&id](const auto& model) { return model.id == id; });
+        if (found == models.end()) {
+            roformerStatus_.setText("Unknown model", juce::dontSendNotification);
+            return;
+        }
+        roformerStatus_.setText(
+            juce::String(found->experimental ? "Experimental" : "Audited") +
+                " · " +
+                (processor_.isModelInstalled(id) ? "Downloaded" : "Not downloaded"),
+            juce::dontSendNotification);
     }
 
     void updatePanelVisibility() {
@@ -3798,6 +3910,7 @@ private:
 
         const auto mediaStatus = processor_.getMediaStatusText();
         const auto modelStatus = processor_.getModelDownloadStatusText();
+        updateRoformerStatus();
         status_.setText(
             modelBusy || (!selectedModelInstalled && modelStatus.isNotEmpty())
                 ? modelStatus
@@ -3865,6 +3978,15 @@ private:
     juce::Label modelLabel_;
     juce::ComboBox modelBox_;
     juce::TextButton modelDownloadButton_;
+    juce::Label roformerCategoryLabel_;
+    juce::ComboBox roformerCategoryBox_;
+    juce::Label roformerSearchLabel_;
+    juce::TextEditor roformerSearch_;
+    juce::Label roformerModelLabel_;
+    juce::ComboBox roformerModelBox_;
+    juce::Label roformerStatusLabel_;
+    juce::Label roformerStatus_;
+    std::vector<juce::String> visibleRoformerIds_;
     juce::Label computeLabel_;
     juce::ComboBox computeBox_;
     juce::Label gpuLabel_;

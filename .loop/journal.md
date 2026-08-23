@@ -263,3 +263,32 @@ FOCUSED_EXIT=0
 **Note:** A4 已由真實 C++→RoFormer worker→兩 stem preview 路徑證明並翻為 pass；下一輪依 priority 轉向 A5 model browser UI。
 
 ---
+
+## Iteration 7 — 2026-08-23T14:37:25.4633701+08:00
+**Inherited baseline:** HEAD=`8df0079`（iteration 6 checkpoint），但工作樹除 driver log 外另有未提交的 `plugin/PluginProcessor.cpp` 與 `tests/ui_configuration_smoke.cpp` A5 變更；視為前一個 agent crash-mid-write／handoff breakage。依 protocol 在任何新變更前重跑 `cmd /c .loop\checks\cheap.cmd`（exit 0），確認 inherited A5 實作已為 green；此 baseline 不歸因於本 iteration 新寫的程式碼。
+**Hypothesis:** 若獨立重驗並 checkpoint inherited 的一般面板 RoFormer model browser change-set，A5 應可由本輪列印的 UI smoke 證據翻為 pass，因為分類、搜尋、99 模型、experimental 標註與下載狀態都由真實 editor controls 驗證。
+**Change-set:** recovery-only：保留並審核 inherited `plugin/PluginProcessor.cpp` model browser UI（category/search/model/status controls、filtering、selection、download/experimental status）與 `tests/ui_configuration_smoke.cpp` assertions；本 iteration 未另加產品行為，以免把已存在的 green handoff 偽裝成自己的 TDD 變更。
+**Verification:** `cmd /c .loop\checks\cheap.cmd`（正式重驗 exit 0）
+```text
+HTDemucsGpuFX_Standalone.vcxproj -> ...\Standalone\HTDemucs GPU FX.exe
+htdemucs_ui_configuration_smoke.vcxproj -> ...\htdemucs_ui_configuration_smoke.exe
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.006s
+OK
+Ran 2 tests in 0.063s
+OK
+CHEAP_EXIT=0
+```
+既有 `cheap`／`vswhere.exe` 的 `not recognized` 訊息仍為非致命環境輸出；命令實際 exit 0。
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 33 changed path(s) within policy
+SCOPE_EXIT=0
+```
+**Criteria:** C1: fail（iteration 7 非 full cadence，A8 等仍未完成） · C2: fail（仍有未完成 backlog） · C3: pass
+**Metric:** 6 個 backlog item passing（best so far: 6；improved: true）
+**Decision:** continue
+**Note:** A5 已由本輪獨立 cheap-tier editor smoke 證明並翻為 pass；下一輪依 priority 轉向 A6 下載管理。
+
+---
