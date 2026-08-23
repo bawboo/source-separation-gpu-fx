@@ -1,0 +1,2 @@
+[driver] FATAL: another driver appears to be running (lock: .loop/driver.lockdir).
+[driver] If no driver is running, remove the stale lock: rmdir .loop/driver.lockdir

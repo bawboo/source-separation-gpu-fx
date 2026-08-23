@@ -1,13 +1,91 @@
 [
-  {"id": "A1", "title": "conda env htfx-roformer 建立且 melband-roformer-infer 安裝完成：`conda run -n htfx-roformer melband-roformer-infer --help` 退出碼 0", "passes": false, "priority": 1, "source": "plan", "evidence": null, "check": "C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe run -n htfx-roformer melband-roformer-infer --help"},
-  {"id": "A2", "title": "從上游 registry 產生 assets/models/roformer-manifest.json（99 項，含 name/category/url/sha256/size/audited 旗標）且 tools/validate_roformer_manifest.py 驗證退出碼 0", "passes": false, "priority": 2, "source": "plan", "evidence": null},
-  {"id": "A3", "title": "RoFormer worker 模組（worker/ 新增）可 headless 對 C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures 合成音檔完成一次分離並輸出有效 WAV（時長不變/stereo/32-bit float/有限值）", "passes": false, "priority": 3, "source": "plan", "evidence": null},
-  {"id": "A4", "title": "C++ 整合：processor 支援 roformer 模型清單/選擇/worker 啟動；standalone 建置通過", "passes": false, "priority": 4, "source": "plan", "evidence": null},
-  {"id": "A5", "title": "一般面板 model browser UI：分類/搜尋/下載狀態/experimental 標註；ui_configuration_smoke（含擴充）PASS", "passes": false, "priority": 5, "source": "plan", "evidence": null},
-  {"id": "A6", "title": "下載管理：按需下載＋SHA-256 驗證＋滾動快取上限 3 個（C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache）＋自動清理，含測試", "passes": false, "priority": 6, "source": "plan", "evidence": null},
-  {"id": "A7", "title": "輸出 UX：各類別（vocals/instrumental/karaoke/dereverb/denoise…）2-stem 輸出命名與 Export 流程正確", "passes": false, "priority": 7, "source": "plan", "evidence": null},
-  {"id": "A8", "title": "新增 htdemucs_roformer_smoke CMake target（tests/roformer_smoke.cpp）且 PASS，納入 full tier", "passes": false, "priority": 8, "source": "plan", "evidence": null},
-  {"id": "A9", "title": "回歸：htdemucs_record_mode_smoke／htdemucs_media_io_smoke／htdemucs_ui_configuration_smoke 全 PASS（.loop/checks/full.cmd）", "passes": false, "priority": 9, "source": "plan", "evidence": null},
-  {"id": "A10", "title": "README.md 新增 RoFormer 章節（模型分類、下載/快取行為、experimental 語意）", "passes": false, "priority": 10, "source": "plan", "evidence": null},
-  {"id": "M-ENUM", "title": "per-model 項目產生：依 roformer-manifest.json append M001..M099（57 個 audited＝必過「下載+SHA-256→分離 fixtures→輸出規格驗證」；42 個未稽核＝「收錄+experimental 標註+嘗試一次並記錄結果（成敗皆記）」）", "passes": false, "priority": 11, "source": "plan", "evidence": null}
+  {
+    "id": "A1",
+    "title": "conda env htfx-roformer 建立且 melband-roformer-infer 安裝完成：`conda run -n htfx-roformer melband-roformer-infer --help` 退出碼 0",
+    "passes": true,
+    "priority": 1,
+    "source": "plan",
+    "evidence": "iter 1: C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe run -n htfx-roformer melband-roformer-infer --help (exit 0)",
+    "check": "C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe run -n htfx-roformer melband-roformer-infer --help"
+  },
+  {
+    "id": "A2",
+    "title": "從上游 registry 產生 assets/models/roformer-manifest.json（99 項，含 name/category/url/sha256/size/audited 旗標）且 tools/validate_roformer_manifest.py 驗證退出碼 0",
+    "passes": false,
+    "priority": 2,
+    "source": "plan",
+    "evidence": null
+  },
+  {
+    "id": "A3",
+    "title": "RoFormer worker 模組（worker/ 新增）可 headless 對 C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures 合成音檔完成一次分離並輸出有效 WAV（時長不變/stereo/32-bit float/有限值）",
+    "passes": false,
+    "priority": 3,
+    "source": "plan",
+    "evidence": null
+  },
+  {
+    "id": "A4",
+    "title": "C++ 整合：processor 支援 roformer 模型清單/選擇/worker 啟動；standalone 建置通過",
+    "passes": false,
+    "priority": 4,
+    "source": "plan",
+    "evidence": null
+  },
+  {
+    "id": "A5",
+    "title": "一般面板 model browser UI：分類/搜尋/下載狀態/experimental 標註；ui_configuration_smoke（含擴充）PASS",
+    "passes": false,
+    "priority": 5,
+    "source": "plan",
+    "evidence": null
+  },
+  {
+    "id": "A6",
+    "title": "下載管理：按需下載＋SHA-256 驗證＋滾動快取上限 3 個（C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache）＋自動清理，含測試",
+    "passes": false,
+    "priority": 6,
+    "source": "plan",
+    "evidence": null
+  },
+  {
+    "id": "A7",
+    "title": "輸出 UX：各類別（vocals/instrumental/karaoke/dereverb/denoise…）2-stem 輸出命名與 Export 流程正確",
+    "passes": false,
+    "priority": 7,
+    "source": "plan",
+    "evidence": null
+  },
+  {
+    "id": "A8",
+    "title": "新增 htdemucs_roformer_smoke CMake target（tests/roformer_smoke.cpp）且 PASS，納入 full tier",
+    "passes": false,
+    "priority": 8,
+    "source": "plan",
+    "evidence": null
+  },
+  {
+    "id": "A9",
+    "title": "回歸：htdemucs_record_mode_smoke／htdemucs_media_io_smoke／htdemucs_ui_configuration_smoke 全 PASS（.loop/checks/full.cmd）",
+    "passes": false,
+    "priority": 9,
+    "source": "plan",
+    "evidence": null
+  },
+  {
+    "id": "A10",
+    "title": "README.md 新增 RoFormer 章節（模型分類、下載/快取行為、experimental 語意）",
+    "passes": false,
+    "priority": 10,
+    "source": "plan",
+    "evidence": null
+  },
+  {
+    "id": "M-ENUM",
+    "title": "per-model 項目產生：依 roformer-manifest.json append M001..M099（57 個 audited＝必過「下載+SHA-256→分離 fixtures→輸出規格驗證」；42 個未稽核＝「收錄+experimental 標註+嘗試一次並記錄結果（成敗皆記）」）",
+    "passes": false,
+    "priority": 11,
+    "source": "plan",
+    "evidence": null
+  }
 ]

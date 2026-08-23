@@ -1,1 +1,2455 @@
-Not logged in · Please run /login
+Reading additional input from stdin...
+2026-08-23T03:53:00.527864Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 97 column 5
+OpenAI Codex v0.144.1
+--------
+workdir: C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a02cc0-154f-7d12-80d0-6f2eba50dbc6
+--------
+user
+Read the file .loop/ITERATION_PROMPT.md in the current directory and follow it exactly: execute exactly ONE loop iteration, then stop with the LOOP STATUS line.
+codex
+I’m using the `using-superpowers` and `loop-engineering` skills because this request is a repository loop iteration. I’ll read their runbooks and `.loop/ITERATION_PROMPT.md`, execute exactly one iteration, and stop at the required status line.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw 'C:\\Users\\<user>\\.codex\\skills\\using-superpowers\\SKILL.md'; Get-Content -Raw 'C:\\Users\\<user>\\.codex\\skills\\loop-engineering\\SKILL.md'; Get-Content -Raw '.loop\\ITERATION_PROMPT.md'" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+codex
+The instruction read is still running, so I’m waiting for it to finish before taking any repository action.
+2026-08-23T03:53:27.551663Z ERROR codex_core::tools::router: error=Exit code: 124
+Wall time: 12.3 seconds
+Output:
+command timed out after 12335 milliseconds
+Exception ignored on flushing sys.stdout:
+OSError: [Errno 22] Invalid argument
+
+ exited 124 in 12335ms:
+Exception ignored on flushing sys.stdout:
+OSError: [Errno 22] Invalid argument
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Item 'C:\\Users\\<user>\\.codex\\skills\\using-superpowers\\SKILL.md','C:\\Users\\<user>\\.codex\\skills\\loop-engineering\\SKILL.md','.loop\\ITERATION_PROMPT.md' | Select-Object FullName,Length; Get-Content -Raw 'C:\\Users\\<user>\\.codex\\skills\\using-superpowers\\SKILL.md'" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+ succeeded in 9398ms:
+
+[32;1mFullName                                                                                                    [0m[32;1m Length[0m
+[32;1m--------                                                                                                    [0m [32;1m------[0m
+C:\Users\<user>\.codex\skills\using-superpowers\SKILL.md                                                        5899
+C:\Users\<user>\.codex\skills\loop-engineering\SKILL.md                                                        17887
+C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\.loop\ITERATION_PROMPT.md   8843
+---
+name: using-superpowers
+description: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions
+---
+
+<SUBAGENT-STOP>
+If you were dispatched as a subagent to execute a specific task, skip this skill.
+</SUBAGENT-STOP>
+
+<EXTREMELY-IMPORTANT>
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+
+This is not negotiable. This is not optional. You cannot rationalize your way out of this.
+</EXTREMELY-IMPORTANT>
+
+## Instruction Priority
+
+Superpowers skills override default system prompt behavior, but **user instructions always take precedence**:
+
+1. **User's explicit instructions** (CLAUDE.md, GEMINI.md, AGENTS.md, direct requests) — highest priority
+2. **Superpowers skills** — override default system behavior where they conflict
+3. **Default system prompt** — lowest priority
+
+If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "always use TDD," follow the user's instructions. The user is in control.
+
+## How to Access Skills
+
+**Never read skill files manually with file tools** — always use your platform's skill-loading mechanism so the skill is properly activated.
+
+**In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you — follow it directly.
+
+**In Codex:** Skills load natively. Follow the instructions presented when a skill activates.
+
+**In Copilot CLI:** Use the `skill` tool. Skills are auto-discovered from installed plugins.
+
+**In Gemini CLI:** Skills activate via the `activate_skill` tool. Gemini loads skill metadata at session start and activates the full content on demand.
+
+**In other environments:** Check your platform's documentation for how skills are loaded.
+
+## Platform Adaptation
+
+Skills speak in actions ("dispatch a subagent", "create a todo", "read a file") rather than naming any one runtime's tools. For per-platform tool equivalents and instructions-file conventions, see [claude-code-tools.md](references/claude-code-tools.md), [codex-tools.md](references/codex-tools.md), [copilot-tools.md](references/copilot-tools.md), [gemini-tools.md](references/gemini-tools.md), [pi-tools.md](references/pi-tools.md), and [antigravity-tools.md](references/antigravity-tools.md). Gemini CLI users get the tool mapping loaded automatically via GEMINI.md.
+
+# Using Skills
+
+## The Rule
+
+**Invoke relevant or requested skills BEFORE any response or action.** Even a 1% chance a skill might apply means that you should invoke the skill to check. If an invoked skill turns out to be wrong for the situation, you don't need to use it.
+
+```dot
+digraph skill_flow {
+    "User message received" [shape=doublecircle];
+    "About to enter plan mode?" [shape=doublecircle];
+    "Already brainstormed?" [shape=diamond];
+    "Invoke brainstorming skill" [shape=box];
+    "Might any skill apply?" [shape=diamond];
+    "Invoke the skill" [shape=box];
+    "Announce: 'Using [skill] to [purpose]'" [shape=box];
+    "Has checklist?" [shape=diamond];
+    "Create a todo per item" [shape=box];
+    "Follow skill exactly" [shape=box];
+    "Respond (including clarifications)" [shape=doublecircle];
+
+    "About to enter plan mode?" -> "Already brainstormed?";
+    "Already brainstormed?" -> "Invoke brainstorming skill" [label="no"];
+    "Already brainstormed?" -> "Might any skill apply?" [label="yes"];
+    "Invoke brainstorming skill" -> "Might any skill apply?";
+
+    "User message received" -> "Might any skill apply?";
+    "Might any skill apply?" -> "Invoke the skill" [label="yes, even 1%"];
+    "Might any skill apply?" -> "Respond (including clarifications)" [label="definitely not"];
+    "Invoke the skill" -> "Announce: 'Using [skill] to [purpose]'";
+    "Announce: 'Using [skill] to [purpose]'" -> "Has checklist?";
+    "Has checklist?" -> "Create a todo per item" [label="yes"];
+    "Has checklist?" -> "Follow skill exactly" [label="no"];
+    "Create a todo per item" -> "Follow skill exactly";
+}
+```
+
+## Red Flags
+
+These thoughts mean STOP—you're rationalizing:
+
+| Thought | Reality |
+|---------|---------|
+| "This is just a simple question" | Questions are tasks. Check for skills. |
+| "I need more context first" | Skill check comes BEFORE clarifying questions. |
+| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
+| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
+| "Let me gather information first" | Skills tell you HOW to gather information. |
+| "This doesn't need a formal skill" | If a skill exists, use it. |
+| "I remember this skill" | Skills evolve. Read current version. |
+| "This doesn't count as a task" | Action = task. Check for skills. |
+| "The skill is overkill" | Simple things become complex. Use it. |
+| "I'll just do this one thing first" | Check BEFORE doing anything. |
+| "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
+| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
+
+## Skill Priority
+
+When multiple skills could apply, use this order:
+
+1. **Process skills first** (brainstorming, systematic-debugging) - these determine HOW to approach the task
+2. **Implementation skills second** (frontend-design, mcp-builder) - these guide execution
+
+"Let's build X" → brainstorming first, then implementation skills.
+"Fix this bug" → systematic-debugging first, then domain-specific skills.
+
+## Skill Types
+
+**Rigid** (TDD, systematic-debugging): Follow exactly. Don't adapt away discipline.
+
+**Flexible** (patterns): Adapt principles to context.
+
+The skill itself tells you which.
+
+## User Instructions
+
+Instructions say WHAT, not HOW. "Add X" or "Fix Y" doesn't mean skip workflows.
+
+
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw 'C:\\Users\\<user>\\.codex\\skills\\loop-engineering\\SKILL.md'" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+ succeeded in 13726ms:
+---
+name: loop-engineering
+description: Configure and run an autonomous engineering loop that repeatedly modifies a project, verifies with explicit commands or metrics, records durable state under .loop/, and stops on convergence, budget, stall, or escape hatches. Elicits criteria/tools/scope/engine plan-mode style, requires explicit plan approval, then executes via an external Ralph-style driver (unattended/overnight), Claude Code /goal (attended), or in-session iteration. Use when the user says "loop engineering", "/goal", "Ralph", "無人值守", "過夜跑", or wants an agent to keep fixing, tuning, or iterating on files until tests pass, a metric threshold is reached, or a verifiable condition converges — especially unattended or overnight runs. Do NOT use for ordinary programming loops (for/while), ML training-loop code, or conceptual discussion of iteration and convergence, or one-shot debugging.
+---
+
+# Loop Engineering
+
+Turn a vague "keep working on this until it's done" request into a fully specified,
+autonomous, self-terminating loop: **elicit → plan → approve → wire an engine →
+execute → report**.
+
+Why the ceremony up front: autonomous loops without explicit, machine-checkable
+completion criteria either run forever, silently drift off-goal, or declare victory
+without evidence. Five minutes of configuration prevents hours of wasted iterations.
+Never skip the elicitation and approval phases, even if the user's prompt seems
+complete — confirm the inferred configuration instead of asking from scratch.
+
+## The one lesson that shapes everything: loops die after iteration 1
+
+A model's natural behavior is to complete one visible unit of work, summarize, and
+end its turn. In a loop, **a completed iteration is not a completed task** — the
+task is the converged loop. If continuation depends on the model "remembering" to
+keep going, the loop will almost always stop after the first pass. So continuation
+must be **mechanical**, provided by an execution engine chosen in Phase 1.
+
+**Engine selection is intent-first.** "Autonomous" does not mean "interactive":
+when the user's intent is *unattended* operation — run by itself to completion,
+overnight, walk away, 無人值守 — the default is Engine B. Engine A automates turns
+*inside an open, attended session*; it is not background work.
+
+- **Engine B — external driver script** (Ralph-style; **default for unattended
+  intent**): a bash `while` loop invokes a fresh headless agent per iteration; the
+  script decides whether to go again by reading `.loop/state.json`. Survives under
+  `nohup`/`tmux` with the terminal closed, works in Claude Code, Codex,
+  Antigravity, or any headless-capable harness. This is the walk-away engine.
+- **Engine A — Claude Code `/goal`** (hands-free **while you watch**): after every
+  turn, a Stop-hook evaluator checks the condition and, if the loop should
+  continue, starts exactly one more turn. It advances **one turn at a time**, only
+  while this client stays open, the goal is active, and tool calls are
+  auto-approved (Auto mode — a hard prerequisite, not an optimization). It is
+  **not** a background job: closing the session stops the loop, and stopping a
+  misbehaving loop ultimately relies on the human (`/goal clear`). Choose it for
+  attended or semi-attended runs.
+- **Engine C — in-session self-loop** (last resort): the model chains iterations
+  inside its own turns under strict continuation discipline. Weakest by design;
+  use only when A and B are both unavailable.
+
+**Design constraint to respect throughout: assume the executing model has a limited
+context window and may be a smaller model.** All durable state lives in files, not
+in memory. Engines A and B both exploit this: the files are the loop's memory
+spine; any single turn or process can die without losing the loop.
+
+## Anatomy: goal → criteria → verification → three exits
+
+A loop is fully specified when four layers exist, each more machine-checkable
+than the one above:
+
+- **Ultimate goal** — the north star; one sentence of *why* (plan §1).
+- **Completion criteria** — the goal's machine-checkable projection: *what
+  "done" means* as commands, metrics, plateaus, or capped human checkpoints
+  (plan §2). Multi-item goals get a `.loop/backlog.json` work queue whose
+  "all items pass" check becomes the criterion.
+- **Verification** — the procedure that produces *evidence* every iteration;
+  this is the loop's **backpressure**. The faster the cheap tier, the tighter
+  the loop; the full tier gates convergence (plan §3).
+- **Stop conditions** — a loop stops in exactly one of three ways, and all
+  three are designed before iteration 1:
+  1. **Converged** — criteria pass, evidence printed.
+  2. **Ceiling** — iteration budget, wall clock, per-iteration timeout, turn
+     cap (plan §6). Ceilings are the *primary* safety mechanism: the only
+     exit that cannot be reasoned around or gamed.
+  3. **Escape hatch** — structured early exits (`blocked`, `stalled`,
+     `paused`, `aborted`; plan §7 + execution.md) for walls the loop should
+     report, not grind against.
+
+  A loop with only a success exit cannot stop when the goal is unreachable; a
+  loop with only ceilings burns the whole budget failing silently; a loop
+  without hatches turns every wall into wasted iterations.
+
+## Artifacts
+
+All loop state lives in a `.loop/` directory at the project root (created in
+Phase 2). If there is no project directory, use the current working directory.
+
+```
+.loop/
+├── LOOP_PLAN.md          # the approved configuration — single source of truth
+├── policy.json           # machine-readable permissions + scope (from plan §4/§5)
+├── state.json            # run state: status, stop_reason, iteration, metrics, git origin
+├── iterations/           # structured per-iteration records NNNN.json (machine-readable)
+├── journal.md            # append-only human-readable log with verification evidence
+├── backlog.json          # optional multi-item work queue [{id,title,passes,…}] — append-only
+├── LESSONS.md            # append-only one-line signs every later iteration must obey
+├── check_scope.py        # scope enforcement helper (from assets/check-scope-template.py)
+├── run_loop.sh           # Engine B only: the driver (from assets/run-loop-template.sh)
+├── ITERATION_PROMPT.md   # Engine B only: the fixed per-iteration prompt
+└── FINAL_REPORT.md       # written on termination (Engine B: by the driver; A/C: in Phase 4)
+```
+
+Transient operator files (all engines honor them): `touch .loop/STOP` — clean
+manual abort at the next check; `.loop/STEER.md` — a one-shot mid-run
+directive the next iteration reads, quotes into the journal, and deletes (it
+steers within the plan; it cannot expand scope or permissions).
+
+`LOOP_PLAN.md` is immutable during a run except through the amendment protocol in
+`references/execution.md`. Treat it the way you would treat a signed spec.
+
+## Phase 0 — Detect environment and check for resume
+
+1. **Resume check.** If `.loop/state.json` exists with `status` `"running"` or
+   `"paused"`, a previous loop was interrupted. Read the plan, the state, and the
+   journal tail; summarize where it stopped; ask the user: resume, restart fresh
+   (archive to `.loop-archive-<timestamp>/`), or abandon. If it exists with a
+   terminal status (`converged`, `stalled`, `aborted`, `max_iterations`,
+   `blocked`), confirm archiving the old `.loop/` to
+   `.loop-archive-<timestamp>/` before starting fresh — a new run must never
+   mix its `iterations/` and `journal.md` with a previous run's. Never
+   silently start a new loop over an old one.
+
+2. **Interaction mode for elicitation.** If an interactive question tool exists
+   (Claude Code: `AskUserQuestion`), use it for the plan-mode-style option picker.
+   Otherwise fall back to numbered plain-text questions with lettered options and
+   an explicit "or type your own answer" line, batched into one message.
+
+3. **Engine availability signals** (facts only — the *recommendation* is
+   intent-first and happens in Phase 1):
+   - The driver script needs a shell, `python3`, and an agent CLI that runs
+     headless (`claude -p ...`, `codex exec ...`, or equivalent).
+   - `/goal` needs Claude Code ≥ v2.1.139, an accepted workspace trust dialog,
+     hooks not disabled, Auto mode for unattended turns, and a session that stays
+     open. You cannot always verify version from inside the session — let the
+     user confirm.
+
+4. **Task tracking.** If a todo tool exists, create entries for the phases.
+
+## Phase 1 — Elicitation
+
+Read `references/elicitation.md` now — full question bank, per-dimension suggested
+options, batching rules. Summary of the rules:
+
+1. **Depth mode first**: quick (infer-heavy, ≈3 confirm calls) vs thorough
+   (every dimension asked, no call cap). Honor standing preferences from user
+   memory/CLAUDE.md silently; detect "越詳細越好"-type intent → thorough;
+   otherwise ask as the first question.
+2. **Pre-fill to sharpen questions, not to skip them**; every plan value
+   carries a provenance tag — `(stated)` verbatim in the prompt, `(asked)`,
+   or `(inferred)`. Detect **unattended intent** ("自己跑到完", "過夜",
+   "無人值守", "跑完叫我", overnight, walk away) → Engine B becomes the
+   recommended option in dimension 9.
+3. **Must-ask dimensions are never inferred, in either direction**: network
+   access, package install, destructive operations, git remote/branch depth,
+   and the final deny_paths list. Absence of mention licenses a question,
+   never a value; conservative values may appear only as recommended options
+   inside a question. The permissions matrix gets its own dedicated call.
+   This outranks every batching guideline.
+4. Every question ships with 2–4 concrete, task-specific options plus free
+   input, with one recommended default and a one-line reason.
+5. Cover all **nine dimensions**: goal, completion criteria, verification
+   method (including who checks — maker–checker), tool permissions (must-ask
+   matrix), scope in/out, iteration budget + stall detection, failure/stall
+   policy, checkpointing + autonomy, **execution engine** (intent-first).
+6. **Completion criteria must be machine-checkable** (command exit code, metric
+   threshold, plateau rule) or explicitly converted to human-checkpoint criteria
+   with a hard cap. Never accept "you'll know when it's done".
+7. **Maker–checker**: the entity that judges completion should not be the entity
+   that did the work, wherever possible. Prefer a verification command whose
+   output cannot be gamed; Engine A adds an independent evaluator; offer a
+   verifier-subagent option if the harness has subagents.
+8. Ask in the user's language; keep technical terms in English.
+
+## Phase 2 — Plan and approval
+
+1. Create `.loop/` and write `LOOP_PLAN.md` from `assets/loop-plan-template.md`.
+   Fill every field with its provenance tag (`stated`/`asked`/`inferred`);
+   write `none` rather than leaving blanks. Plan §9 **must** include the
+   **Crank line**: one sentence stating exactly who starts each next
+   iteration, what must stay true for that to keep happening, and what the kill
+   switch is. This line exists because wrong expectations about the crank are how
+   users end up feeling deceived by "autonomous" loops.
+2. **Inferred-confirmation gate.** Before asking for overall approval, render
+   a separate "**Inferred, not asked**" block: every `(inferred)` value with a
+   one-line consequence (e.g. "no network → literature survey impossible
+   mid-loop"), and have the user confirm or modify these item by item.
+   Must-ask dimensions may never appear in this block — if one does, that is
+   an elicitation bug: go back to Phase 1 and ask. Only low-risk leftovers
+   belong here.
+3. **Paste the complete plan into the conversation** and ask: approve, or change?
+   When presenting, restate the Crank line in plain words (e.g. Engine A: "這個
+   loop 由 /goal 的 evaluator 驅動,一次推進一個 turn;只在這個 client 開著、Auto
+   mode 開啟時前進;它不是背景工作;kill switch 是 /goal clear"). Apply requested
+   changes, re-render, repeat until explicit approval. Silence or a topic change
+   is not approval.
+4. On approval, write `.loop/policy.json` from plan §4/§5, create
+   `.loop/iterations/`, copy `assets/check-scope-template.py` to
+   `.loop/check_scope.py`, create an empty `.loop/LESSONS.md`, seed
+   `.loop/backlog.json` when plan §2 defines one (the run appends items and
+   flips `passes` with evidence — it never deletes or rewords an item),
+   record the git origin (branch + HEAD sha) and, when plan §8 uses git
+   checkpointing, create and switch to `loop/<slug>` from that clean HEAD
+   (git checkpoint protocol; dirty tree → pause and ask), and initialize
+   `state.json` (atomic writes from here on — tmp file, then rename):
+   ```json
+   {"status": "running", "stop_reason": null,
+    "iteration": 0, "max_iterations": <N>, "stall_threshold": <K>,
+    "best_metric": null, "iterations_since_improvement": 0,
+    "git": {"origin_branch": "<name|none>", "origin_head": "<sha|none>",
+             "loop_branch": "loop/<slug>|none"},
+    "started_at": "<ISO8601>", "updated_at": "<ISO8601>"}
+   ```
+   write the plan-approved header into `journal.md`, then **wire the engine**:
+
+   - **Engine B**: instantiate `.loop/run_loop.sh` from
+     `assets/run-loop-template.sh` — edit its CONFIG block defaults to plan
+     §9's values (AGENT_CMD_JSON, PROMPT_MODE, MAX_WALL_MINUTES,
+     ITERATION_TIMEOUT_MINUTES, SLEEP_SECONDS; integers, no unit suffix) —
+     and `.loop/ITERATION_PROMPT.md` from
+     `assets/iteration-prompt-template.md`, replacing every `<placeholder>`
+     from the plan. `chmod +x .loop/run_loop.sh`. Tell the user how to launch —
+     **pilot one iteration first** (`MAX_LAUNCHES=1 bash .loop/run_loop.sh`,
+     watch it write a record, append the journal, and commit; this shakes out
+     headless permission/auth bricking before bed), then `nohup`/`tmux` for
+     true walk-away runs — and that rerunning the script later resumes from
+     `state.json`.
+   - **Engine A**: **hard gate first** — confirm with the user that Auto mode
+     will be ON and the client will stay open for the whole run; if their intent
+     is actually unattended, stop and recommend Engine B instead. Then compose
+     the goal condition using the STOP-framing template in
+     `references/execution.md` §Engine A (criteria inlined verbatim, the
+     LOOP STATUS clause spelled out as a STOP signal, a turn cap; ≤4,000 chars),
+     store it in plan §9, and hand the user the exact command:
+     `/goal <condition>` — or headless `claude -p "/goal <condition>"`.
+   - **Engine C**: no wiring; proceed to Phase 3 under the continuation
+     discipline in `references/execution.md` §Engine C.
+
+Do not execute a single loop action before approval — this gate is the point.
+
+## Phase 3 — Execution
+
+Read `references/execution.md` before the first iteration. The per-iteration
+protocol (reload state → one hypothesis → execute → verify verbatim → record →
+decide) is identical for all engines; **the engine only determines who starts the
+next iteration**:
+
+- **Engine B**: one iteration per process. The script restarts you; your job ends
+  at the `LOOP STATUS:` line. You have no memory of prior iterations — the files
+  are your memory.
+- **Engine A**: one iteration per turn. Ending the turn is *correct* — the
+  evaluator restarts it while the session lives. End every turn with a
+  `LOOP STATUS:` line.
+- **Engine C**: nothing restarts you. After a "continue" decision, the next action
+  **in the same response** is Step 1 of the next iteration. Ending your message
+  while `status` is `"running"` kills the loop.
+
+Non-negotiable rules (full rationale in execution.md): evidence or it didn't
+pass; never weaken a criterion to pass it; never touch out-of-scope paths or
+disallowed tools — pause instead; one change-set per iteration; print
+verification output to the conversation, not only the journal; and never
+print a status you cannot evidence — a false `converged` to end the loop is
+the one unforgivable move.
+
+## Phase 4 — Termination and report
+
+Set `status` to `converged | max_iterations | stalled | aborted | blocked`
+with its matching `stop_reason` (see references/execution.md §State schema),
+then report: outcome with evidence, per-criterion pass/fail table, trajectory
+(iterations, metric progression, best iteration), leftovers and suggested next
+steps — in the conversation and in `.loop/FINAL_REPORT.md` (under Engine B
+the driver already wrote a machine summary there; extend it, don't discard
+it). For non-converged outcomes, offer: extend budget, amend plan, accept
+best-so-far, or roll back.
+
+## Cross-environment notes
+
+- **Feature-detect, never assume.** `/goal`, question tools, todo tools, git, and
+  subagents are all optional. Hard requirements: read/write files, run shell
+  commands, converse.
+- **Other harnesses (Codex, Antigravity, …)**: Engine B is the portable path —
+  set the driver's `AGENT_CMD_JSON` to that harness's headless command. Engine C is
+  the in-session fallback everywhere.
+- **No git?** Checkpoint by copying changed files to `.loop/checkpoints/iter-<N>/`.
+- **Small-model discipline.** When unsure mid-loop, re-read `LOOP_PLAN.md` and
+  `references/execution.md` instead of improvising. About to do something the
+  plan doesn't cover → that is the pause signal, not a judgment call.
+- **Language.** User-facing prose follows the user's language; `.loop/` field
+  names, `state.json` keys, status values, and the `LOOP STATUS:` line stay in
+  English exactly as templated so scripts and later sessions can parse them.
+
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw '.loop\\ITERATION_PROMPT.md'" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+ succeeded in 13942ms:
+# ITERATION_PROMPT — one iteration of a pre-approved engineering loop
+
+You are executing exactly ONE iteration of a pre-approved autonomous loop, then
+you must stop. You have no memory of previous iterations; all truth lives in
+files. An external driver script decides whether another iteration runs — that
+is not your job.
+
+Project: HTDemucs GPU FX (JUCE Windows standalone) — goal: integrate all 99
+MelBand RoFormer source-separation models (repo:
+https://github.com/openmirlab/melband-roformer-infer) per `.loop/LOOP_PLAN.md`.
+Windows notes: use `python` (anaconda), never bare `python3`; conda is at
+`C:\Users\<user>\anaconda3\Scripts\conda.exe`; builds go through
+`.loop\checks\*.cmd` (VsDevCmd inside). 回報與 journal 敘述用繁體中文；JSON keys、
+status 值與 LOOP STATUS 行保持英文。
+
+## Protocol (follow in order, skip nothing)
+
+1. Read `.loop/LOOP_PLAN.md` in full — goal, completion criteria, verification
+   commands, tool permissions, scope, budgets, policies. It is the signed spec;
+   nothing you "remember" overrides it. Also read `.loop/policy.json` — the
+   machine-readable permission/scope rules you must stay inside — and
+   `.loop/LESSONS.md`: every sign in it binds this iteration.
+2. Read `.loop/state.json`, `.loop/backlog.json`, the newest 1–3 records in
+   `.loop/iterations/` (highest-numbered files), and the tail of
+   `.loop/journal.md`.
+3. Operator files, then status:
+   - If `.loop/STOP` exists: delete it; then, only if `state.json` `status`
+     is `"running"`, atomically set it to `"aborted"` / `"manual_abort"` and
+     print `LOOP STATUS: aborted — manual stop file` and stop immediately.
+     A stale STOP beside a terminal status is only removed — never overwrite
+     a recorded outcome.
+   - If `.loop/STEER.md` exists: it is a one-shot operator directive — it
+     steers this iteration's hypothesis within the plan's scope and
+     permissions (it cannot grant new ones). Quote it in this iteration's
+     journal entry, and delete the file only after that entry is written.
+   - If `state.json` `status` is not `"running"`, print
+     `LOOP STATUS: <status> — halting` and stop immediately.
+4. Choose ONE change-set: a single hypothesis, "if I do X, criterion/metric Y
+   should improve because Z" — within scope, using only allowed tools, and not
+   an approach the records already show as failed (unless you can state what
+   is different this time). Target the highest-priority `.loop/backlog.json`
+   item with `"passes": false`; work you discover along the way is appended to
+   the backlog as a new item (`"source": "discovered"`), never absorbed into
+   this change-set. If the working tree is unexpectedly dirty or the newest
+   record shows a crash mid-write, first re-run the cheap verification tier to
+   establish the inherited baseline and journal it as handoff breakage, not as
+   your change's effect.
+5. Execute the change-set. Track every file you touch.
+6. Run the verification command(s) from the plan VERBATIM, capturing each
+   command's exit code:
+   - Cheap tier (EVERY iteration): `cmd /c .loop\checks\cheap.cmd`
+   - Full tier (when this iteration's number is a multiple of 5, and ALWAYS
+     before declaring convergence): `cmd /c .loop\checks\full.cmd` AND the
+     backlog checker
+     `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"`
+   Print the real output. Never paraphrase a result, never claim a pass
+   without the output shown.
+7. Scope self-check: run `python .loop/check_scope.py` and print its output.
+   On violation (exit 2): revert the out-of-policy changes if trivially
+   revertable, otherwise this iteration's status is `"blocked"` with
+   `stop_reason` `"blocked_permission_required"`.
+8. Decide this iteration's `decision`, `status`, and `stop_reason` — first
+   match wins:
+   - ALL completion criteria pass with verification output printed this run
+     (full tier + backlog checker + an independent fresh-context re-verify via
+     a Task subagent that re-runs `cmd /c .loop\checks\full.cmd` from scratch)
+     → `"converged"` / `"criterion_met"`
+   - this run's own iteration number (state.json `iteration` + 1) ≥ 60 →
+     `"max_iterations"` / `"iteration_budget_exhausted"`
+   - `iterations_since_improvement` ≥ 6 and the plan's stall policy
+     (strategy-switch, max 1) is exhausted → `"stalled"` /
+     `"stalled_no_metric_improvement"`
+   - verification command itself errored this run AND the previous record
+     shows the same → `"blocked"` / `"blocked_verification_unavailable"`
+   - the fix requires out-of-scope changes or disallowed tools → `"blocked"` /
+     `"blocked_permission_required"` — the journal Note must state three
+     fields: **Missing**, **Why**, **Unlocks**; a criterion appears wrong or
+     unachievable → `"blocked"` / `"blocked_criterion_doubt"`
+   - otherwise → `decision` `"continue"`, `status` stays `"running"`,
+     `stop_reason` `null`
+9. Write the structured record `.loop/iterations/<NNNN>.json` (zero-padded
+   iteration number, e.g. `0003.json`), atomically (write `.tmp`, rename):
+
+   ```json
+   {
+     "iteration": 3,
+     "timestamp": "<ISO8601>",
+     "hypothesis": "...",
+     "files_touched": ["plugin/..."],
+     "commands": [{"cmd": "cmd /c .loop\\checks\\cheap.cmd", "exit_code": 0, "timed_out": false}],
+     "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+     "metrics": {"name": "backlog_items_passing", "value": 3, "improved": true},
+     "decision": "continue",
+     "status": "running",
+     "stop_reason": null
+   }
+   ```
+
+   Update `.loop/backlog.json` atomically too: flip `passes` (and set
+   `evidence`) only for items whose proof was printed this run; append
+   discovered items; never delete or reword an item.
+10. Append the human-readable entry to `.loop/journal.md` (never rewrite old
+    entries): hypothesis, files touched, verification command + verbatim
+    output (last ~50 lines + key lines), criteria pass/fail, metric value,
+    decision, one-line lesson (mandatory if the hypothesis failed). When the
+    lesson is a rule future iterations must obey, also append it to
+    `.loop/LESSONS.md` as `- SIGN (iter <N>): <rule>`.
+11. Update `.loop/state.json` **atomically — write `state.json.tmp`, then
+    rename; never edit in place**. Fields: `iteration` += 1; `updated_at` =
+    now; if a new criterion passed or ≥1 backlog item newly passes, update
+    `best_metric` (= count of passing backlog items) and set
+    `iterations_since_improvement` to 0, else increment it; `status` and
+    `stop_reason` from step 8. All file I/O with `encoding="utf-8"`.
+12. Checkpoint: `git add -A` the change-set and commit on branch
+    `loop/melband-roformer` with message
+    `loop(iter-<N>): <status> — <short summary>`; commit even when
+    verification failed. Never switch branches, never touch remotes. If
+    checkpointing fails, set `status` `"blocked"` /
+    `"blocked_checkpoint_failed"` and update `state.json` again atomically.
+13. Print exactly one final line and stop:
+    `LOOP STATUS: <status> — <one-line summary>`
+    Do NOT begin another iteration. Do NOT ask questions — route everything
+    through `status` + `stop_reason` + the records.
+
+## Hard rules
+
+- Never weaken, delete, or reinterpret a completion criterion or test to make
+  it pass; that is the `"blocked_criterion_doubt"` path.
+- Print `LOOP STATUS: converged` only when ALL criteria genuinely passed with
+  output printed this run. Never print a status you cannot evidence.
+- Backlog items are append-only: flip `passes` with printed evidence; never
+  delete or reword an item.
+- Never touch paths in `policy.json` `deny_paths`, or outside `allow_paths`
+  when it is non-empty, even when convenient. Model weight downloads go ONLY
+  to `C:\CodexProjects\SourceSeparation_GPU_FX\verify\roformer-cache\` (max 3
+  weights, delete oldest after verification).
+- Never delete or overwrite pre-existing files (`allow_delete: false`);
+  editing files within your own change-set is not deletion; deleting cached
+  model weights inside `verify\roformer-cache\` is the one allowed exception.
+- Network is download/reference only (HF models, PyPI/GitHub packages, docs);
+  NEVER upload, push, or publish anything.
+- Package installs go ONLY into the `htfx-roformer` conda env.
+- All writes to `.loop/state.json` and `.loop/iterations/*.json` use the
+  atomic tmp+rename protocol, `encoding="utf-8"` explicitly.
+- Do not gold-plate: macOS/VST3, frozen-runtime packaging, and separation
+  quality metrics are explicitly waived this run.
+- One hypothesis per run — attribution is the point of the loop.
+- User-facing prose in 繁體中文; JSON keys, status values, `stop_reason`
+  values, and the `LOOP STATUS:` line stay in English exactly as above.
+
+
+codex
+The loop prompt is loaded. Before changing anything, I’m now reloading the signed plan, policy, lessons, durable state, backlog, recent iteration records, journal tail, and the loop execution protocol exactly as required.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw 'C:\\Users\\<user>\\.codex\\skills\\loop-engineering\\references\\execution.md'; Get-Content -Raw '.loop\\LOOP_PLAN.md'; Get-Content -Raw '.loop\\policy.json'; Get-Content -Raw '.loop\\LESSONS.md'; Get-Content -Raw '.loop\\state.json'; Get-Content -Raw '.loop\\backlog.json'; "'$recent = Get-ChildItem '"'.loop\\iterations' -File | Sort-Object Name -Descending | Select-Object -First 3; foreach ("'$f in ($recent | Sort-Object Name)) { Write-Output "===== $($f.Name) ====="; Get-Content -Raw $f.FullName }; Write-Output '"'===== JOURNAL TAIL ====='; Get-Content '.loop\\journal.md' -Tail 180; Write-Output '===== OPERATOR FILES ====='; Get-ChildItem '.loop\\STOP','.loop\\STEER.md' -ErrorAction SilentlyContinue | Select-Object FullName,Length" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+2026-08-23T03:54:38.290131Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 8.8 seconds
+Total output lines: 657
+Output:
+# Execution protocol
+
+Read this once before iteration 1, and re-read it whenever you are unsure what to
+do mid-loop. Uncertainty mid-loop is a signal to consult the files, not to
+improvise — improvisation is how loops drift.
+
+## State schema: status and stop_reason
+
+Exits come in three kinds — **converged** (success with evidence),
+**ceilings** (iteration budget, wall clock, iteration timeout, turn cap), and
+**escape hatches** (`blocked`, `stalled`, `paused`, `aborted`). The tables
+below are the complete exit set: if the loop is stopping for a reason not
+listed, pick the nearest hatch and explain in the journal — never invent a
+new status.
+
+Canonical status set — use these exact strings everywhere (state.json, LOOP
+STATUS lines, /goal conditions, driver, reports):
+
+`running | converged | paused | blocked | stalled | aborted | max_iterations`
+
+Every non-`running` status carries a machine-readable `stop_reason`
+(`running` → `null`):
+
+| stop_reason | typical status | meaning |
+|---|---|---|
+| `criterion_met` | converged | all completion criteria passed with evidence |
+| `iteration_budget_exhausted` | max_iterations | hit `max_iterations` |
+| `max_wall_time` | aborted | driver wall-clock ceiling reached |
+| `stalled_no_metric_improvement` | stalled | `stall_threshold` hit, stall policy exhausted |
+| `stalled_no_state_update` | blocked | agent launches not advancing `iteration` (driver-detected) |
+| `blocked_permission_required` | blocked | needs out-of-scope change / disallowed tool / scope violation |
+| `blocked_verification_unavailable` | blocked | verification command itself errors repeatedly |
+| `blocked_external_dependency` | blocked | blocked on something outside the repo |
+| `blocked_criterion_doubt` | blocked | a criterion appears wrong or unachievable |
+| `blocked_checkpoint_failed` | blocked | git/file checkpointing itself failed |
+| `user_pause_required` | paused | human checkpoint due per plan |
+| `manual_abort` | aborted | user said stop |
+| `aborted_agent_error` | aborted | agent process failing hard, no cleaner category |
+
+`state.json` full schema (all writes atomic — tmp file, then rename):
+
+```json
+{"status": "running", "stop_reason": null,
+ "iteration": 0, "max_iterations": 10, "stall_threshold": 3,
+ "best_metric": null, "iterations_since_improvement": 0,
+ "git": {"origin_branch": "main", "origin_head": "<sha>",
+          "loop_branch": "loop/<slug>"},
+ "started_at": "<ISO8601>", "updated_at": "<ISO8601>"}
+```
+
+Structured per-iteration records live in `.loop/iterations/<NNNN>.json`
+(schema in the iteration prompt): `journal.md` is for humans; the records are
+what lets the next fresh-context agent — or the final report — recover state
+without parsing prose.
+
+`.loop/backlog.json` (optional — multi-item goals, seeded in Phase 2) is a
+JSON array:
+
+```json
+[{"id": "B1", "title": "tests/api all green", "passes": false,
+  "priority": 1, "source": "plan", "evidence": null}]
+```
+
+`id`/`title`/`passes` are required; `priority` (1 = first), `source`
+(`plan` | `discovered`), `evidence` (one line: iteration + command that
+proved it), and optional `check` (a command that proves this item on its own)
+keep the audit trail. Append-only discipline: add items, flip `passes` with
+printed evidence, never delete or reword. Note the all-passes checker counts
+flags the worker itself flipped — bookkeeping, not proof — which is why the
+plan must AND it with at least one ungameable command criterion (or use
+per-item `check` commands). `.loop/LESSONS.md` is
+its prose sibling: an append-only list of one-line signs
+(`- SIGN (iter 3): <rule>`) that every later iteration reads and obeys —
+the lessons that would otherwise scroll out of the journal tail.
+
+## Engines: who starts the next iteration
+
+The single most common way loops fail is that nothing restarts them: the model
+finishes one pass, summarizes, and ends its turn. Each engine solves this
+differently. Know which engine the plan specifies and follow its section exactly.
+Every plan carries a **Crank line** (plan §9) naming who starts each next
+iteration, what must stay true, and the kill switch — quote it when reporting.
+
+### Engine B — external driver script (the unattended default)
+
+Mechanics: `.loop/run_loop.sh` (instantiated in Phase 2 from
+`assets/run-loop-template.sh`) loops while `state.json` says `status ==
+"running"` and ceilings are unbreached, invoking `AGENT_CMD_JSON` once per
+iteration with the fixed prompt in `.loop/ITERATION_PROMPT.md`. Each invocation is a
+**fresh context** — the Ralph insight: intelligence comes from the spec, the
+verifiable checks, and the on-disk state, not from one long session. Under
+`nohup`/`tmux` it keeps cranking with the terminal closed and the human asleep;
+this is why unattended intent defaults here.
+
+Crank line: *the driver process starts every next iteration; it keeps cranking
+while the process lives and `state.json` says `running`; kill switch:
+`touch .loop/STOP`, Ctrl+C / kill the process, or set `status` in
+`state.json`.*
+
+Consequences you must respect as the worker model (when you are the invoked
+iteration):
+
+1. You remember nothing. Step 1 of the checklist (read plan, state, journal
+   tail) is your entire memory. Trust files over any impression of familiarity.
+2. Do exactly one iteration, print the `LOOP STATUS:` line, and stop. Never
+   start a second iteration — the driver owns continuation, and double
+   iterations corrupt the state accounting.
+3. To stop the loop for any reason, set `state.json` `status` accordingly; the
+   driver reads it before every launch. That is *your* only channel to the
+   driver — `.loop/STOP` is the operator's.
+4. Leave the working tree clean (checkpoint per plan) — the next iteration
+   starts from what you leave behind.
+
+Driver guarantees (built into the template):
+
+- **Single instance**: a portable `mkdir` lock (`.loop/driver.lockdir`)
+  refuses a second concurrent driver; stale locks after a crash are removed
+  manually (`rmdir .loop/driver.lockdir`).
+- **No lying state**: every driver-side terminal decision (budget, wall
+  clock, dead-agent guard, scope violation) is written back to `state.json`
+  atomically with a `stop_reason` — the file never ends a run still saying
+  `running`.
+- **Real exit codes**: the agent runs via a JSON-argv subprocess wrapper
+  (`AGENT_CMD_JSON`, `PROMPT_MODE=arg|stdin`) and the driver captures the
+  agent's exit code, not `tee`'s.
+- **Scope enforcement outside the model**: after each iteration the driver
+  runs `.loop/check_scope.py` (if present); a violation while status is still
+  `running` sets `blocked` / `blocked_permission_required`.
+- **Wall clock is opt-in**: `MAX_WALL_MINUTES=0` (default) disables it; a
+  non-zero value must mirror plan §6 `max_wall_time` — the driver never
+  imposes a ceiling the plan doesn't state.
+- **Hang guard**: `ITERATION_TIMEOUT_MINUTES` (0 = disabled; mirrors plan §6
+  `iteration_timeout`) kills an agent run that exceeds it (process-group
+  SIGTERM→SIGKILL, exit code 124) — a stuck headless permission prompt or
+  network call cannot silently end an overnight run; the dead-agent guard
+  then counts it as a failed launch.
+- **Pilot mode**: `MAX_LAUNCHES=N` stops the driver after N launches, state
+  untouched. `MAX_LAUNCHES=1 bash .loop/run_loop.sh` is the mandatory first
+  run: watch one iteration write its record, append the journal, and commit —
+  auth, permission-allowlist, and prompt bugs surface here, not at 3 a.m.
+- **Kill-switch file**: `touch .loop/STOP` — the driver aborts
+  (`aborted`/`manual_abort`) before the next launch and removes the file.
+  Easier than editing JSON, works from any shell, and the worker honors the
+  same file at the start of its next iteration (checklist Step 1) — which
+  also makes STOP work under Engines A and C.
+- **Final report**: on termination the driver writes `.loop/FINAL_REPORT.md`
+  from `state.json` + `iterations/*.json` (status, stop_reason, criteria/
+  metric trajectory, files touched). For the full human-facing Phase 4 report,
+  re-invoke the skill in an interactive session — it will read the same files.
+
+Operator notes (tell the user in Phase 2): **pilot first** —
+`MAX_LAUNCHES=1 bash .loop/run_loop.sh` and watch one full iteration succeed;
+then `bash .loop/run_loop.sh` (foreground) or `nohup bash .loop/run_loop.sh &`
+/ inside `tmux` for walk-away runs; rerunning the script later resumes from
+`state.json`. Headless agent invocations answer no interactive permission
+prompts — a tool call that would prompt simply fails — so grant the minimal
+allowlist the plan's verification and checkpoint commands need (e.g. Claude
+Code `--allowedTools "Bash(pytest:*) Bash(git:*) Edit Write Read"`); that
+argues for tighter tool permissions and scope in the plan, and ideally a
+sandbox or dedicated branch/worktree. A wrong allowlist is exactly what the
+pilot run exists to catch. Rerunning resumes only while state says `running`;
+after a `paused`/`blocked` stop, first set `status` back to `"running"` and
+`stop_reason` to `null`, then rerun. Mid-run controls: `touch .loop/STOP`
+aborts cleanly; writing `.loop/STEER.md` hands the next iteration a one-shot
+directive (read → journaled → deleted).
+
+### Engine A — Claude Code `/goal` (attended hands-free; not a background job)
+
+**Hard prerequisites — confirm all of these with the user before handing over
+the command; if any fails, or the real intent is unattended, recommend Engine B
+instead:**
+
+1. Claude Code ≥ v2.1.139, workspace trust dialog accepted, hooks enabled.
+2. **Auto mode ON** (tool calls auto-approved). Without it the loop halts at
+   the first permission prompt. This is a hard precondition, not an
+   optimization.
+3. **The session stays open for the whole run.** `/goal` advances **exactly one
+   turn per Stop-hook evaluation**, and only in a live session. It is not a
+   scheduler, not a daemon, not background work. Closing the client, sleeping
+   the laptop, or losing the session stops the crank (a still-active goal is
+   restored on `--resume`, with counters reset).
+
+Crank line: *the /goal Stop-hook evaluator starts every next turn; it keeps
+cranking only while this client is open, the goal is active, and Auto mode is
+on; kill switch: `/goal clear` (interactive) or Ctrl+C (headless `claude -p`).*
+
+Mechanics: the user runs `/goal <condition>`. Setting the goal starts a turn
+immediately with the condition as the directive. After every turn, an
+independent small evaluator model reads the **conversation transcript** (it
+cannot run tools or read files) and answers yes/no; if the loop should
+continue, a new turn starts with the evaluator's reason as the next
+instruction. Headless variant: `claude -p "/goal <condition>"` runs the loop in
+one foreground process.
+
+Consequences you must respect as the worker model:
+
+1. **One iteration per turn.** Run the full per-iteration checklist inside the
+   turn, then end the turn. Ending the turn is safe and required — the
+   machinery restarts it.
+2. **The evaluator sees only what you print.** Verification output must appear
+   in the conversation, not just in the journal. A criterion whose evidence was
+   never printed is, to the evaluator, unmet.
+3. **Never ask the user questions mid-loop** — a question doesn't pause
+   anything; the evaluator just restarts you. Route everything through the
+   `LOOP STATUS:` line.
+4. End **every** turn with exactly one line in this format:
+   `LOOP STATUS: running — iteration 3 recorded, criterion C1 still failing`
+   `LOOP STATUS: paused — human checkpoint due per plan §8`
+   Allowed statuses: `running | converged | paused | blocked | stalled |
+   aborted | max_iterations`.
+
+**Honest failure modes — state these to the user up front:**
+
+- `paused`/`blocked`/`stalled` stop the loop **only if the evaluator honors the
+  STOP clause in the condition**. The evaluator is a small model; if the
+  condition doesn't spell out that these statuses mean STOP, its literal
+  reading of "is the goal met?" is "not met → continue", and the loop is
+  trapped restarting a worker that is trying to stop. Even with the clause,
+  treat stopping as *likely, not guaranteed* — if the loop keeps restarting
+  after a `paused`/`blocked` status, the human must run `/goal clear`.
+- There is no built-in token budget; the turn cap inside the condition is the
+  only ceiling the evaluator enforces.
+
+Composing the goal condition (done in Phase 2; stored in plan §9). **Frame the
+question the evaluator answers as "should the loop STOP", never as "is the
+work converged."** Rules:
+
+- The evaluator cannot read `.loop/LOOP_PLAN.md`, so **the criteria must be
+  spelled out verbatim inside the condition text**. The plan file is for the
+  worker; the condition is for the judge.
+- Enumerate STOP causes explicitly — success is only one of them. Escape
+  statuses and the turn cap are the others, and each must be labeled as a
+  STOP-the-loop answer, not left for the evaluator to infer.
+- Keep it under 4,000 characters. One goal per session; compound unrelated
+  objectives overwhelm the evaluator — split into sequential goals.
+- Sanity-check from the evaluator's perspective before handing it over: "if
+  the worker's last message says `LOOP STATUS: blocked`, does this text
+  unambiguously tell me to answer YES (stop)?"
+
+Template:
+
+```
+Directive for the worker: work per the approved plan in .loop/LOOP_PLAN.md —
+one loop iteration per turn, update .loop/state.json and append to
+.loop/journal.md every turn, print all verification output in the
+conversation, never ask the user questions, and end every turn with a
+"LOOP STATUS:" line.
+
+Condition for the evaluator: answer YES (goal satisfied — STOP the loop) if
+ANY of the following holds:
+(a) ALL of these criteria pass, with their verification output printed in the
+conversation this session: <criterion 1: command + expected observable
+result>; <criterion 2: …>;
+(b) the assistant's latest message contains a line starting with
+"LOOP STATUS:" followed by converged, paused, blocked, stalled, aborted, or
+max_iterations — treat paused, blocked, stalled, aborted, and max_iterations
+as STOP-the-loop signals, NOT as "not yet done";
+(c) <N> turns have elapsed since this goal was set.
+Otherwise answer NO (the loop continues).
+```
+
+### Engine C — in-session self-loop
+
+No machinery restarts you. Crank line: *the worker model itself starts each
+next iteration inside its own response; the crank stops the moment the model
+ends its message; kill switch: none needed — it dies on its own too easily.*
+
+Continuation discipline:
+
+1. After a Step 6 decision of "continue", the next thing **in the same
+   response** is Step 1 of the next iteration. Not a summary, not a question,
+   not an offer to continue. A completed iteration is not a completed task.
+2. Ending your message while `status` is `"running"` terminates the loop —
+   treat it as a bug in your own behavior, equivalent to a driver script
+   crashing.
+3. You may only end your message when `status` is `converged`, `paused`,
+   `blocked`, `stalled`, `aborted`, `max_iterations` — or when the turn genuinely cannot continue
+   (context exhaustion), in which case set `status` to `"paused"` first, write
+   the journal entry, and tell the user to re-invoke to resume.
+4. If a todo tool exists, pre-create one item per remaining budgeted iteration
+   and check them off — visible unfinished items counteract the end-turn bias.
+
+Engine C is the least reliable engine by construction. If it keeps dying after
+one iteration, recommend the user rerun with Engine B (or A, if attended)
+rather than trying harder.
+
+## The per-iteration checklist
+
+Identical for all engines. Run every iteration exactly in this order; do not
+skip the recording step even when an iteration "obviously failed".
+
+### Step 1 — Reload state
+Read `.loop/LOOP_PLAN.md` and `.loop/state.json`; read `.loop/LESSONS.md` if
+present — every sign in it binds this iteration; skim the last 3 journal
+entries. Confirm `status` is `running`; if not, print
+`LOOP STATUS: <status> — halting` and stop. Disk wins over memory, always.
+Operator files: if `.loop/STOP` exists, delete it — then, only if `status`
+is `running`, set `aborted`/`manual_abort` (atomic) and halt with the LOOP
+STATUS line; a stale STOP beside a terminal status is removed without
+overwriting the recorded outcome. If `.loop/STEER.md` exists, it is a
+one-shot operator directive — it steers this iteration's hypothesis within
+the plan's scope and permissions (it cannot grant new ones), is quoted in
+this iteration's journal entry, and is deleted only once that entry is
+written (journal-then-delete — a crash before journaling re-applies it).
+If the working tree is unexpectedly dirty or the newest record shows a crash
+mid-iteration, re-run the cheap verification tier *before* changing anything
+and journal the result as the inherited baseline — pre-existing breakage is
+attributed to the handoff, never to this iteration's change.
+
+### Step 2 — Plan one change-set
+State the single hypothesis this iteration tests: "if I do X, criterion/metric
+Y should improve because Z". One hypothesis per iteration — attribution is the
+whole point of looping. It must be in scope and within allowed tools; if it
+cannot be, go to the escape hatches. Never retry an approach the journal
+records as failed unless you can say what is different this time.
+If `.loop/backlog.json` exists, the hypothesis targets the highest-priority
+item with `"passes": false`. Work discovered mid-iteration becomes a new
+backlog item (`"source": "discovered"`) — never a silent extension of this
+change-set.
+
+### Step 3 — Execute
+Apply the change-set. Track every file touched.
+
+### Step 4 — Verify
+Run the plan's verification command(s) **verbatim** and **print the real
+output to the conversation** (truncate to the last ~50 lines plus metric lines
+for the journal; never paraphrase a result). Two-tier schemes: cheap tier every
+iteration, full tier at the plan's cadence and always before declaring
+convergence. If the command itself errors (cannot run) twice in a row, that is
+the broken-harness hatch — every later "result" would be noise.
+
+### Step 5 — Record (before announcing)
+Determine the Step-6 outcome first, then persist it in three places before
+announcing or acting on it: (1) the structured record
+`.loop/iterations/<NNNN>.json` (schema in the iteration prompt — the
+machine-readable source the next agent and the final report recover from);
+(2) the journal entry (template below); (3) `state.json` — `iteration` += 1;
+`updated_at`; on improvement beyond epsilon or a newly passing criterion,
+update `best_metric` and reset `iterations_since_improvement` to 0, else
+increment it; `status` and `stop_reason` per the decision. **All JSON writes
+are atomic: write `<file>.tmp`, then rename over the target — never edit
+`state.json` or a record in place.** Then checkpoint per the git protocol
+below. Persisting before announcing means a crash between steps loses
+nothing. Backlog runs also update `.loop/backlog.json` atomically here — flip
+`passes` (and set `evidence`) only for items this iteration's printed
+verification proves; append discovered items. When the journal Note's lesson
+is a rule future iterations must obey, also append it to `.loop/LESSONS.md`
+as `- SIGN (iter <N>): <rule>`.
+
+### Step 6 — Decide
+First match wins:
+1. **All criteria pass** (full-tier evidence where defined, printed) →
+   `status: "converged"` → Phase 4.
+2. **Escape hatch fired** (table below) → corresponding status → Phase 4.
+3. **Human checkpoint due** → `status: "paused"`, post checkpoint summary.
+4. Otherwise → continue, per your engine's continuation rule.
+Always end the iteration with the `LOOP STATUS:` line.
+
+## Exit table — ceilings and escape hatches
+
+Budget and Wall clock are ceilings (designed budget exits); every other row
+is an escape hatch (structured early exit). Toget…724 tokens truncated… as run>`
+```
+<verbatim output, last ~50 lines + metric lines>
+```
+**Criteria:** C1: pass/fail · C2: pass/fail · …
+**Metric:** <value or n/a> (best so far: <value>)
+**Decision:** continue | converged | paused | <hatch name>
+**Note:** <lesson learned; mandatory one-liner if the hypothesis failed>
+```
+
+## Git checkpoint protocol (when plan §8 enables git checkpointing)
+
+Before iteration 1 (done during Phase 2 wiring):
+- Record the current branch and HEAD sha into `state.json` `git.origin_branch`
+  / `git.origin_head` (also used by `check_scope.py` as the diff base).
+- The working tree must be clean. If dirty: do not start; set `paused` /
+  `user_pause_required` and ask — stashing or committing the user's work is
+  their decision, never the loop's.
+- Create and switch to `loop/<slug>` from that HEAD. The loop never commits
+  outside this branch.
+
+Each iteration (inside Step 5, after the record/journal/state writes):
+- Stage the change-set's files (including new in-scope files) and commit with
+  message `loop(iter-<N>): <status> — <short summary>`.
+- **Commit even when verification failed.** Checkpoints exist for
+  recoverability and attribution, not endorsement; pass/fail lives in the
+  record and journal.
+- Lockfiles / dependency manifests: only if `policy.json`
+  `permissions.allow_install` is true AND the paths are not in `deny_paths`.
+- If checkpointing itself fails (git errors): `blocked` /
+  `blocked_checkpoint_failed`.
+
+End of loop:
+- **Never auto-switch back to the origin branch** — an unattended `git
+  switch` under the user is a nasty surprise. The final report states origin
+  and loop branch; merging or switching back is the user's Phase 4 decision.
+
+No git available → file-copy checkpoints to `.loop/checkpoints/iter-<N>/`;
+scope enforcement then falls back to the worker's self-check only (state this
+limitation in the plan).
+
+## Amendment protocol
+
+The plan changes mid-run **only** via this path: (1) the user requests it, or
+you pause and propose — never amend unilaterally; (2) append to the plan's
+`## Amendments` section (`- iter <N>, <timestamp>: <field>: <old> → <new>
+(reason)`) and update the field in place — and if the amendment touches plan
+§4/§5, **atomically rewrite `.loop/policy.json` to match**: the driver and
+`check_scope.py` enforce policy.json, not the plan prose; (3) note it in the current journal
+entry; (4) amendments that **loosen completion criteria** require one explicit
+confirmation restating what the loosened criterion no longer guarantees.
+Quietly lowering the bar is the classic failure mode of long-running loops.
+Under Engine A, a criteria amendment also requires the user to re-run `/goal`
+with the updated condition — the old condition keeps judging otherwise.
+
+## Resume protocol
+
+On starting with an existing `.loop/` whose status is `running` or `paused`:
+read the plan in full, the state, the newest 1-3 records in `.loop/iterations/`, and the journal tail; post a resume
+summary (iteration reached, criteria status, best metric, last hypothesis and
+outcome, next intended hypothesis); ask resume / restart (archive to
+`.loop-archive-<timestamp>/`) / abandon. On resume, continue at Step 1. Under
+Engine B this protocol is unnecessary for the invoked iterations (the prompt
+handles it) — it applies to interactive sessions rediscovering the loop.
+
+## Conduct rules and why they exist
+
+- **Evidence or it didn't pass.** A criterion counts as passed only when this
+  iteration printed verification output demonstrating it. Models under
+  iteration pressure drift toward optimistic summaries; verbatim output is the
+  antidote — and under Engine A, the evaluator literally cannot see anything
+  you don't print.
+- **Never weaken the test to pass the test.** Deleting a failing assertion,
+  loosening a tolerance, or special-casing the checker is failing the criterion
+  plus corrupting the loop. A genuinely wrong test is the criterion-doubt
+  hatch: pause and ask.
+- **Out-of-scope means out-of-scope**, precisely at the moment touching it
+  looks convenient.
+- **Do not gold-plate.** Waived concerns are permission to ignore them;
+  unrequested improvements consume budget and risk regressions.
+- **One iteration, one hypothesis.** Batching five changes destroys
+  attribution — you learn nothing from pass or fail. Mid-iteration
+  discoveries become backlog items or journal notes, not scope creep.
+- **A false status is the one unforgivable move.** Print `LOOP STATUS:
+  converged` only when the criteria genuinely passed with evidence printed
+  this run. Emitting a status to escape the loop corrupts every downstream
+  decision — prefer `blocked` plus an honest reason.
+- **Backlog items are append-only.** Flip `passes` with evidence; never
+  delete or reword an item — removing a hard item is the checklist version
+  of deleting a failing test.
+- **User-facing prose in the user's language**; `.loop/` field names, JSON
+  keys, statuses, and the `LOOP STATUS:` line stay in English as templated so
+  scripts, evaluators, and later sessions can parse them.
+
+# LOOP_PLAN — melband-roformer-integration
+
+> Status: APPROVED (2026-08-23T10:30+08:00, user reply "直接LOOP"; inferred items all confirmed)
+> Field names and status values stay in English; free-text values follow the
+> user's language (繁體中文). `none` = empty field.
+
+## 1. Goal
+把 https://github.com/openmirlab/melband-roformer-infer 的全部 99 個 source-separation 模型，以「擴充現有一般面板模型選單為分類式 model browser（分類／搜尋／下載狀態／按需下載）」的 UX 整合進 HTDemucs GPU FX（Windows standalone），推論走獨立 conda env 的開發 Python worker；57 個稽核可用模型端到端必過，42 個未稽核模型收錄並標註 experimental。(stated + asked)
+
+## 2. Completion criteria
+All criteria must hold simultaneously (AND).
+
+| # | Type | Definition | Checked by |
+|---|---|---|---|
+| C1 | command | `cmd /c .loop\checks\full.cmd` exits 0 —— 內含：standalone 建置成功＋`htdemucs_record_mode_smoke`＋`htdemucs_media_io_smoke`＋`htdemucs_ui_configuration_smoke` 全 PASS（不退步）＋新增 `htdemucs_roformer_smoke` PASS | full tier |
+| C2 | command | backlog checker exits 0：`python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` —— 全部 backlog 項目 passes=true | full tier |
+| C3 | command | `python .loop/check_scope.py` exits 0（範圍無違規） | every iteration |
+
+Backlog 語意（asked）：57 個稽核模型每個一項「下載＋SHA-256 驗證→對測試音檔分離→輸出規格驗證（時長不變、stereo、32-bit float、有限值）」必過；42 個未稽核模型每個一項「收錄進 registry/UI＋標註 experimental＋嘗試一次並記錄結果（成敗皆可）」；另含架構項目（conda env、registry 匯入、worker、C++ 整合、model browser UI、下載管理器＋滾動快取、roformer smoke test、README 新章節）。
+Plateau parameters: none
+Combination rule: AND
+Backlog: `.loop/backlog.json` seeded at wiring（架構項目 A1–A10＋模型枚舉項；per-model 項目由早期 iteration 從 repo registry 產生後 append，append-only——flip `passes` with printed evidence, never delete or reword；C2 為記帳、C1 為不可美化的指令證據，兩者 AND）。
+
+## 3. Verification
+- Cheap tier (every iteration): `cmd /c .loop\checks\cheap.cmd` —— 增量建置 standalone＋ui_configuration_smoke＋（存在後）registry 驗證 script 與本次目標模型的單項 check。預期 2–6 分鐘。(asked)
+- Full tier (every 5 iterations and before declaring convergence): `cmd /c .loop\checks\full.cmd`＋C2 backlog checker。(asked)
+- Working directory: `C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22` · Timeout per run: 30 min
+- Checker independence: deterministic commands 為基準；宣告 converged 前必須以 fresh-context verifier（Task subagent 或另起 `claude -p`）從零重跑 full tier 並比對，證據列印。(asked)
+
+## 4. Tool permissions
+Allowed (prose)：shell（建置/測試/conda/pip/ffmpeg/git）；網路僅限下載與查文件（HF 模型、PyPI/GitHub 套件、文件頁），**禁止任何上傳／push／發佈**；套件只裝進獨立 conda env `htfx-roformer`；git 僅本機 commit 於 loop branch（**絕不設 remote、絕不 push**）；不刪除、不整檔覆寫任何既有檔案（在 allow_paths 內編輯原始碼可以；唯一例外：`verify\roformer-cache\` 內模型權重檔可刪——滾動快取需要）；subagents 允許（收斂前獨立重驗）。
+Everything else: disallowed → pause-and-ask (`blocked` / `blocked_permission_required`).
+```json
+{
+  "permissions": {
+    "allow_shell": true,
+    "allow_network": "download_only",
+    "allow_install": "conda_env_htfx-roformer_only",
+    "allow_git_commit": true,
+    "allow_delete": false,
+    "allow_subagents": true
+  },
+  "scope": {
+    "allow_paths": ["plugin/", "cpp/", "worker/", "tests/", "tools/", "assets/models/", "docs/", "CMakeLists.txt", "README.md", ".gitignore"],
+    "deny_paths": ["third_party/", "patches/", "dist/", "build/windows-web/", "assets/models/*.th", "assets/models/*.yaml", "assets/models/model-manifest.json", "AGENTS.md", "CODEX_HANDOFF.md", "THIRD_PARTY_NOTICES.md", "docs/RELEASING_WINDOWS.md", "TRANSFER_BINARY_SHA256.txt", ".gitattributes", ".gitmodules"]
+  }
+}
+```
+Provenance — network: asked · install: asked · git: asked · delete: asked · deny_paths: asked · shell: inferred-confirmed · subagents: inferred-confirmed
+
+## 5. Scope
+- In scope (may modify): `plugin/`、`cpp/`、`worker/`、`tests/`、`tools/`、`CMakeLists.txt`、`assets/models/`（僅新增檔案，例如 roformer registry json）、`docs/`（新增檔案）、`README.md`（新增章節）、`.gitignore`（新增條目）。repo 外：`C:\CodexProjects\SourceSeparation_GPU_FX\verify\roformer-cache\`（模型滾動快取，可建可刪）、`verify\output\`（測試輸出）。
+- Out of scope / do-not-touch: `third_party/`（JUCE＋demucs）、`patches/`、`dist/`、`build/windows-web/`、`assets/models` 既有檔（*.th／*.yaml／model-manifest.json）、五份移交基準文件、`TRANSFER_BINARY_SHA256.txt`、repo 外的 `verify\payload-cuda\`。(asked)
+- Waived concerns: macOS/VST3 路徑不管；frozen runtime／installer 打包不在本輪（留待下一階段）；分離「品質」不設指標（只驗格式與流程正確）。(asked/inferred)
+- Enforcement: worker self-check + Engine B driver post-check via `.loop/check_scope.py`
+
+## 6. Budget
+- max_iterations: 60 (asked)
+- stall_threshold: 6 consecutive iterations without improvement (asked)
+- max_wall_time: none（`MAX_WALL_MINUTES=0`——配合跨用量 reset 續跑）(asked)
+- iteration_timeout: 40 min（`ITERATION_TIMEOUT_MINUTES=40`——懸死防護）(asked)
+- improvement epsilon: 任一 criterion 轉 pass 或任一 backlog 項目轉 passes=true (inferred)
+
+## 7. Failure / stall policy
+strategy-switch（最多 1 次換質性不同方法，再卡即 pause-and-ask）。(asked)
+Broken verification harness (command errors twice in a row): always pause-and-ask.
+
+## 8. Checkpointing & autonomy
+- Checkpointing: git commit every iteration on branch `loop/melband-roformer`（先 `git init` 本機 repo＋main 基準 commit；絕不設 remote）；commit message `loop(iter-<N>): <status> — <summary>`；commit even on failed verification。(asked)
+- Autonomy: fully autonomous until termination（無人值守；`max_iterations` 為安全網）。(stated)
+
+## 9. Execution engine
+- Engine: B — external driver script (asked; 使用者要求「五小時額度耗盡後 reset 自動續跑」)
+- **Crank line**: 外部驅動器 `.loop/run_loop.sh`（Git Bash＋nohup/tmux）發動每一次 iteration，每輪以 `claude -p` 全新 context 執行；只要 driver 程序活著且 `state.json.status=="running"` 就持續；偵測到 usage limit 時睡 20 分鐘重試、不計入 iteration；kill switch：`touch .loop/STOP`、Ctrl+C／kill driver、或改 `state.json`。
+- Engine B — AGENT_CMD_JSON: `["claude","-p","--permission-mode","acceptEdits","--allowedTools","Bash Edit Write Read Glob Grep Task WebFetch WebSearch"]`（headless 無互動提示；Bash 全開——護欄由 policy.json＋deny_paths＋check_scope＋git 承擔；模型用 CLI 預設） · PROMPT_MODE: arg · MAX_WALL_MINUTES: 0 · ITERATION_TIMEOUT_MINUTES: 40 · SLEEP_SECONDS: 10
+  Driver 客製（本專案）：(1) python3 → anaconda `python` shim（Windows Git Bash）；(2) usage-limit 偵測——agent 輸出含 usage/rate limit 樣式且 iteration 未推進時，睡 20 分鐘後重試，不計入 failed launch。
+  Launch — pilot first: `MAX_LAUNCHES=1 bash .loop/run_loop.sh`（看完一輪：record 寫入、journal append、commit 存在）→ `nohup bash .loop/run_loop.sh &`（或 tmux）walk-away · rerun to resume
+
+## Amendments
+- iter 0, 2026-08-23T11:20+08:00: §9 AGENT_CMD_JSON: claude.exe headless → codex.exe `exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox`（原因：claude CLI 在本機未登入（"Not logged in"），headless 無法認證；codex exec 實測已認證可用。引擎仍為 B、其餘不變。使用者已於 2026-08-23 授權自行運行維護）
+- iter 0, 2026-08-23T11:20+08:00: §4 追加使用者規則：絕不允許刪除 `C:\CodexProjects\SourceSeparation_GPU_FX\` 專案根目錄以外的任何檔案（已寫入 LESSONS.md SIGN）
+
+{
+  "permissions": {
+    "allow_shell": true,
+    "allow_network": "download_only",
+    "allow_install": "conda_env_htfx-roformer_only",
+    "allow_git_commit": true,
+    "allow_delete": false,
+    "allow_subagents": true
+  },
+  "scope": {
+    "allow_paths": ["plugin/", "cpp/", "worker/", "tests/", "tools/", "assets/models/", "docs/", "CMakeLists.txt", "README.md", ".gitignore", "CLAUDE.md"],
+    "deny_paths": ["third_party/", "patches/", "dist/", "build/windows-web/", "assets/models/*.th", "assets/models/*.yaml", "assets/models/model-manifest.json", "AGENTS.md", "CODEX_HANDOFF.md", "THIRD_PARTY_NOTICES.md", "docs/RELEASING_WINDOWS.md", "TRANSFER_BINARY_SHA256.txt", ".gitattributes", ".gitmodules"]
+  }
+}
+
+# LESSONS — append-only signs; every iteration must obey all of these
+
+- SIGN (wiring): cmake 不在 PATH——建置一律走 `.loop\checks\cheap.cmd`／`full.cmd`（內含 VsDevCmd），或先 call VsDevCmd.bat。CMake target 名稱先查 CMakeLists.txt。
+- SIGN (wiring): conda 完整路徑 `C:\Users\<user>\anaconda3\Scripts\conda.exe`；anaconda base python=3.13.5 torch 2.8.0+cu126（cuda 可用）。套件只裝進 `htfx-roformer` env。
+- SIGN (wiring): ffmpeg=`C:\ffmpeg-master\bin\ffmpeg.exe`（media_io_smoke 硬編碼此路徑）；測試 fixtures 在 `C:\CodexProjects\SourceSeparation_GPU_FX\verify\fixtures\`（test_48k_2s.wav）。
+- SIGN (wiring): RoFormer 模型快取固定 `C:\CodexProjects\SourceSeparation_GPU_FX\verify\roformer-cache\`，同時最多 3 個權重，驗證完即刪最舊的；絕不下載到 C: 其他位置（磁碟只剩約 55 GB）。
+- SIGN (wiring): 所有 `.loop/` JSON 讀寫必須 `encoding="utf-8"`；state/record 寫入一律 tmp+rename 原子操作。
+- SIGN (wiring): smoke tests 的正式 sidecar 靠 junction `build\windows-installed\Release\Resources\sidecar`→`verify\payload-cuda\Resources\sidecar`；若 junction 不存在會導致 record_mode_smoke 失敗——用 `New-Item -ItemType Junction` 重建，不要改 test 程式。
+- SIGN (wiring): 上游 repo https://github.com/openmirlab/melband-roformer-infer（MIT）；registry 在其 `src/mel_band_roformer/data/melband_models.json`；預設下載快取為 `~/.cache/melband-roformer-infer/`——需將其導向本專案快取目錄（環境變數 `MELBAND_ROFORMER_MODELS_PATH` 或 `--models_dir`）。
+- SIGN (user, 2026-08-23): 絕對不允許刪除 `C:\CodexProjects\SourceSeparation_GPU_FX\` 專案根目錄以外的任何檔案（包含 ~/.cache、temp 等）；專案內也僅限 `verify\roformer-cache\` 的權重檔可刪。
+
+{
+  "status": "running",
+  "stop_reason": null,
+  "iteration": 0,
+  "max_iterations": 60,
+  "stall_threshold": 6,
+  "best_metric": null,
+  "iterations_since_improvement": 0,
+  "git": {
+    "origin_branch": "main",
+    "origin_head": "24bfb70f2c4de22ba92996cdcee08ac8ecbff9e6",
+    "loop_branch": "loop/melband-roformer"
+  },
+  "started_at": "2026-08-23T10:50:55+08:00",
+  "updated_at": "2026-08-23T10:50:55+08:00"
+}
+
+[
+  {"id": "A1", "title": "conda env htfx-roformer 建立且 melband-roformer-infer 安裝完成：`conda run -n htfx-roformer melband-roformer-infer --help` 退出碼 0", "passes": false, "priority": 1, "source": "plan", "evidence": null, "check": "C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe run -n htfx-roformer melband-roformer-infer --help"},
+  {"id": "A2", "title": "從上游 registry 產生 assets/models/roformer-manifest.json（99 項，含 name/category/url/sha256/size/audited 旗標）且 tools/validate_roformer_manifest.py 驗證退出碼 0", "passes": false, "priority": 2, "source": "plan", "evidence": null},
+  {"id": "A3", "title": "RoFormer worker 模組（worker/ 新增）可 headless 對 C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures 合成音檔完成一次分離並輸出有效 WAV（時長不變/stereo/32-bit float/有限值）", "passes": false, "priority": 3, "source": "plan", "evidence": null},
+  {"id": "A4", "title": "C++ 整合：processor 支援 roformer 模型清單/選擇/worker 啟動；standalone 建置通過", "passes": false, "priority": 4, "source": "plan", "evidence": null},
+  {"id": "A5", "title": "一般面板 model browser UI：分類/搜尋/下載狀態/experimental 標註；ui_configuration_smoke（含擴充）PASS", "passes": false, "priority": 5, "source": "plan", "evidence": null},
+  {"id": "A6", "title": "下載管理：按需下載＋SHA-256 驗證＋滾動快取上限 3 個（C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache）＋自動清理，含測試", "passes": false, "priority": 6, "source": "plan", "evidence": null},
+  {"id": "A7", "title": "輸出 UX：各類別（vocals/instrumental/karaoke/dereverb/denoise…）2-stem 輸出命名與 Export 流程正確", "passes": false, "priority": 7, "source": "plan", "evidence": null},
+  {"id": "A8", "title": "新增 htdemucs_roformer_smoke CMake target（tests/roformer_smoke.cpp）且 PASS，納入 full tier", "passes": false, "priority": 8, "source": "plan", "evidence": null},
+  {"id": "A9", "title": "回歸：htdemucs_record_mode_smoke／htdemucs_media_io_smoke／htdemucs_ui_configuration_smoke 全 PASS（.loop/checks/full.cmd）", "passes": false, "priority": 9, "source": "plan", "evidence": null},
+  {"id": "A10", "title": "README.md 新增 RoFormer 章節（模型分類、下載/快取行為、experimental 語意）", "passes": false, "priority": 10, "source": "plan", "evidence": null},
+  {"id": "M-ENUM", "title": "per-model 項目產生：依 roformer-manifest.json append M001..M099（57 個 audited＝必過「下載+SHA-256→分離 fixtures→輸出規格驗證」；42 個未稽核＝「收錄+experimental 標註+嘗試一次並記錄結果（成敗皆記）」）", "passes": false, "priority": 11, "source": "plan", "evidence": null}
+]
+
+===== JOURNAL TAIL =====
+# Loop journal — melband-roformer-integration
+
+Plan approved: 2026-08-23T10:30+08:00（使用者回覆「直接LOOP」；10 個推斷項全數確認）
+Origin: main @ 24bfb70f2c4de22ba92996cdcee08ac8ecbff9e6 · Loop branch: loop/melband-roformer
+Engine: B（外部驅動器 .loop/run_loop.sh；claude -p headless；usage-limit 睡 20 分自動重試）
+Criteria: C1 full.cmd（建置＋3 既有 smoke＋roformer smoke）· C2 backlog 全綠 · C3 scope 無違規
+Budget: max_iterations=60 · stall_threshold=6 · iteration_timeout=40m · wall=none
+
+---
+===== OPERATOR FILES =====
+
+ exited 1 in 8758ms:
+# Execution protocol
+
+Read this once before iteration 1, and re-read it whenever you are unsure what to
+do mid-loop. Uncertainty mid-loop is a signal to consult the files, not to
+improvise — improvisation is how loops drift.
+
+## State schema: status and stop_reason
+
+Exits come in three kinds — **converged** (success with evidence),
+**ceilings** (iteration budget, wall clock, iteration timeout, turn cap), and
+**escape hatches** (`blocked`, `stalled`, `paused`, `aborted`). The tables
+below are the complete exit set: if the loop is stopping for a reason not
+listed, pick the nearest hatch and explain in the journal — never invent a
+new status.
+
+Canonical status set — use these exact strings everywhere (state.json, LOOP
+STATUS lines, /goal conditions, driver, reports):
+
+`running | converged | paused | blocked | stalled | aborted | max_iterations`
+
+Every non-`running` status carries a machine-readable `stop_reason`
+(`running` → `null`):
+
+| stop_reason | typical status | meaning |
+|---|---|---|
+| `criterion_met` | converged | all completion criteria passed with evidence |
+| `iteration_budget_exhausted` | max_iterations | hit `max_iterations` |
+| `max_wall_time` | aborted | driver wall-clock ceiling reached |
+| `stalled_no_metric_improvement` | stalled | `stall_threshold` hit, stall policy exhausted |
+| `stalled_no_state_update` | blocked | agent launches not advancing `iteration` (driver-detected) |
+| `blocked_permission_required` | blocked | needs out-of-scope change / disallowed tool / scope violation |
+| `blocked_verification_unavailable` | blocked | verification command itself errors repeatedly |
+| `blocked_external_dependency` | blocked | blocked on something outside the repo |
+| `blocked_criterion_doubt` | blocked | a criterion appears wrong or unachievable |
+| `blocked_checkpoint_failed` | blocked | git/file checkpointing itself failed |
+| `user_pause_required` | paused | human checkpoint due per plan |
+| `manual_abort` | aborted | user said stop |
+| `aborted_agent_error` | aborted | agent process failing hard, no cleaner category |
+
+`state.json` full schema (all writes atomic — tmp file, then rename):
+
+```json
+{"status": "running", "stop_reason": null,
+ "iteration": 0, "max_iterations": 10, "stall_threshold": 3,
+ "best_metric": null, "iterations_since_improvement": 0,
+ "git": {"origin_branch": "main", "origin_head": "<sha>",
+          "loop_branch": "loop/<slug>"},
+ "started_at": "<ISO8601>", "updated_at": "<ISO8601>"}
+```
+
+Structured per-iteration records live in `.loop/iterations/<NNNN>.json`
+(schema in the iteration prompt): `journal.md` is for humans; the records are
+what lets the next fresh-context agent — or the final report — recover state
+without parsing prose.
+
+`.loop/backlog.json` (optional — multi-item goals, seeded in Phase 2) is a
+JSON array:
+
+```json
+[{"id": "B1", "title": "tests/api all green", "passes": false,
+  "priority": 1, "source": "plan", "evidence": null}]
+```
+
+`id`/`title`/`passes` are required; `priority` (1 = first), `source`
+(`plan` | `discovered`), `evidence` (one line: iteration + command that
+proved it), and optional `check` (a command that proves this item on its own)
+keep the audit trail. Append-only discipline: add items, flip `passes` with
+printed evidence, never delete or reword. Note the all-passes checker counts
+flags the worker itself flipped — bookkeeping, not proof — which is why the
+plan must AND it with at least one ungameable command criterion (or use
+per-item `check` commands). `.loop/LESSONS.md` is
+its prose sibling: an append-only list of one-line signs
+(`- SIGN (iter 3): <rule>`) that every later iteration reads and obeys —
+the lessons that would otherwise scroll out of the journal tail.
+
+## Engines: who starts the next iteration
+
+The single most common way loops fail is that nothing restarts them: the model
+finishes one pass, summarizes, and ends its turn. Each engine solves this
+differently. Know which engine the plan specifies and follow its section exactly.
+Every plan carries a **Crank line** (plan §9) naming who starts each next
+iteration, what must stay true, and the kill switch — quote it when reporting.
+
+### Engine B — external driver script (the unattended default)
+
+Mechanics: `.loop/run_loop.sh` (instantiated in Phase 2 from
+`assets/run-loop-template.sh`) loops while `state.json` says `status ==
+"running"` and ceilings are unbreached, invoking `AGENT_CMD_JSON` once per
+iteration with the fixed prompt in `.loop/ITERATION_PROMPT.md`. Each invocation is a
+**fresh context** — the Ralph insight: intelligence comes from the spec, the
+verifiable checks, and the on-disk state, not from one long session. Under
+`nohup`/`tmux` it keeps cranking with the terminal closed and the human asleep;
+this is why unattended intent defaults here.
+
+Crank line: *the driver process starts every next iteration; it keeps cranking
+while the process lives and `state.json` says `running`; kill switch:
+`touch .loop/STOP`, Ctrl+C / kill the process, or set `status` in
+`state.json`.*
+
+Consequences you must respect as the worker model (when you are the invoked
+iteration):
+
+1. You remember nothing. Step 1 of the checklist (read plan, state, journal
+   tail) is your entire memory. Trust files over any impression of familiarity.
+2. Do exactly one iteration, print the `LOOP STATUS:` line, and stop. Never
+   start a second iteration — the driver owns continuation, and double
+   iterations corrupt the state accounting.
+3. To stop the loop for any reason, set `state.json` `status` accordingly; the
+   driver reads it before every launch. That is *your* only channel to the
+   driver — `.loop/STOP` is the operator's.
+4. Leave the working tree clean (checkpoint per plan) — the next iteration
+   starts from what you leave behind.
+
+Driver guarantees (built into the template):
+
+- **Single instance**: a portable `mkdir` lock (`.loop/driver.lockdir`)
+  refuses a second concurrent driver; stale locks after a crash are removed
+  manually (`rmdir .loop/driver.lockdir`).
+- **No lying state**: every driver-side terminal decision (budget, wall
+  clock, dead-agent guard, scope violation) is written back to `state.json`
+  atomically with a `stop_reason` — the file never ends a run still saying
+  `running`.
+- **Real exit codes**: the agent runs via a JSON-argv subprocess wrapper
+  (`AGENT_CMD_JSON`, `PROMPT_MODE=arg|stdin`) and the driver captures the
+  agent's exit code, not `tee`'s.
+- **Scope enforcement outside the model**: after each iteration the driver
+  runs `.loop/check_scope.py` (if present); a violation while status is still
+  `running` sets `blocked` / `blocked_permission_required`.
+- **Wall clock is opt-in**: `MAX_WALL_MINUTES=0` (default) disables it; a
+  non-zero value must mirror plan §6 `max_wall_time` — the driver never
+  imposes a ceiling the plan doesn't state.
+- **Hang guard**: `ITERATION_TIMEOUT_MINUTES` (0 = disabled; mirrors plan §6
+  `iteration_timeout`) kills an agent run that exceeds it (process-group
+  SIGTERM→SIGKILL, exit code 124) — a stuck headless permission prompt or
+  network call cannot silently end an overnight run; the dead-agent guard
+  then counts it as a failed launch.
+- **Pilot mode**: `MAX_LAUNCHES=N` stops the driver after N launches, state
+  untouched. `MAX_LAUNCHES=1 bash .loop/run_loop.sh` is the mandatory first
+  run: watch one iteration write its record, append the journal, and commit —
+  auth, permission-allowlist, and prompt bugs surface here, not at 3 a.m.
+- **Kill-switch file**: `touch .loop/STOP` — the driver aborts
+  (`aborted`/`manual_abort`) before the next launch and removes the file.
+  Easier than editing JSON, works from any shell, and the worker honors the
+  same file at the start of its next iteration (checklist Step 1) — which
+  also makes STOP work under Engines A and C.
+- **Final report**: on termination the driver writes `.loop/FINAL_REPORT.md`
+  from `state.json` + `iterations/*.json` (status, stop_reason, criteria/
+  metric trajectory, files touched). For the full human-facing Phase 4 report,
+  re-invoke the skill in an interactive session — it will read the same files.
+
+Operator notes (tell the user in Phase 2): **pilot first** —
+`MAX_LAUNCHES=1 bash .loop/run_loop.sh` and watch one full iteration succeed;
+then `bash .loop/run_loop.sh` (foreground) or `nohup bash .loop/run_loop.sh &`
+/ inside `tmux` for walk-away runs; rerunning the script later resumes from
+`state.json`. Headless agent invocations answer no interactive permission
+prompts — a tool call that would prompt simply fails — so grant the minimal
+allowlist the plan's verification and checkpoint commands need (e.g. Claude
+Code `--allowedTools "Bash(pytest:*) Bash(git:*) Edit Write Read"`); that
+argues for tighter tool permissions and scope in the plan, and ideally a
+sandbox or dedicated branch/worktree. A wrong allowlist is exactly what the
+pilot run exists to catch. Rerunning resumes only while state says `running`;
+after a `paused`/`blocked` stop, first set `status` back to `"running"` and
+`stop_reason` to `null`, then rerun. Mid-run controls: `touch .loop/STOP`
+aborts cleanly; writing `.loop/STEER.md` hands the next iteration a one-shot
+directive (read → journaled → deleted).
+
+### Engine A — Claude Code `/goal` (attended hands-free; not a background job)
+
+**Hard prerequisites — confirm all of these with the user before handing over
+the command; if any fails, or the real intent is unattended, recommend Engine B
+instead:**
+
+1. Claude Code ≥ v2.1.139, workspace trust dialog accepted, hooks enabled.
+2. **Auto mode ON** (tool calls auto-approved). Without it the loop halts at
+   the first permission prompt. This is a hard precondition, not an
+   optimization.
+3. **The session stays open for the whole run.** `/goal` advances **exactly one
+   turn per Stop-hook evaluation**, and only in a live session. It is not a
+   scheduler, not a daemon, not background work. Closing the client, sleeping
+   the laptop, or losing the session stops the crank (a still-active goal is
+   restored on `--resume`, with counters reset).
+
+Crank line: *the /goal Stop-hook evaluator starts every next turn; it keeps
+cranking only while this client is open, the goal is active, and Auto mode is
+on; kill switch: `/goal clear` (interactive) or Ctrl+C (headless `claude -p`).*
+
+Mechanics: the user runs `/goal <condition>`. Setting the goal starts a turn
+immediately with the condition as the directive. After every turn, an
+independent small evaluator model reads the **conversation transcript** (it
+cannot run tools or read files) and answers yes/no; if the loop should
+continue, a new turn starts with the evaluator's reason as the next
+instruction. Headless variant: `claude -p "/goal <condition>"` runs the loop in
+one foreground process.
+
+Consequences you must respect as the worker model:
+
+1. **One iteration per turn.** Run the full per-iteration checklist inside the
+   turn, then end the turn. Ending the turn is safe and required — the
+   machinery restarts it.
+2. **The evaluator sees only what you print.** Verification output must appear
+   in the conversation, not just in the journal. A criterion whose evidence was
+   never printed is, to the evaluator, unmet.
+3. **Never ask the user questions mid-loop** — a question doesn't pause
+   anything; the evaluator just restarts you. Route everything through the
+   `LOOP STATUS:` line.
+4. End **every** turn with exactly one line in this format:
+   `LOOP STATUS: running — iteration 3 recorded, criterion C1 still failing`
+   `LOOP STATUS: paused — human checkpoint due per plan §8`
+   Allowed statuses: `running | converged | paused | blocked | stalled |
+   aborted | max_iterations`.
+
+**Honest failure modes — state these to the user up front:**
+
+- `paused`/`blocked`/`stalled` stop the loop **only if the evaluator honors the
+  STOP clause in the condition**. The evaluator is a small model; if the
+  condition doesn't spell out that these statuses mean STOP, its literal
+  reading of "is the goal met?" is "not met → continue", and the loop is
+  trapped restarting a worker that is trying to stop. Even with the clause,
+  treat stopping as *likely, not guaranteed* — if the loop keeps restarting
+  after a `paused`/`blocked` status, the human must run `/goal clear`.
+- There is no built-in token budget; the turn cap inside the condition is the
+  only ceiling the evaluator enforces.
+
+Composing the goal condition (done in Phase 2; stored in plan §9). **Frame the
+question the evaluator answers as "should the loop STOP", never as "is the
+work converged."** Rules:
+
+- The evaluator cannot read `.loop/LOOP_PLAN.md`, so **the criteria must be
+  spelled out verbatim inside the condition text**. The plan file is for the
+  worker; the condition is for the judge.
+- Enumerate STOP causes explicitly — success is only one of them. Escape
+  statuses and the turn cap are the others, and each must be labeled as a
+  STOP-the-loop answer, not left for the evaluator to infer.
+- Keep it under 4,000 characters. One goal per session; compound unrelated
+  objectives overwhelm the evaluator — split into sequential goals.
+- Sanity-check from the evaluator's perspective before handing it over: "if
+  the worker's last message says `LOOP STATUS: blocked`, does this text
+  unambiguously tell me to answer YES (stop)?"
+
+Template:
+
+```
+Directive for the worker: work per the approved plan in .loop/LOOP_PLAN.md —
+one loop iteration per turn, update .loop/state.json and append to
+.loop/journal.md every turn, print all verification output in the
+conversation, never ask the user questions, and end every turn with a
+"LOOP STATUS:" line.
+
+Condition for the evaluator: answer YES (goal satisfied — STOP the loop) if
+ANY of the following holds:
+(a) ALL of these criteria pass, with their verification output printed in the
+conversation this session: <criterion 1: command + expected observable
+result>; <criterion 2: …>;
+(b) the assistant's latest message contains a line starting with
+"LOOP STATUS:" followed by converged, paused, blocked, stalled, aborted, or
+max_iterations — treat paused, blocked, stalled, aborted, and max_iterations
+as STOP-the-loop signals, NOT as "not yet done";
+(c) <N> turns have elapsed since this goal was set.
+Otherwise answer NO (the loop continues).
+```
+
+### Engine C — in-session self-loop
+
+No machinery restarts you. Crank line: *the worker model itself starts each
+next iteration inside its own response; the crank stops the moment the model
+ends its message; kill switch: none needed — it dies on its own too easily.*
+
+Continuation discipline:
+
+1. After a Step 6 decision of "continue", the next thing **in the same
+   response** is Step 1 of the next iteration. Not a summary, not a question,
+   not an offer to continue. A completed iteration is not a completed task.
+2. Ending your message while `status` is `"running"` terminates the loop —
+   treat it as a bug in your own behavior, equivalent to a driver script
+   crashing.
+3. You may only end your message when `status` is `converged`, `paused`,
+   `blocked`, `stalled`, `aborted`, `max_iterations` — or when the turn genuinely cannot continue
+   (context exhaustion), in which case set `status` to `"paused"` first, write
+   the journal entry, and tell the user to re-invoke to resume.
+4. If a todo tool exists, pre-create one item per remaining budgeted iteration
+   and check them off — visible unfinished items counteract the end-turn bias.
+
+Engine C is the least reliable engine by construction. If it keeps dying after
+one iteration, recommend the user rerun with Engine B (or A, if attended)
+rather than trying harder.
+
+## The per-iteration checklist
+
+Identical for all engines. Run every iteration exactly in this order; do not
+skip the recording step even when an iteration "obviously failed".
+
+### Step 1 — Reload state
+Read `.loop/LOOP_PLAN.md` and `.loop/state.json`; read `.loop/LESSONS.md` if
+present — every sign in it binds this iteration; skim the last 3 journal
+entries. Confirm `status` is `running`; if not, print
+`LOOP STATUS: <status> — halting` and stop. Disk wins over memory, always.
+Operator files: if `.loop/STOP` exists, delete it — then, only if `status`
+is `running`, set `aborted`/`manual_abort` (atomic) and halt with the LOOP
+STATUS line; a stale STOP beside a terminal status is removed without
+overwriting the recorded outcome. If `.loop/STEER.md` exists, it is a
+one-shot operator directive — it steers this iteration's hypothesis within
+the plan's scope and permissions (it cannot grant new ones), is quoted in
+this iteration's journal entry, and is deleted only once that entry is
+written (journal-then-delete — a crash before journaling re-applies it).
+If the working tree is unexpectedly dirty or the newest record shows a crash
+mid-iteration, re-run the cheap verification tier *before* changing anything
+and journal the result as the inherited baseline — pre-existing breakage is
+attributed to the handoff, never to this iteration's change.
+
+### Step 2 — Plan one change-set
+State the single hypothesis this iteration tests: "if I do X, criterion/metric
+Y should improve because Z". One hypothesis per iteration — attribution is the
+whole point of looping. It must be in scope and within allowed tools; if it
+cannot be, go to the escape hatches. Never retry an approach the journal
+records as failed unless you can say what is different this time.
+If `.loop/backlog.json` exists, the hypothesis targets the highest-priority
+item with `"passes": false`. Work discovered mid-iteration becomes a new
+backlog item (`"source": "discovered"`) — never a silent extension of this
+change-set.
+
+### Step 3 — Execute
+Apply the change-set. Track every file touched.
+
+### Step 4 — Verify
+Run the plan's verification command(s) **verbatim** and **print the real
+output to the conversation** (truncate to the last ~50 lines plus metric lines
+for the journal; never paraphrase a result). Two-tier schemes: cheap tier every
+iteration, full tier at the plan's cadence and always before declaring
+convergence. If the command itself errors (cannot run) twice in a row, that is
+the broken-harness hatch — every later "result" would be noise.
+
+### Step 5 — Record (before announcing)
+Determine the Step-6 outcome first, then persist it in three places before
+announcing or acting on it: (1) the structured record
+`.loop/iterations/<NNNN>.json` (schema in the iteration prompt — the
+machine-readable source the next agent and the final report recover from);
+(2) the journal entry (template below); (3) `state.json` — `iteration` += 1;
+`updated_at`; on improvement beyond epsilon or a newly passing criterion,
+update `best_metric` and reset `iterations_since_improvement` to 0, else
+increment it; `status` and `stop_reason` per the decision. **All JSON writes
+are atomic: write `<file>.tmp`, then rename over the target — never edit
+`state.json` or a record in place.** Then checkpoint per the git protocol
+below. Persisting before announcing means a crash between steps loses
+nothing. Backlog runs also update `.loop/backlog.json` atomically here — flip
+`passes` (and set `evidence`) only for items this iteration's printed
+verification proves; append discovered items. When the journal Note's lesson
+is a rule future iterations must obey, also append it to `.loop/LESSONS.md`
+as `- SIGN (iter <N>): <rule>`.
+
+### Step 6 — Decide
+First match wins:
+1. **All criteria pass** (full-tier evidence where defined, printed) →
+   `status: "converged"` → Phase 4.
+2. **Escape hatch fired** (table below) → corresponding status → Phase 4.
+3. **Human checkpoint due** → `status: "paused"`, post checkpoint summary.
+4. Otherwise → continue, per your engine's continuation rule.
+Always end the iteration with the `LOOP STATUS:` line.
+
+## Exit table — ceilings and escape hatches
+
+Budget and Wall clock are ceilings (designed budget exits); every other row
+is an escape hatch (structured early exit). Together with `converged` they
+are the complete exit set from the Anatomy section.
+
+| Exit | Condition | Status | stop_reason |
+|---|---|---|---|
+| Budget | `iteration` ≥ `max_iterations` | `max_iterations` | `iteration_budget_exhausted` |
+| Stall | `iterations_since_improvement` ≥ `stall_threshold`, after the plan's stall policy (strategy-switch/rollback) is exhausted | `stalled` | `stalled_no_metric_improvement` |
+| Broken harness | verification command errors twice consecutively | `blocked` | `blocked_verification_unavailable` |
+| Scope wall | viable fixes require out-of-scope changes or disallowed tools | `blocked` | `blocked_permission_required` |
+| Criterion doubt | a criterion appears wrong, self-contradictory, or unachievable | `blocked` | `blocked_criterion_doubt` |
+| Checkpoint failure | git/file checkpointing itself fails | `blocked` | `blocked_checkpoint_failed` |
+| Wall clock (driver) | `MAX_WALL_MINUTES` reached | `aborted` | `max_wall_time` |
+| Dead agent (driver) | two launches without state advance | `blocked` | `stalled_no_state_update` |
+| User abort | the user says stop | `aborted` | `manual_abort` |
+
+Budget and stall comparisons use **this iteration's own number** — the value
+Step 5 writes (stored `iteration` + 1 at decide time), not the pre-increment
+value read at Step 1 — so `max_iterations: 10` means iteration 10 is the last
+to run. Engine B's driver enforces the same ceiling pre-launch.
+
+`blocked` always means: stop, explain precisely what blocks, present options.
+Never silently work around a block. Under Engine A, remember that any of these
+statuses stops the loop only via the condition's STOP clause — and if the
+evaluator misses it, the human's `/goal clear` is the real hatch.
+
+### Permission wall protocol
+
+When the scope-wall or permission hatch fires (`blocked` /
+`blocked_permission_required`), the pause message **and** the journal Note
+must contain exactly these three fields, so the user can unlock the loop in a
+single reply:
+
+- **Missing**: the specific permission or path (e.g. `allow_network`,
+  `allow_install`, a `deny_paths` entry).
+- **Why**: what the current change-set needs it for, concretely.
+- **Unlocks**: what granting it enables, and the next intended hypothesis.
+
+On the user's grant, apply it through the amendment protocol (plan §4/§5 +
+`.loop/policy.json`, both updated), set `status` back to `"running"` and
+`stop_reason` to `null` (atomic write), then resume — under Engine B rerun
+`bash .loop/run_loop.sh`; the driver only launches while state says
+`running`. Never treat a grant as permanent policy beyond what the user
+actually said.
+
+## Journal entry template
+
+Append to `.loop/journal.md`; never rewrite past entries.
+
+```markdown
+## Iteration <N> — <ISO8601 timestamp>
+**Hypothesis:** <if X then Y because Z>
+**Change-set:** <files touched + one-line summary each>
+**Verification:** `<command as run>`
+```
+<verbatim output, last ~50 lines + metric lines>
+```
+**Criteria:** C1: pass/fail · C2: pass/fail · …
+**Metric:** <value or n/a> (best so far: <value>)
+**Decision:** continue | converged | paused | <hatch name>
+**Note:** <lesson learned; mandatory one-liner if the hypothesis failed>
+```
+
+## Git checkpoint protocol (when plan §8 enables git checkpointing)
+
+Before iteration 1 (done during Phase 2 wiring):
+- Record the current branch and HEAD sha into `state.json` `git.origin_branch`
+  / `git.origin_head` (also used by `check_scope.py` as the diff base).
+- The working tree must be clean. If dirty: do not start; set `paused` /
+  `user_pause_required` and ask — stashing or committing the user's work is
+  their decision, never the loop's.
+- Create and switch to `loop/<slug>` from that HEAD. The loop never commits
+  outside this branch.
+
+Each iteration (inside Step 5, after the record/journal/state writes):
+- Stage the change-set's files (including new in-scope files) and commit with
+  message `loop(iter-<N>): <status> — <short summary>`.
+- **Commit even when verification failed.** Checkpoints exist for
+  recoverability and attribution, not endorsement; pass/fail lives in the
+  record and journal.
+- Lockfiles / dependency manifests: only if `policy.json`
+  `permissions.allow_install` is true AND the paths are not in `deny_paths`.
+- If checkpointing itself fails (git errors): `blocked` /
+  `blocked_checkpoint_failed`.
+
+End of loop:
+- **Never auto-switch back to the origin branch** — an unattended `git
+  switch` under the user is a nasty surprise. The final report states origin
+  and loop branch; merging or switching back is the user's Phase 4 decision.
+
+No git available → file-copy checkpoints to `.loop/checkpoints/iter-<N>/`;
+scope enforcement then falls back to the worker's self-check only (state this
+limitation in the plan).
+
+## Amendment protocol
+
+The plan changes mid-run **only** via this path: (1) the user requests it, or
+you pause and propose — never amend unilaterally; (2) append to the plan's
+`## Amendments` section (`- iter <N>, <timestamp>: <field>: <old> → <new>
+(reason)`) and update the field in place — and if the amendment touches plan
+§4/§5, **atomically rewrite `.loop/policy.json` to match**: the driver and
+`check_scope.py` enforce policy.json, not the plan prose; (3) note it in the current journal
+entry; (4) amendments that **loosen completion criteria** require one explicit
+confirmation restating what the loosened criterion no longer guarantees.
+Quietly lowering the bar is the classic failure mode of long-running loops.
+Under Engine A, a criteria amendment also requires the user to re-run `/goal`
+with the updated condition — the old condition keeps judging otherwise.
+
+## Resume protocol
+
+On starting with an existing `.loop/` whose status is `running` or `paused`:
+read the plan in full, the state, the newest 1-3 records in `.loop/iterations/`, and the journal tail; post a resume
+summary (iteration reached, criteria status, best metric, last hypothesis and
+outcome, next intended hypothesis); ask resume / restart (archive to
+`.loop-archive-<timestamp>/`) / abandon. On resume, continue at Step 1. Under
+Engine B this protocol is unnecessary for the invoked iterations (the prompt
+handles it) — it applies to interactive sessions rediscovering the loop.
+
+## Conduct rules and why they exist
+
+- **Evidence or it didn't pass.** A criterion counts as passed only when this
+  iteration printed verification output demonstrating it. Models under
+  iteration pressure drift toward optimistic summaries; verbatim output is the
+  antidote — and under Engine A, the evaluator literally cannot see anything
+  you don't print.
+- **Never weaken the test to pass the test.** Deleting a failing assertion,
+  loosening a tolerance, or special-casing the checker is failing the criterion
+  plus corrupting the loop. A genuinely wrong test is the criterion-doubt
+  hatch: pause and ask.
+- **Out-of-scope means out-of-scope**, precisely at the moment touching it
+  looks convenient.
+- **Do not gold-plate.** Waived concerns are permission to ignore them;
+  unrequested improvements consume budget and risk regressions.
+- **One iteration, one hypothesis.** Batching five changes destroys
+  attribution — you learn nothing from pass or fail. Mid-iteration
+  discoveries become backlog items or journal notes, not scope creep.
+- **A false status is the one unforgivable move.** Print `LOOP STATUS:
+  converged` only when the criteria genuinely passed with evidence printed
+  this run. Emitting a status to escape the loop corrupts every downstream
+  decision — prefer `blocked` plus an honest reason.
+- **Backlog items are append-only.** Flip `passes` with evidence; never
+  delete or reword an item — removing a hard item is the checklist version
+  of deleting a failing test.
+- **User-facing prose in the user's language**; `.loop/` field names, JSON
+  keys, statuses, and the `LOOP STATUS:` line stay in English as templated so
+  scripts, evaluators, and later sessions can parse them.
+
+# LOOP_PLAN — melband-roformer-integration
+
+> Status: APPROVED (2026-08-23T10:30+08:00, user reply "直接LOOP"; inferred items all confirmed)
+> Field names and status values stay in English; free-text values follow the
+> user's language (繁體中文). `none` = empty field.
+
+## 1. Goal
+把 https://github.com/openmirlab/melband-roformer-infer 的全部 99 個 source-separation 模型，以「擴充現有一般面板模型選單為分類式 model browser（分類／搜尋／下載狀態／按需下載）」的 UX 整合進 HTDemucs GPU FX（Windows standalone），推論走獨立 conda env 的開發 Python worker；57 個稽核可用模型端到端必過，42 個未稽核模型收錄並標註 experimental。(stated + asked)
+
+## 2. Completion criteria
+All criteria must hold simultaneously (AND).
+
+| # | Type | Definition | Checked by |
+|---|---|---|---|
+| C1 | command | `cmd /c .loop\checks\full.cmd` exits 0 —— 內含：standalone 建置成功＋`htdemucs_record_mode_smoke`＋`htdemucs_media_io_smoke`＋`htdemucs_ui_configuration_smoke` 全 PASS（不退步）＋新增 `htdemucs_roformer_smoke` PASS | full tier |
+| C2 | command | backlog checker exits 0：`python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` —— 全部 backlog 項目 passes=true | full tier |
+| C3 | command | `python .loop/check_scope.py` exits 0（範圍無違規） | every iteration |
+
+Backlog 語意（asked）：57 個稽核模型每個一項「下載＋SHA-256 驗證→對測試音檔分離→輸出規格驗證（時長不變、stereo、32-bit float、有限值）」必過；42 個未稽核模型每個一項「收錄進 registry/UI＋標註 experimental＋嘗試一次並記錄結果（成敗皆可）」；另含架構項目（conda env、registry 匯入、worker、C++ 整合、model browser UI、下載管理器＋滾動快取、roformer smoke test、README 新章節）。
+Plateau parameters: none
+Combination rule: AND
+Backlog: `.loop/backlog.json` seeded at wiring（架構項目 A1–A10＋模型枚舉項；per-model 項目由早期 iteration 從 repo registry 產生後 append，append-only——flip `passes` with printed evidence, never delete or reword；C2 為記帳、C1 為不可美化的指令證據，兩者 AND）。
+
+## 3. Verification
+- Cheap tier (every iteration): `cmd /c .loop\checks\cheap.cmd` —— 增量建置 standalone＋ui_configuration_smoke＋（存在後）registry 驗證 script 與本次目標模型的單項 check。預期 2–6 分鐘。(asked)
+- Full tier (every 5 iterations and before declaring convergence): `cmd /c .loop\checks\full.cmd`＋C2 backlog checker。(asked)
+- Working directory: `C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22` · Timeout per run: 30 min
+- Checker independence: deterministic commands 為基準；宣告 converged 前必須以 fresh-context verifier（Task subagent 或另起 `claude -p`）從零重跑 full tier 並比對，證據列印。(asked)
+
+## 4. Tool permissions
+Allowed (prose)：shell（建置/測試/conda/pip/ffmpeg/git）；網路僅限下載與查文件（HF 模型、PyPI/GitHub 套件、文件頁），**禁止任何上傳／push／發佈**；套件只裝進獨立 conda env `htfx-roformer`；git 僅本機 commit 於 loop branch（**絕不設 remote、絕不 push**）；不刪除、不整檔覆寫任何既有檔案（在 allow_paths 內編輯原始碼可以；唯一例外：`verify\roformer-cache\` 內模型權重檔可刪——滾動快取需要）；subagents 允許（收斂前獨立重驗）。
+Everything else: disallowed → pause-and-ask (`blocked` / `blocked_permission_required`).
+```json
+{
+  "permissions": {
+    "allow_shell": true,
+    "allow_network": "download_only",
+    "allow_install": "conda_env_htfx-roformer_only",
+    "allow_git_commit": true,
+    "allow_delete": false,
+    "allow_subagents": true
+  },
+  "scope": {
+    "allow_paths": ["plugin/", "cpp/", "worker/", "tests/", "tools/", "assets/models/", "docs/", "CMakeLists.txt", "README.md", ".gitignore"],
+    "deny_paths": ["third_party/", "patches/", "dist/", "build/windows-web/", "assets/models/*.th", "assets/models/*.yaml", "assets/models/model-manifest.json", "AGENTS.md", "CODEX_HANDOFF.md", "THIRD_PARTY_NOTICES.md", "docs/RELEASING_WINDOWS.md", "TRANSFER_BINARY_SHA256.txt", ".gitattributes", ".gitmodules"]
+  }
+}
+```
+Provenance — network: asked · install: asked · git: asked · delete: asked · deny_paths: asked · shell: inferred-confirmed · subagents: inferred-confirmed
+
+## 5. Scope
+- In scope (may modify): `plugin/`、`cpp/`、`worker/`、`tests/`、`tools/`、`CMakeLists.txt`、`assets/models/`（僅新增檔案，例如 roformer registry json）、`docs/`（新增檔案）、`README.md`（新增章節）、`.gitignore`（新增條目）。repo 外：`C:\CodexProjects\SourceSeparation_GPU_FX\verify\roformer-cache\`（模型滾動快取，可建可刪）、`verify\output\`（測試輸出）。
+- Out of scope / do-not-touch: `third_party/`（JUCE＋demucs）、`patches/`、`dist/`、`build/windows-web/`、`assets/models` 既有檔（*.th／*.yaml／model-manifest.json）、五份移交基準文件、`TRANSFER_BINARY_SHA256.txt`、repo 外的 `verify\payload-cuda\`。(asked)
+- Waived concerns: macOS/VST3 路徑不管；frozen runtime／installer 打包不在本輪（留待下一階段）；分離「品質」不設指標（只驗格式與流程正確）。(asked/inferred)
+- Enforcement: worker self-check + Engine B driver post-check via `.loop/check_scope.py`
+
+## 6. Budget
+- max_iterations: 60 (asked)
+- stall_threshold: 6 consecutive iterations without improvement (asked)
+- max_wall_time: none（`MAX_WALL_MINUTES=0`——配合跨用量 reset 續跑）(asked)
+- iteration_timeout: 40 min（`ITERATION_TIMEOUT_MINUTES=40`——懸死防護）(asked)
+- improvement epsilon: 任一 criterion 轉 pass 或任一 backlog 項目轉 passes=true (inferred)
+
+## 7. Failure / stall policy
+strategy-switch（最多 1 次換質性不同方法，再卡即 pause-and-ask）。(asked)
+Broken verification harness (command errors twice in a row): always pause-and-ask.
+
+## 8. Checkpointing & autonomy
+- Checkpointing: git commit every iteration on branch `loop/melband-roformer`（先 `git init` 本機 repo＋main 基準 commit；絕不設 remote）；commit message `loop(iter-<N>): <status> — <summary>`；commit even on failed verification。(asked)
+- Autonomy: fully autonomous until termination（無人值守；`max_iterations` 為安全網）。(stated)
+
+## 9. Execution engine
+- Engine: B — external driver script (asked; 使用者要求「五小時額度耗盡後 reset 自動續跑」)
+- **Crank line**: 外部驅動器 `.loop/run_loop.sh`（Git Bash＋nohup/tmux）發動每一次 iteration，每輪以 `claude -p` 全新 context 執行；只要 driver 程序活著且 `state.json.status=="running"` 就持續；偵測到 usage limit 時睡 20 分鐘重試、不計入 iteration；kill switch：`touch .loop/STOP`、Ctrl+C／kill driver、或改 `state.json`。
+- Engine B — AGENT_CMD_JSON: `["claude","-p","--permission-mode","acceptEdits","--allowedTools","Bash Edit Write Read Glob Grep Task WebFetch WebSearch"]`（headless 無互動提示；Bash 全開——護欄由 policy.json＋deny_paths＋check_scope＋git 承擔；模型用 CLI 預設） · PROMPT_MODE: arg · MAX_WALL_MINUTES: 0 · ITERATION_TIMEOUT_MINUTES: 40 · SLEEP_SECONDS: 10
+  Driver 客製（本專案）：(1) python3 → anaconda `python` shim（Windows Git Bash）；(2) usage-limit 偵測——agent 輸出含 usage/rate limit 樣式且 iteration 未推進時，睡 20 分鐘後重試，不計入 failed launch。
+  Launch — pilot first: `MAX_LAUNCHES=1 bash .loop/run_loop.sh`（看完一輪：record 寫入、journal append、commit 存在）→ `nohup bash .loop/run_loop.sh &`（或 tmux）walk-away · rerun to resume
+
+## Amendments
+- iter 0, 2026-08-23T11:20+08:00: §9 AGENT_CMD_JSON: claude.exe headless → codex.exe `exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox`（原因：claude CLI 在本機未登入（"Not logged in"），headless 無法認證；codex exec 實測已認證可用。引擎仍為 B、其餘不變。使用者已於 2026-08-23 授權自行運行維護）
+- iter 0, 2026-08-23T11:20+08:00: §4 追加使用者規則：絕不允許刪除 `C:\CodexProjects\SourceSeparation_GPU_FX\` 專案根目錄以外的任何檔案（已寫入 LESSONS.md SIGN）
+
+{
+  "permissions": {
+    "allow_shell": true,
+    "allow_network": "download_only",
+    "allow_install": "conda_env_htfx-roformer_only",
+    "allow_git_commit": true,
+    "allow_delete": false,
+    "allow_subagents": true
+  },
+  "scope": {
+    "allow_paths": ["plugin/", "cpp/", "worker/", "tests/", "tools/", "assets/models/", "docs/", "CMakeLists.txt", "README.md", ".gitignore", "CLAUDE.md"],
+    "deny_paths": ["third_party/", "patches/", "dist/", "build/windows-web/", "assets/models/*.th", "assets/models/*.yaml", "assets/models/model-manifest.json", "AGENTS.md", "CODEX_HANDOFF.md", "THIRD_PARTY_NOTICES.md", "docs/RELEASING_WINDOWS.md", "TRANSFER_BINARY_SHA256.txt", ".gitattributes", ".gitmodules"]
+  }
+}
+
+# LESSONS — append-only signs; every iteration must obey all of these
+
+- SIGN (wiring): cmake 不在 PATH——建置一律走 `.loop\checks\cheap.cmd`／`full.cmd`（內含 VsDevCmd），或先 call VsDevCmd.bat。CMake target 名稱先查 CMakeLists.txt。
+- SIGN (wiring): conda 完整路徑 `C:\Users\<user>\anaconda3\Scripts\conda.exe`；anaconda base python=3.13.5 torch 2.8.0+cu126（cuda 可用）。套件只裝進 `htfx-roformer` env。
+- SIGN (wiring): ffmpeg=`C:\ffmpeg-master\bin\ffmpeg.exe`（media_io_smoke 硬編碼此路徑）；測試 fixtures 在 `C:\CodexProjects\SourceSeparation_GPU_FX\verify\fixtures\`（test_48k_2s.wav）。
+- SIGN (wiring): RoFormer 模型快取固定 `C:\CodexProjects\SourceSeparation_GPU_FX\verify\roformer-cache\`，同時最多 3 個權重，驗證完即刪最舊的；絕不下載到 C: 其他位置（磁碟只剩約 55 GB）。
+- SIGN (wiring): 所有 `.loop/` JSON 讀寫必須 `encoding="utf-8"`；state/record 寫入一律 tmp+rename 原子操作。
+- SIGN (wiring): smoke tests 的正式 sidecar 靠 junction `build\windows-installed\Release\Resources\sidecar`→`verify\payload-cuda\Resources\sidecar`；若 junction 不存在會導致 record_mode_smoke 失敗——用 `New-Item -ItemType Junction` 重建，不要改 test 程式。
+- SIGN (wiring): 上游 repo https://github.com/openmirlab/melband-roformer-infer（MIT）；registry 在其 `src/mel_band_roformer/data/melband_models.json`；預設下載快取為 `~/.cache/melband-roformer-infer/`——需將其導向本專案快取目錄（環境變數 `MELBAND_ROFORMER_MODELS_PATH` 或 `--models_dir`）。
+- SIGN (user, 2026-08-23): 絕對不允許刪除 `C:\CodexProjects\SourceSeparation_GPU_FX\` 專案根目錄以外的任何檔案（包含 ~/.cache、temp 等）；專案內也僅限 `verify\roformer-cache\` 的權重檔可刪。
+
+{
+  "status": "running",
+  "stop_reason": null,
+  "iteration": 0,
+  "max_iterations": 60,
+  "stall_threshold": 6,
+  "best_metric": null,
+  "iterations_since_improvement": 0,
+  "git": {
+    "origin_branch": "main",
+    "origin_head": "24bfb70f2c4de22ba92996cdcee08ac8ecbff9e6",
+    "loop_branch": "loop/melband-roformer"
+  },
+  "started_at": "2026-08-23T10:50:55+08:00",
+  "updated_at": "2026-08-23T10:50:55+08:00"
+}
+
+[
+  {"id": "A1", "title": "conda env htfx-roformer 建立且 melband-roformer-infer 安裝完成：`conda run -n htfx-roformer melband-roformer-infer --help` 退出碼 0", "passes": false, "priority": 1, "source": "plan", "evidence": null, "check": "C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe run -n htfx-roformer melband-roformer-infer --help"},
+  {"id": "A2", "title": "從上游 registry 產生 assets/models/roformer-manifest.json（99 項，含 name/category/url/sha256/size/audited 旗標）且 tools/validate_roformer_manifest.py 驗證退出碼 0", "passes": false, "priority": 2, "source": "plan", "evidence": null},
+  {"id": "A3", "title": "RoFormer worker 模組（worker/ 新增）可 headless 對 C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures 合成音檔完成一次分離並輸出有效 WAV（時長不變/stereo/32-bit float/有限值）", "passes": false, "priority": 3, "source": "plan", "evidence": null},
+  {"id": "A4", "title": "C++ 整合：processor 支援 roformer 模型清單/選擇/worker 啟動；standalone 建置通過", "passes": false, "priority": 4, "source": "plan", "evidence": null},
+  {"id": "A5", "title": "一般面板 model browser UI：分類/搜尋/下載狀態/experimental 標註；ui_configuration_smoke（含擴充）PASS", "passes": false, "priority": 5, "source": "plan", "evidence": null},
+  {"id": "A6", "title": "下載管理：按需下載＋SHA-256 驗證＋滾動快取上限 3 個（C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache）＋自動清理，含測試", "passes": false, "priority": 6, "source": "plan", "evidence": null},
+  {"id": "A7", "title": "輸出 UX：各類別（vocals/instrumental/karaoke/dereverb/denoise…）2-stem 輸出命名與 Export 流程正確", "passes": false, "priority": 7, "source": "plan", "evidence": null},
+  {"id": "A8", "title": "新增 htdemucs_roformer_smoke CMake target（tests/roformer_smoke.cpp）且 PASS，納入 full tier", "passes": false, "priority": 8, "source": "plan", "evidence": null},
+  {"id": "A9", "title": "回歸：htdemucs_record_mode_smoke／htdemucs_media_io_smoke／htdemucs_ui_configuration_smoke 全 PASS（.loop/checks/full.cmd）", "passes": false, "priority": 9, "source": "plan", "evidence": null},
+  {"id": "A10", "title": "README.md 新增 RoFormer 章節（模型分類、下載/快取行為、experimental 語意）", "passes": false, "priority": 10, "source": "plan", "evidence": null},
+  {"id": "M-ENUM", "title": "per-model 項目產生：依 roformer-manifest.json append M001..M099（57 個 audited＝必過「下載+SHA-256→分離 fixtures→輸出規格驗證」；42 個未稽核＝「收錄+experimental 標註+嘗試一次並記錄結果（成敗皆記）」）", "passes": false, "priority": 11, "source": "plan", "evidence": null}
+]
+
+===== JOURNAL TAIL =====
+# Loop journal — melband-roformer-integration
+
+Plan approved: 2026-08-23T10:30+08:00（使用者回覆「直接LOOP」；10 個推斷項全數確認）
+Origin: main @ 24bfb70f2c4de22ba92996cdcee08ac8ecbff9e6 · Loop branch: loop/melband-roformer
+Engine: B（外部驅動器 .loop/run_loop.sh；claude -p headless；usage-limit 睡 20 分自動重試）
+Criteria: C1 full.cmd（建置＋3 既有 smoke＋roformer smoke）· C2 backlog 全綠 · C3 scope 無違規
+Budget: max_iterations=60 · stall_threshold=6 · iteration_timeout=40m · wall=none
+
+---
+===== OPERATOR FILES =====
+
+codex
+State is `running` at iteration 0 with no operator stop/steer file; A1 is the highest-priority failing item. I’m checking the required Git ownership/branch/remote/tag facts, worktree cleanliness, and the exact cheap-check wrapper before selecting the single change-set.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$repo=(Resolve-Path '"'.').Path; Write-Output \"REPO="'$repo"; git rev-parse --show-toplevel; git status --short --branch; git remote -v; git tag --points-at HEAD; git branch --show-current; git rev-parse HEAD; Write-Output '"'===== cheap.cmd ====='; Get-Content -Raw '.loop\\checks\\cheap.cmd'; Write-Output '===== env check ====='; & 'C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe' env list; & 'C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe' run -n htfx-roformer melband-roformer-infer --help" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+2026-08-23T03:55:08.220290Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 19.5 seconds
+Output:
+REPO=C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+C:/CodexProjects/SourceSeparation_GPU_FX/HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+## loop/melband-roformer
+ M .loop/driver.log
+ M .loop/lastrun.log
+?? .loop/nohup.out
+loop/melband-roformer
+d3ad30bb3ea7049cc945d4db9a02e168a952ec15
+===== cheap.cmd =====
+@echo off
+rem cheap verification tier — every iteration (LOOP_PLAN §3)
+setlocal
+call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -no_logo -arch=x64 -host_arch=x64
+if errorlevel 1 exit /b 1
+cd /d "%~dp0..\.."
+cmake --build build\windows-installed --config Release --target HTDemucsGpuFX_Standalone htdemucs_ui_configuration_smoke -- /m
+if errorlevel 1 exit /b 1
+build\windows-installed\Release\htdemucs_ui_configuration_smoke.exe
+if errorlevel 1 exit /b 1
+rem extension point: the loop may create/extend cheap_extra.cmd (add checks only)
+if exist "%~dp0cheap_extra.cmd" (
+  call "%~dp0cheap_extra.cmd"
+  if errorlevel 1 exit /b 1
+)
+exit /b 0
+
+===== env check =====
+
+# conda environments:
+#
+base                 * C:\Users\<user>\anaconda3
+7micarray              C:\Users\<user>\anaconda3\envs\7micarray
+bleed-remove           C:\Users\<user>\anaconda3\envs\bleed-remove
+comfyui                C:\Users\<user>\anaconda3\envs\comfyui
+gemini                 C:\Users\<user>\anaconda3\envs\gemini
+ggd                    C:\Users\<user>\anaconda3\envs\ggd
+musescore              C:\Users\<user>\anaconda3\envs\musescore
+sidejitserver          C:\Users\<user>\anaconda3\envs\sidejitserver
+test260222             C:\Users\<user>\anaconda3\envs\test260222
+
+
+EnvironmentLocationNotFound: Not a conda environment: C:\Users\<user>\anaconda3\envs\htfx-roformer
+
+
+ exited 1 in 19452ms:
+REPO=C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+C:/CodexProjects/SourceSeparation_GPU_FX/HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+## loop/melband-roformer
+ M .loop/driver.log
+ M .loop/lastrun.log
+?? .loop/nohup.out
+loop/melband-roformer
+d3ad30bb3ea7049cc945d4db9a02e168a952ec15
+===== cheap.cmd =====
+@echo off
+rem cheap verification tier — every iteration (LOOP_PLAN §3)
+setlocal
+call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -no_logo -arch=x64 -host_arch=x64
+if errorlevel 1 exit /b 1
+cd /d "%~dp0..\.."
+cmake --build build\windows-installed --config Release --target HTDemucsGpuFX_Standalone htdemucs_ui_configuration_smoke -- /m
+if errorlevel 1 exit /b 1
+build\windows-installed\Release\htdemucs_ui_configuration_smoke.exe
+if errorlevel 1 exit /b 1
+rem extension point: the loop may create/extend cheap_extra.cmd (add checks only)
+if exist "%~dp0cheap_extra.cmd" (
+  call "%~dp0cheap_extra.cmd"
+  if errorlevel 1 exit /b 1
+)
+exit /b 0
+
+===== env check =====
+
+# conda environments:
+#
+base                 * C:\Users\<user>\anaconda3
+7micarray              C:\Users\<user>\anaconda3\envs\7micarray
+bleed-remove           C:\Users\<user>\anaconda3\envs\bleed-remove
+comfyui                C:\Users\<user>\anaconda3\envs\comfyui
+gemini                 C:\Users\<user>\anaconda3\envs\gemini
+ggd                    C:\Users\<user>\anaconda3\envs\ggd
+musescore              C:\Users\<user>\anaconda3\envs\musescore
+sidejitserver          C:\Users\<user>\anaconda3\envs\sidejitserver
+test260222             C:\Users\<user>\anaconda3\envs\test260222
+
+
+EnvironmentLocationNotFound: Not a conda environment: C:\Users\<user>\anaconda3\envs\htfx-roformer
+
+
+codex
+Git ownership is valid; the loop branch is correct, no remote is configured, and HEAD has no tag. The only dirty files are driver-generated `.loop` logs, so per protocol I’ll establish an inherited baseline first. Hypothesis for iteration 1: creating `htfx-roformer` and installing the upstream package will make A1 pass because its CLI will become available in that isolated environment.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "cmd /c .loop\\checks\\cheap.cmd" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+ succeeded in 27452ms:
+.NET Framework 的 MSBuild 版本 17.14.23+b0019275e
+
+  Checking File Globs
+  HTDemucsGpuFX_rc_lib.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\HTDemucsGpuFX_rc_lib.dir\Release\HTDemucsGpuFX_rc_lib.lib
+  htfx_gpu_worker_client.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\Release\htfx_gpu_worker_client.lib
+  HTDemucsGpuFX.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\HTDemucsGpuFX_artefacts\Release\HTDemucs GPU FX_SharedCode.lib
+  HTDemucsGpuFX_Standalone.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\HTDemucsGpuFX_artefacts\Release\Standalone\HTDemucs GPU FX.exe
+.NET Framework 的 MSBuild 版本 17.14.23+b0019275e
+
+  Checking File Globs
+  htfx_gpu_worker_client.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\Release\htfx_gpu_worker_client.lib
+  HTDemucsGpuFX.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\HTDemucsGpuFX_artefacts\Release\HTDemucs GPU FX_SharedCode.lib
+  htdemucs_ui_configuration_smoke.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\Release\htdemucs_ui_configuration_smoke.exe
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true PASS
+'cheap' is not recognized as an internal or external command,
+operable program or batch file.
+
+2026-08-23T03:55:43.397309Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 97 column 5
+codex
+The inherited cheap baseline passed its build and UI smoke test (exit 0), though it also exposed a non-fatal `cheap_extra.cmd` parsing message; that belongs to later work and won’t expand this iteration. I’m now executing only A1’s isolated environment installation.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "& 'C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe' create -n htfx-roformer python=3.11 pip -y; if ("'$LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; & '"'C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe' run -n htfx-roformer python -m pip install 'git+https://github.com/openmirlab/melband-roformer-infer.git'" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+codex
+The environment installation is still in progress and remains within the iteration timeout. No repository files have been changed by this step.
+codex
+The dependency resolver is still running; I’m continuing to wait without starting any second change-set.
+2026-08-23T03:58:46.465080Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 97 column 5
+codex
+Installation is taking several minutes but has not timed out. I’ll let this single A1 operation finish, then run the mandated verification commands and record the iteration atomically.
+codex
+The installer is still active with no streamed output from `conda run`; elapsed time remains comfortably under the 40-minute ceiling.
+codex
+A1’s install remains the only active operation. I’m preserving the one-hypothesis boundary and waiting for a definitive exit code.
+ succeeded in 497788ms:
+3 channel Terms of Service accepted
+Retrieving notices: - \ | / - done
+Channels:
+ - defaults
+Platform: win-64
+Collecting package metadata (repodata.json): | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ done
+Solving environment: / - done
+
+## Package Plan ##
+
+  environment location: C:\Users\<user>\anaconda3\envs\htfx-roformer
+
+  added / updated specs:
+    - pip
+    - python=3.11
+
+
+The following packages will be downloaded:
+
+    package                    |            build
+    ---------------------------|-----------------
+    ca-certificates-2026.7.16  |       haa95532_0         106 KB
+    packaging-26.3             |  py311haa95532_0         379 KB
+    setuptools-83.0.0          |  py311haa95532_0         1.6 MB
+    tzdata-2026c               |       he532380_0         117 KB
+    ------------------------------------------------------------
+                                           Total:         2.2 MB
+
+The following NEW packages will be INSTALLED:
+
+  bzip2              pkgs/main/win-64::bzip2-1.0.8-h2bbff1b_6 
+  ca-certificates    pkgs/main/win-64::ca-certificates-2026.7.16-haa95532_0 
+  libexpat           pkgs/main/win-64::libexpat-2.8.2-hd7fb8db_1 
+  libffi             pkgs/main/win-64::libffi-3.4.8-h42d73b9_3 
+  libzlib            pkgs/main/win-64::libzlib-1.3.2-h1c6eee0_0 
+  openssl            pkgs/main/win-64::openssl-3.5.7-hbb43b14_0 
+  packaging          pkgs/main/win-64::packaging-26.3-py311haa95532_0 
+  pip                pkgs/main/noarch::pip-26.1.2-pyhc872135_0 
+  python             pkgs/main/win-64::python-3.11.15-hb00fc5c_1 
+  setuptools         pkgs/main/win-64::setuptools-83.0.0-py311haa95532_0 
+  sqlite             pkgs/main/win-64::sqlite-3.53.2-hee5a0db_0 
+  tk                 pkgs/main/win-64::tk-8.6.15-hf199647_0 
+  tzdata             pkgs/main/noarch::tzdata-2026c-he532380_0 
+  ucrt               pkgs/main/win-64::ucrt-10.0.22621.0-haa95532_0 
+  vc                 pkgs/main/win-64::vc-14.3-h2df5915_12 
+  vc14_runtime       pkgs/main/win-64::vc14_runtime-14.44.35208-h4927774_12 
+  vs2015_runtime     pkgs/main/win-64::vs2015_runtime-14.44.35208-ha6b5a95_12 
+  wheel              pkgs/main/win-64::wheel-0.47.0-py311haa95532_0 
+  xz                 pkgs/main/win-64::xz-5.8.2-h53af0af_0 
+  zlib               pkgs/main/win-64::zlib-1.3.2-h1c6eee0_0 
+
+
+
+Downloading and Extracting Packages: ...working...setuptools-83.0.0    | 1.6 MB    |            |   0% 
+packaging-26.3       | 379 KB    |            |   0% [A
+
+tzdata-2026c         | 117 KB    |            |   0% [A[A
+
+
+ca-certificates-2026 | 106 KB    |            |   0% [A[A[A
+
+tzdata-2026c         | 117 KB    | #3         |  14% [A[Asetuptools-83.0.0    | 1.6 MB    |            |   1% 
+packaging-26.3       | 379 KB    | 4          |   4% [A
+
+
+ca-certificates-2026 | 106 KB    | #5         |  15% [A[A[A
+
+tzdata-2026c         | 117 KB    | ########## | 100% [A[A
+
+
+ca-certificates-2026 | 106 KB    | ########## | 100% [A[A[Asetuptools-83.0.0    | 1.6 MB    | ###3       |  33% 
+packaging-26.3       | 379 KB    | ########## | 100% [A
+packaging-26.3       | 379 KB    | ########## | 100% [Asetuptools-83.0.0    | 1.6 MB    | #########3 |  93% setuptools-83.0.0    | 1.6 MB    | ########## | 100% 
+
+
+ca-certificates-2026 | 106 KB    | ########## | 100% [A[A[A
+
+
+ca-certificates-2026 | 106 KB    | ########## | 100% [A[A[A
+packaging-26.3       | 379 KB    | ########## | 100% [A
+
+tzdata-2026c         | 117 KB    | ########## | 100% [A[A
+
+tzdata-2026c         | 117 KB    | ########## | 100% [A[Asetuptools-83.0.0    | 1.6 MB    | ########## | 100%                                                      
+                                                     [A
+
+                                                     [A[A
+
+
+                                                     [A[A[A done
+Preparing transaction: | / - \ | / - \ | / done
+Verifying transaction: \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / done
+Executing transaction: \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ done
+#
+# To activate this environment, use
+#
+#     $ conda activate htfx-roformer
+#
+# To deactivate an active environment, use
+#
+#     $ conda deactivate
+
+
+Channel "defaults" has the following notices:
+  [info] -- Thu Aug  6 00:00:00 2026
+  main-x (Anaconda's new authenticated channel) is now generally available, with thousands of additional packages from our secure supply chain. Get started at: https://anaconda.com/docs/getting-started/main-x?utm_source=channel_notices
+
+Collecting git+https://github.com/openmirlab/melband-roformer-infer.git
+  Cloning https://github.com/openmirlab/melband-roformer-infer.git to C:\Users\<user>\AppData\Local\Temp\pip-req-build-uob5q2sn
+  Resolved https://github.com/openmirlab/melband-roformer-infer.git to commit 77ff05e6ce533d85439d1e7a52d8316a2987c1b9
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting beartype>=0.14 (from melband-roformer-infer==0.1.6)
+  Using cached beartype-0.22.9-py3-none-any.whl.metadata (37 kB)
+Collecting einops>=0.6.1 (from melband-roformer-infer==0.1.6)
+  Downloading einops-0.8.2-py3-none-any.whl.metadata (13 kB)
+Collecting librosa>=0.9 (from melband-roformer-infer==0.1.6)
+  Using cached librosa-0.11.0-py3-none-any.whl.metadata (8.7 kB)
+Collecting llvmlite>=0.44.0 (from melband-roformer-infer==0.1.6)
+  Downloading llvmlite-0.49.0-cp311-cp311-win_amd64.whl.metadata (4.9 kB)
+Collecting ml-collections>=0.1.1 (from melband-roformer-infer==0.1.6)
+  Using cached ml_collections-1.1.0-py3-none-any.whl.metadata (22 kB)
+Collecting numba>=0.61.0 (from melband-roformer-infer==0.1.6)
+  Downloading numba-0.67.0-cp311-cp311-win_amd64.whl.metadata (2.8 kB)
+Collecting numpy>=1.23 (from melband-roformer-infer==0.1.6)
+  Using cached numpy-2.4.6-cp311-cp311-win_amd64.whl.metadata (6.6 kB)
+Requirement already satisfied: packaging>=14.1 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from melband-roformer-infer==0.1.6) (25.0)
+Requirement already satisfied: pyyaml>=6.0 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from melband-roformer-infer==0.1.6) (6.0.3)
+Requirement already satisfied: requests>=2.31 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from melband-roformer-infer==0.1.6) (2.32.5)
+Collecting rotary-embedding-torch>=0.3.5 (from melband-roformer-infer==0.1.6)
+  Using cached rotary_embedding_torch-0.9.1-py3-none-any.whl.metadata (8.4 kB)
+Collecting soundfile>=0.12 (from melband-roformer-infer==0.1.6)
+  Using cached soundfile-0.14.0-py2.py3-none-win_amd64.whl.metadata (18 kB)
+Collecting torch>=2.0 (from melband-roformer-infer==0.1.6)
+  Downloading torch-2.13.0-cp311-cp311-win_amd64.whl.metadata (39 kB)
+Requirement already satisfied: tqdm>=4.64 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from melband-roformer-infer==0.1.6) (4.67.1)
+Collecting audioread>=2.1.9 (from librosa>=0.9->melband-roformer-infer==0.1.6)
+  Using cached audioread-3.1.0-py3-none-any.whl.metadata (9.0 kB)
+Collecting scipy>=1.6.0 (from librosa>=0.9->melband-roformer-infer==0.1.6)
+  Using cached scipy-1.17.1-cp311-cp311-win_amd64.whl.metadata (60 kB)
+Collecting scikit-learn>=1.1.0 (from librosa>=0.9->melband-roformer-infer==0.1.6)
+  Using cached scikit_learn-1.9.0-cp311-cp311-win_amd64.whl.metadata (11 kB)
+Collecting joblib>=1.0 (from librosa>=0.9->melband-roformer-infer==0.1.6)
+  Using cached joblib-1.5.3-py3-none-any.whl.metadata (5.5 kB)
+Requirement already satisfied: decorator>=4.3.0 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from librosa>=0.9->melband-roformer-infer==0.1.6) (5.2.1)
+Collecting pooch>=1.1 (from librosa>=0.9->melband-roformer-infer==0.1.6)
+  Using cached pooch-1.9.0-py3-none-any.whl.metadata (10 kB)
+Collecting soxr>=0.3.2 (from librosa>=0.9->melband-roformer-infer==0.1.6)
+  Using cached soxr-1.1.0-cp311-cp311-win_amd64.whl.metadata (5.8 kB)
+Requirement already satisfied: typing_extensions>=4.1.1 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from librosa>=0.9->melband-roformer-infer==0.1.6) (4.15.0)
+Collecting lazy_loader>=0.1 (from librosa>=0.9->melband-roformer-infer==0.1.6)
+  Using cached lazy_loader-0.5-py3-none-any.whl.metadata (5.9 kB)
+Collecting msgpack>=1.0 (from librosa>=0.9->melband-roformer-infer==0.1.6)
+  Using cached msgpack-1.2.1-cp311-cp311-win_amd64.whl.metadata (8.5 kB)
+Collecting absl-py (from ml-collections>=0.1.1->melband-roformer-infer==0.1.6)
+  Using cached absl_py-2.5.0-py3-none-any.whl.metadata (3.3 kB)
+Requirement already satisfied: platformdirs>=2.5.0 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from pooch>=1.1->librosa>=0.9->melband-roformer-infer==0.1.6) (4.4.0)
+Requirement already satisfied: charset_normalizer<4,>=2 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from requests>=2.31->melband-roformer-infer==0.1.6) (3.4.4)
+Requirement already satisfied: idna<4,>=2.5 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from requests>=2.31->melband-roformer-infer==0.1.6) (3.11)
+Requirement already satisfied: urllib3<3,>=1.21.1 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from requests>=2.31->melband-roformer-infer==0.1.6) (2.6.3)
+Requirement already satisfied: certifi>=2017.4.17 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from requests>=2.31->melband-roformer-infer==0.1.6) (2026.1.4)
+Collecting narwhals>=2.0.1 (from scikit-learn>=1.1.0->librosa>=0.9->melband-roformer-infer==0.1.6)
+  Downloading narwhals-2.25.0-py3-none-any.whl.metadata (15 kB)
+Collecting threadpoolctl>=3.5.0 (from scikit-learn>=1.1.0->librosa>=0.9->melband-roformer-infer==0.1.6)
+  Using cached threadpoolctl-3.6.0-py3-none-any.whl.metadata (13 kB)
+Requirement already satisfied: cffi>=1.0 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from soundfile>=0.12->melband-roformer-infer==0.1.6) (2.0.0)
+Requirement already satisfied: pycparser in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from cffi>=1.0->soundfile>=0.12->melband-roformer-infer==0.1.6) (2.23)
+Collecting filelock (from torch>=2.0->melband-roformer-infer==0.1.6)
+  Downloading filelock-3.32.3-py3-none-any.whl.metadata (2.0 kB)
+Requirement already satisfied: setuptools>=77.0.3 in C:\Users\<user>\anaconda3\envs\htfx-roformer\Lib\site-packages (from torch>=2.0->melband-roformer-infer==0.1.6) (83.0.0)
+Collecting sympy>=1.13.3 (from torch>=2.0->melband-roformer-infer==0.1.6)
+  Using cached sympy-1.14.0-py3-none-any.whl.metadata (12 kB)
+Collecting networkx>=2.5.1 (from torch>=2.0->melband-roformer-infer==0.1.6)
+  Using cached networkx-3.6.1-py3-none-any.whl.metadata (6.8 kB)
+Requirement already satisfied: jinja2 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from torch>=2.0->melband-roformer-infer==0.1.6) (3.1.6)
+Collecting fsspec>=0.8.5 (from torch>=2.0->melband-roformer-infer==0.1.6)
+  Downloading fsspec-2026.7.0-py3-none-any.whl.metadata (10 kB)
+Collecting mpmath<1.4,>=1.1.0 (from sympy>=1.13.3->torch>=2.0->melband-roformer-infer==0.1.6)
+  Using cached mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
+Requirement already satisfied: colorama in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from tqdm>=4.64->melband-roformer-infer==0.1.6) (0.4.6)
+Requirement already satisfied: MarkupSafe>=2.0 in C:\Users\<user>\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages (from jinja2->torch>=2.0->melband-roformer-infer==0.1.6) (3.0.3)
+Using cached beartype-0.22.9-py3-none-any.whl (1.3 MB)
+Downloading einops-0.8.2-py3-none-any.whl (65 kB)
+Using cached librosa-0.11.0-py3-none-any.whl (260 kB)
+Using cached audioread-3.1.0-py3-none-any.whl (23 kB)
+Using cached joblib-1.5.3-py3-none-any.whl (309 kB)
+Using cached lazy_loader-0.5-py3-none-any.whl (8.0 kB)
+Downloading llvmlite-0.49.0-cp311-cp311-win_amd64.whl (41.9 MB)
+   ---------------------------------------- 41.9/41.9 MB 10.5 MB/s  0:00:04
+Using cached ml_collections-1.1.0-py3-none-any.whl (76 kB)
+Using cached msgpack-1.2.1-cp311-cp311-win_amd64.whl (70 kB)
+Downloading numba-0.67.0-cp311-cp311-win_amd64.whl (2.8 MB)
+   ---------------------------------------- 2.8/2.8 MB 9.6 MB/s  0:00:00
+Using cached numpy-2.4.6-cp311-cp311-win_amd64.whl (12.6 MB)
+Using cached pooch-1.9.0-py3-none-any.whl (67 kB)
+Using cached rotary_embedding_torch-0.9.1-py3-none-any.whl (17 kB)
+Using cached scikit_learn-1.9.0-cp311-cp311-win_amd64.whl (8.3 MB)
+Downloading narwhals-2.25.0-py3-none-any.whl (467 kB)
+Using cached scipy-1.17.1-cp311-cp311-win_amd64.whl (36.6 MB)
+Using cached soundfile-0.14.0-py2.py3-none-win_amd64.whl (1.0 MB)
+Using cached soxr-1.1.0-cp311-cp311-win_amd64.whl (176 kB)
+Using cached threadpoolctl-3.6.0-py3-none-any.whl (18 kB)
+Downloading torch-2.13.0-cp311-cp311-win_amd64.whl (122.0 MB)
+   ---------------------------------------- 122.0/122.0 MB 11.1 MB/s  0:00:11
+Downloading fsspec-2026.7.0-py3-none-any.whl (206 kB)
+Using cached networkx-3.6.1-py3-none-any.whl (2.1 MB)
+Using cached sympy-1.14.0-py3-none-any.whl (6.3 MB)
+Using cached mpmath-1.3.0-py3-none-any.whl (536 kB)
+Using cached absl_py-2.5.0-py3-none-any.whl (137 kB)
+Downloading filelock-3.32.3-py3-none-any.whl (98 kB)
+Building wheels for collected packages: melband-roformer-infer
+  Building wheel for melband-roformer-infer (pyproject.toml): started
+  Building wheel for melband-roformer-infer (pyproject.toml): finished with status 'done'
+  Created wheel for melband-roformer-infer: filename=melband_roformer_infer-0.1.6-py3-none-any.whl size=82882 sha256=ad8372d56ff8eb75b39369bbb92ed4c253e0f1d28a72c9ce4c5d4f1d11b728ee
+  Stored in directory: C:\Users\<user>\AppData\Local\Temp\pip-ephem-wheel-cache-ilt8ybq4\wheels\0b\cc\4b\c7ebdb79ec29d7458968f0926ca19d5c791272466c880f91e7
+Successfully built melband-roformer-infer
+Installing collected packages: mpmath, threadpoolctl, sympy, numpy, networkx, narwhals, msgpack, llvmlite, lazy_loader, joblib, fsspec, filelock, einops, beartype, audioread, absl-py, torch, soxr, soundfile, scipy, pooch, numba, ml-collections, scikit-learn, rotary-embedding-torch, librosa, melband-roformer-infer
+
+Successfully installed absl-py-2.5.0 audioread-3.1.0 beartype-0.22.9 einops-0.8.2 filelock-3.32.3 fsspec-2026.7.0 joblib-1.5.3 lazy_loader-0.5 librosa-0.11.0 llvmlite-0.49.0 melband-roformer-infer-0.1.6 ml-collections-1.1.0 mpmath-1.3.0 msgpack-1.2.1 narwhals-2.25.0 networkx-3.6.1 numba-0.67.0 numpy-2.4.6 pooch-1.9.0 rotary-embedding-torch-0.9.1 scikit-learn-1.9.0 scipy-1.17.1 soundfile-0.14.0 soxr-1.1.0 sympy-1.14.0 threadpoolctl-3.6.0 torch-2.13.0
+
+
+
+==> WARNING: A newer version of conda exists. <==
+    current version: 25.5.1
+    latest version: 26.7.1
+
+Please update conda by running
+
+    $ conda update -n base -c defaults conda
+
+
+  Running command git clone --filter=blob:none --quiet https://github.com/openmirlab/melband-roformer-infer.git 'C:\Users\<user>\AppData\Local\Temp\pip-req-build-uob5q2sn'
+
+
+codex
+A1 installation completed successfully. I’m now running the plan’s cheap tier verbatim, then A1’s own CLI check and the mandatory scope checker, capturing each real exit code.
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "cmd /c .loop\\checks\\cheap.cmd" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+ succeeded in 14379ms:
+.NET Framework 的 MSBuild 版本 17.14.23+b0019275e
+
+  Checking File Globs
+  HTDemucsGpuFX_rc_lib.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\HTDemucsGpuFX_rc_lib.dir\Release\HTDemucsGpuFX_rc_lib.lib
+  htfx_gpu_worker_client.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\Release\htfx_gpu_worker_client.lib
+  HTDemucsGpuFX.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\HTDemucsGpuFX_artefacts\Release\HTDemucs GPU FX_SharedCode.lib
+  HTDemucsGpuFX_Standalone.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\HTDemucsGpuFX_artefacts\Release\Standalone\HTDemucs GPU FX.exe
+.NET Framework 的 MSBuild 版本 17.14.23+b0019275e
+
+  Checking File Globs
+  htfx_gpu_worker_client.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\Release\htfx_gpu_worker_client.lib
+  HTDemucsGpuFX.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\HTDemucsGpuFX_artefacts\Release\HTDemucs GPU FX_SharedCode.lib
+  htdemucs_ui_configuration_smoke.vcxproj -> C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\build\windows-installed\Release\htdemucs_ui_configuration_smoke.exe
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true PASS
+'cheap' is not recognized as an internal or external command,
+operable program or batch file.
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "& 'C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe' run -n htfx-roformer melband-roformer-infer --help" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'python .loop/check_scope.py' in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+ succeeded in 7379ms:
+[scope] OK — 17 changed path(s) within policy
+
+2026-08-23T04:04:47.028488Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 97 column 5
+ succeeded in 23944ms:
+usage: melband-roformer-infer [-h] [--model_type MODEL_TYPE]
+                              [--config_path CONFIG_PATH]
+                              [--model_path MODEL_PATH] [--model MODEL]
+                              [--models_dir MODELS_DIR] --input_folder
+                              INPUT_FOLDER [--store_dir STORE_DIR]
+                              [--device DEVICE] [--backend BACKEND]
+                              [--device_ids DEVICE_IDS [DEVICE_IDS ...]]
+
+Mel-Band Roformer inference runner
+
+options:
+  -h, --help            show this help message and exit
+  --model_type MODEL_TYPE
+  --config_path CONFIG_PATH
+                        path to config yaml file (omit to auto-resolve from
+                        --model)
+  --model_path MODEL_PATH
+                        path to the .ckpt weights (omit to auto-resolve from
+                        --model)
+  --model MODEL         registry model slug/name to auto-resolve when paths
+                        are omitted (default: melband-roformer-kim-vocals)
+  --models_dir MODELS_DIR
+                        directory holding downloaded model assets (default:
+                        $MELBAND_ROFORMER_MODELS_PATH or ~/.cache/melband-
+                        roformer-infer; a legacy ./models directory is also
+                        searched)
+  --input_folder INPUT_FOLDER
+                        folder with songs to process
+  --store_dir STORE_DIR
+                        path to store model outputs
+  --device DEVICE       torch device string, defaults to auto
+  --backend BACKEND     compute backend: 'torch' (default), 'mlx', or 'auto'
+  --device_ids DEVICE_IDS [DEVICE_IDS ...]
+                        optional list of gpu ids for DataParallel
+
+
+2026-08-23T04:05:00.985319Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `base_instructions` at line 97 column 5
+codex
+Verification evidence is decisive: cheap tier exit 0, A1 CLI exit 0, and scope exit 0. I’m recording iteration 1 as `running` with A1 newly passing (metric 1), while C1/C2 remain incomplete and C3 passes.
+apply patch
+patch: completed
+C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22\.loop\journal.md
+diff --git a/.loop/journal.md b/.loop/journal.md
+index 4a27541ec6adb2ccd7cce4e45fce058dacb4e422..381a2d87880837b6d457bf1324280d22423d54dd
+--- a/.loop/journal.md
++++ b/.loop/journal.md
+@@ -7,3 +7,35 @@
+ Budget: max_iterations=60 · stall_threshold=6 · iteration_timeout=40m · wall=none
+ 
+ ---
++
++## Iteration 1 — 2026-08-23
++**Inherited baseline:** 工作樹僅有 driver 產生的 `.loop/driver.log`、`.loop/lastrun.log` 與 `.loop/nohup.out` 變動；變更前先執行 cheap tier，exit 0。建置與 `htdemucs_ui_configuration_smoke` PASS；尾端另印出非致命訊息：`'cheap' is not recognized as an internal or external command, operable program or batch file.`
++**Hypothesis:** 若建立獨立 `htfx-roformer` conda env 並安裝 upstream package，A1 應會改善，因為該環境將提供 `melband-roformer-infer` CLI。
++**Files touched:** `C:/Users/<user>/anaconda3/envs/htfx-roformer/`（允許的獨立 conda env）；`.loop/backlog.json`、`.loop/iterations/0001.json`、`.loop/journal.md`、`.loop/state.json`（loop 控制面）。
++**Verification:** `cmd /c .loop\checks\cheap.cmd`（exit 0）
++```text
++.NET Framework 的 MSBuild 版本 17.14.23+b0019275e
++HTDemucsGpuFX_Standalone.vcxproj -> ...\Standalone\HTDemucs GPU FX.exe
++htdemucs_ui_configuration_smoke.vcxproj -> ...\htdemucs_ui_configuration_smoke.exe
++default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true PASS
++'cheap' is not recognized as an internal or external command,
++operable program or batch file.
++```
++**A1 check:** `C:\Users\<user>\anaconda3\Scripts\conda.exe run -n htfx-roformer melband-roformer-infer --help`（exit 0）
++```text
++usage: melband-roformer-infer [-h] [--model_type MODEL_TYPE]
++                              [--config_path CONFIG_PATH]
++                              [--model_path MODEL_PATH] [--model MODEL]
++                              [--models_dir MODELS_DIR] --input_folder INPUT_FOLDER
++Mel-Band Roformer inference runner
++```
++**Scope:** `python .loop/check_scope.py`（exit 0）
++```text
++[scope] OK — 17 changed path(s) within policy
++```
++**Criteria:** C1: fail（本輪非 full cadence，且整體整合未完成） · C2: fail（其餘 backlog 未完成） · C3: pass
++**Metric:** 1 個 backlog item passing（best so far: 1；improved: true）
++**Decision:** continue
++**Note:** A1 已由隔離環境內的 CLI 實際退出碼 0 證明；下一輪依 priority 轉向 A2。
++
++---
+
+diff --git a/.loop/journal.md b/.loop/journal.md
+index 4a27541ec6adb2ccd7cce4e45fce058dacb4e422..381a2d87880837b6d457bf1324280d22423d54dd
+--- a/.loop/journal.md
++++ b/.loop/journal.md
+@@ -7,3 +7,35 @@
+ Budget: max_iterations=60 · stall_threshold=6 · iteration_timeout=40m · wall=none
+ 
+ ---
++
++## Iteration 1 — 2026-08-23
++**Inherited baseline:** 工作樹僅有 driver 產生的 `.loop/driver.log`、`.loop/lastrun.log` 與 `.loop/nohup.out` 變動；變更前先執行 cheap tier，exit 0。建置與 `htdemucs_ui_configuration_smoke` PASS；尾端另印出非致命訊息：`'cheap' is not recognized as an internal or external command, operable program or batch file.`
++**Hypothesis:** 若建立獨立 `htfx-roformer` conda env 並安裝 upstream package，A1 應會改善，因為該環境將提供 `melband-roformer-infer` CLI。
++**Files touched:** `C:/Users/<user>/anaconda3/envs/htfx-roformer/`（允許的獨立 conda env）；`.loop/backlog.json`、`.loop/iterations/0001.json`、`.loop/journal.md`、`.loop/state.json`（loop 控制面）。
++**Verification:** `cmd /c .loop\checks\cheap.cmd`（exit 0）
++```text
++.NET Framework 的 MSBuild 版本 17.14.23+b0019275e
++HTDemucsGpuFX_Standalone.vcxproj -> ...\Standalone\HTDemucs GPU FX.exe
++htdemucs_ui_configuration_smoke.vcxproj -> ...\htdemucs_ui_configuration_smoke.exe
++default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true PASS
++'cheap' is not recognized as an internal or external command,
++operable program or batch file.
++```
++**A1 check:** `C:\Users\<user>\anaconda3\Scripts\conda.exe run -n htfx-roformer melband-roformer-infer --help`（exit 0）
++```text
++usage: melband-roformer-infer [-h] [--model_type MODEL_TYPE]
++                              [--config_path CONFIG_PATH]
++                              [--model_path MODEL_PATH] [--model MODEL]
++                              [--models_dir MODELS_DIR] --input_folder INPUT_FOLDER
++Mel-Band Roformer inference runner
++```
++**Scope:** `python .loop/check_scope.py`（exit 0）
++```text
++[scope] OK — 17 changed path(s) within policy
++```
++**Criteria:** C1: fail（本輪非 full cadence，且整體整合未完成） · C2: fail（其餘 backlog 未完成） · C3: pass
++**Metric:** 1 個 backlog item passing（best so far: 1；improved: true）
++**Decision:** continue
++**Note:** A1 已由隔離環境內的 CLI 實際退出碼 0 證明；下一輪依 priority 轉向 A2。
++
++---
+
+exec
+"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "python -c 'import json,os; from datetime import datetime; now=datetime.now().astimezone().isoformat(timespec=\"seconds\"); rec={\"iteration\":1,\"timestamp\":now,\"hypothesis\":\"若建立獨立 htfx-roformer conda env 並安裝 upstream package，A1 應會改善，因為該環境將提供 melband-roformer-infer CLI。\",\"files_touched\":[\"C:/Users/<user>/anaconda3/envs/htfx-roformer/\",\".loop/backlog.json\",\".loop/iterations/0001.json\",\".loop/journal.md\",\".loop/state.json\"],\"commands\":[{\"cmd\":\"cmd /c .loop\\\\checks\\\\cheap.cmd\",\"exit_code\":0,\"timed_out\":False},{\"cmd\":\"C:\\\\Users\\\\<user>\\\\anaconda3\\\\Scripts\\\\conda.exe run -n htfx-roformer melband-roformer-infer --help\",\"exit_code\":0,\"timed_out\":False},{\"cmd\":\"python .loop/check_scope.py\",\"exit_code\":0,\"timed_out\":False}],\"criteria\":{\"C1\":\"fail\",\"C2\":\"fail\",\"C3\":\"pass\"},\"metrics\":{\"name\":\"backlog_items_passing\",\"value\":1,\"improved\":True},\"decision\":\"continue\",\"status\":\"running\",\"stop_reason\":None}; p=\".loop/iterations/0001.json\"; t=p+\".tmp\"; open(t,\"w\",encoding=\"utf-8\").write(json.dumps(rec,ensure_ascii=False,indent=2)+\"\\n\"); os.replace(t,p); bp=\".loop/backlog.json\"; b=json.load(open(bp,encoding=\"utf-8\")); a=next(x for x in b if x[\"id\"]==\"A1\"); a[\"passes\"]=True; a[\"evidence\"]=\"iter 1: C:\\\\Users\\\\<user>\\\\anaconda3\\\\Scripts\\\\conda.exe run -n htfx-roformer melband-roformer-infer --help (exit 0)\"; bt=bp+\".tmp\"; open(bt,\"w\",encoding=\"utf-8\").write(json.dumps(b,ensure_ascii=False,indent=2)+\"\\n\"); os.replace(bt,bp); sp=\".loop/state.json\"; s=json.load(open(sp,encoding=\"utf-8\")); s[\"iteration\"]=1; s[\"updated_at\"]=now; s[\"best_metric\"]=1; s[\"iterations_since_improvement\"]=0; s[\"status\"]=\"running\"; s[\"stop_reason\"]=None; st=sp+\".tmp\"; open(st,\"w\",encoding=\"utf-8\").write(json.dumps(s,ensure_ascii=False,indent=2)+\"\\n\"); os.replace(st,sp)'" in C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+ succeeded in 7106ms:
+diff --git a/.loop/journal.md b/.loop/journal.md
+index 4a27541ec6adb2ccd7cce4e45fce058dacb4e422..381a2d87880837b6d457bf1324280d22423d54dd
+--- a/.loop/journal.md
++++ b/.loop/journal.md
+@@ -7,3 +7,35 @@
+ Budget: max_iterations=60 · stall_threshold=6 · iteration_timeout=40m · wall=none
+ 
+ ---
++
++## Iteration 1 — 2026-08-23
++**Inherited baseline:** 工作樹僅有 driver 產生的 `.loop/driver.log`、`.loop/lastrun.log` 與 `.loop/nohup.out` 變動；變更前先執行 cheap tier，exit 0。建置與 `htdemucs_ui_configuration_smoke` PASS；尾端另印出非致命訊息：`'cheap' is not recognized as an internal or external command, operable program or batch file.`
++**Hypothesis:** 若建立獨立 `htfx-roformer` conda env 並安裝 upstream package，A1 應會改善，因為該環境將提供 `melband-roformer-infer` CLI。
++**Files touched:** `C:/Users/<user>/anaconda3/envs/htfx-roformer/`（允許的獨立 conda env）；`.loop/backlog.json`、`.loop/iterations/0001.json`、`.loop/journal.md`、`.loop/state.json`（loop 控制面）。
++**Verification:** `cmd /c .loop\checks\cheap.cmd`（exit 0）
++```text
++.NET Framework 的 MSBuild 版本 17.14.23+b0019275e
++HTDemucsGpuFX_Standalone.vcxproj -> ...\Standalone\HTDemucs GPU FX.exe
++htdemucs_ui_configuration_smoke.vcxproj -> ...\htdemucs_ui_configuration_smoke.exe
++default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true PASS
++'cheap' is not recognized as an internal or external command,
++operable program or batch file.
++```
++**A1 check:** `C:\Users\<user>\anaconda3\Scripts\conda.exe run -n htfx-roformer melband-roformer-infer --help`（exit 0）
++```text
++usage: melband-roformer-infer [-h] [--model_type MODEL_TYPE]
++                              [--config_path CONFIG_PATH]
++                              [--model_path MODEL_PATH] [--model MODEL]
++                              [--models_dir MODELS_DIR] --input_folder INPUT_FOLDER
++Mel-Band Roformer inference runner
++```
++**Scope:** `python .loop/check_scope.py`（exit 0）
++```text
++[scope] OK — 17 changed path(s) within policy
++```
++**Criteria:** C1: fail（本輪非 full cadence，且整體整合未完成） · C2: fail（其餘 backlog 未完成） · C3: pass
++**Metric:** 1 個 backlog item passing（best so far: 1；improved: true）
++**Decision:** continue
++**Note:** A1 已由隔離環境內的 CLI 實際退出碼 0 證明；下一輪依 priority 轉向 A2。
++
++---
+
