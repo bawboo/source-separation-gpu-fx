@@ -14,7 +14,7 @@
 set -uo pipefail
 
 # ── CONFIG (from LOOP_PLAN.md §9) ───────────────────────────────────────────
-AGENT_CMD_JSON=${AGENT_CMD_JSON:-'["claude","-p","--permission-mode","acceptEdits","--allowedTools","Bash Edit Write Read Glob Grep Task WebFetch WebSearch"]'}
+AGENT_CMD_JSON=${AGENT_CMD_JSON:-'["cmd","/c","claude","-p","--permission-mode","acceptEdits","--allowedTools","Bash Edit Write Read Glob Grep Task WebFetch WebSearch"]'}
 PROMPT_MODE=${PROMPT_MODE:-arg}
 MAX_WALL_MINUTES=${MAX_WALL_MINUTES:-0}
 ITERATION_TIMEOUT_MINUTES=${ITERATION_TIMEOUT_MINUTES:-40}
@@ -99,6 +99,15 @@ if mode == "stdin":
     kw["stdin"] = subprocess.PIPE
 
 def kill_agent(p):
+    if os.name != "posix":
+        # Windows: kill the whole process tree (cmd shim -> node -> children)
+        try:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)],
+                           capture_output=True)
+            p.wait(timeout=10)
+            return
+        except Exception:
+            pass
     sigs = [signal.SIGTERM]
     if hasattr(signal, "SIGKILL"):
         sigs.append(signal.SIGKILL)
