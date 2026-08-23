@@ -200,6 +200,23 @@ std::filesystem::path configuredModelsDirectory() {
     return utf8Path(HTFX_DEFAULT_MODELS_PATH);
 }
 
+juce::File configuredRoformerManifest() {
+    const auto environment =
+        juce::SystemStats::getEnvironmentVariable("HTFX_ROFORMER_MANIFEST", {}).trim();
+    if (environment.isNotEmpty()) {
+        return juce::File(environment);
+    }
+    const auto bundled = displayPath(
+        bundledSidecarPath("models/roformer-manifest.json"));
+    if (juce::File(bundled).existsAsFile()) {
+        return juce::File(bundled);
+    }
+    return juce::File::getCurrentWorkingDirectory()
+        .getChildFile("assets")
+        .getChildFile("models")
+        .getChildFile("roformer-manifest.json");
+}
+
 std::filesystem::path configuredWorkerExecutable() {
     const auto environment =
         juce::SystemStats::getEnvironmentVariable("HTFX_WORKER_EXECUTABLE", {}).trim();
@@ -516,6 +533,7 @@ HTDemucsGpuFXAudioProcessor::HTDemucsGpuFXAudioProcessor()
               .withInput("Input", juce::AudioChannelSet::stereo(), true)
               .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters_(*this, nullptr, "HTDemucsGpuFXState", createParameterLayout()) {
+    loadRoformerModels();
     for (std::size_t index = 0; index < stemGainParameters_.size(); ++index) {
         stemGainParameters_[index] = parameters_.getRawParameterValue(kStemParameterIds[index]);
         jassert(stemGainParameters_[index] != nullptr);
@@ -631,6 +649,13 @@ HTDemucsGpuFXAudioProcessor::currentRuntimeConfiguration() const {
         static_cast<int>(kModelNames.size()) - 1);
     configuration.modelName = kModelNames[static_cast<std::size_t>(modelIndex)];
     configuration.sourceCount = modelIndex == 2 ? 6 : 4;
+    {
+        const std::scoped_lock lock(roformerMutex_);
+        if (selectedRoformerModel_.isNotEmpty()) {
+            configuration.modelName = selectedRoformerModel_.toStdString();
+            configuration.sourceCount = 2;
+        }
+    }
     configuration.segmentSamples = static_cast<int>(std::lround(
         kSegmentSeconds[static_cast<std::size_t>(segmentIndex)] * kSampleRate));
     configuration.hopSamples = configuration.segmentSamples * 3 / 4;
@@ -647,6 +672,61 @@ HTDemucsGpuFXAudioProcessor::currentRuntimeConfiguration() const {
         0,
         7);
     return configuration;
+}
+
+void HTDemucsGpuFXAudioProcessor::loadRoformerModels() {
+    std::vector<RoformerModel> loaded;
+    const auto manifest = configuredRoformerManifest();
+    const auto parsed = juce::JSON::parse(manifest.loadFileAsString());
+    const auto* root = parsed.getDynamicObject();
+    if (root != nullptr) {
+        if (const auto* models = root->getProperty("models").getArray()) {
+            loaded.reserve(static_cast<std::size_t>(models->size()));
+            for (const auto& value : *models) {
+                const auto* object = value.getDynamicObject();
+                if (object == nullptr) {
+                    continue;
+                }
+                RoformerModel model;
+                model.id = object->getProperty("id").toString();
+                model.name = object->getProperty("name").toString();
+                model.category = object->getProperty("category").toString();
+                model.audited = static_cast<bool>(object->getProperty("audited"));
+                model.experimental =
+                    static_cast<bool>(object->getProperty("experimental"));
+                if (model.id.isNotEmpty()) {
+                    loaded.push_back(std::move(model));
+                }
+            }
+        }
+    }
+    const std::scoped_lock lock(roformerMutex_);
+    roformerModels_ = std::move(loaded);
+}
+
+std::vector<HTDemucsGpuFXAudioProcessor::RoformerModel>
+HTDemucsGpuFXAudioProcessor::getRoformerModels() const {
+    const std::scoped_lock lock(roformerMutex_);
+    return roformerModels_;
+}
+
+bool HTDemucsGpuFXAudioProcessor::selectRoformerModel(
+    const juce::String& modelId) {
+    const std::scoped_lock lock(roformerMutex_);
+    const auto found = std::find_if(
+        roformerModels_.begin(),
+        roformerModels_.end(),
+        [&modelId](const RoformerModel& model) { return model.id == modelId; });
+    if (found == roformerModels_.end()) {
+        return false;
+    }
+    selectedRoformerModel_ = found->id;
+    return true;
+}
+
+juce::String HTDemucsGpuFXAudioProcessor::getSelectedRoformerModel() const {
+    const std::scoped_lock lock(roformerMutex_);
+    return selectedRoformerModel_;
 }
 
 double HTDemucsGpuFXAudioProcessor::getRecordedSeconds() const noexcept {

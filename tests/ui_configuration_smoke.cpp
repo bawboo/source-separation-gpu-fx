@@ -70,6 +70,23 @@ int run() {
         juce::AudioProcessor::wrapperType_Undefined);
     processor->prepareToPlay(44'100.0, 256);
 
+    const auto roformerModels = processor->getRoformerModels();
+    require(roformerModels.size() == 99, "RoFormer catalog count mismatch");
+    require(
+        std::count_if(
+            roformerModels.begin(),
+            roformerModels.end(),
+            [](const auto& model) { return model.audited; }) == 57,
+        "RoFormer audited count mismatch");
+    require(
+        !processor->selectRoformerModel("not-a-real-model"),
+        "unknown RoFormer model was accepted");
+    require(
+        processor->selectRoformerModel("melband-roformer-kim-vocals") &&
+            processor->getSelectedRoformerModel() ==
+                "melband-roformer-kim-vocals",
+        "RoFormer selection was not retained");
+
     require(
         processor->getOperatingMode() ==
             HTDemucsGpuFXAudioProcessor::OperatingMode::record,

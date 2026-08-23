@@ -8,3 +8,4 @@
 - SIGN (wiring): smoke tests 的正式 sidecar 靠 junction `build\windows-installed\Release\Resources\sidecar`→`verify\payload-cuda\Resources\sidecar`；若 junction 不存在會導致 record_mode_smoke 失敗——用 `New-Item -ItemType Junction` 重建，不要改 test 程式。
 - SIGN (wiring): 上游 repo https://github.com/openmirlab/melband-roformer-infer（MIT）；registry 在其 `src/mel_band_roformer/data/melband_models.json`；預設下載快取為 `~/.cache/melband-roformer-infer/`——需將其導向本專案快取目錄（環境變數 `MELBAND_ROFORMER_MODELS_PATH` 或 `--models_dir`）。
 - SIGN (user, 2026-08-23): 絕對不允許刪除 `C:\CodexProjects\SourceSeparation_GPU_FX\` 專案根目錄以外的任何檔案（包含 ~/.cache、temp 等）；專案內也僅限 `verify\roformer-cache\` 的權重檔可刪。
+- SIGN (iter 5): A4 只有在真實 RoFormer worker 路由也完成並有證據後才能翻為 pass；catalog 載入與選擇本身只是可驗證基礎。

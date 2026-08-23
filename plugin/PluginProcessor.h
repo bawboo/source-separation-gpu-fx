@@ -46,6 +46,14 @@ public:
         accompaniment = 1,
     };
 
+    struct RoformerModel {
+        juce::String id;
+        juce::String name;
+        juce::String category;
+        bool audited = false;
+        bool experimental = true;
+    };
+
     HTDemucsGpuFXAudioProcessor();
     ~HTDemucsGpuFXAudioProcessor() override;
 
@@ -158,6 +166,9 @@ public:
     [[nodiscard]] bool importedFromVideo() const noexcept {
         return importedVideo_.load(std::memory_order_acquire);
     }
+    [[nodiscard]] std::vector<RoformerModel> getRoformerModels() const;
+    bool selectRoformerModel(const juce::String& modelId);
+    [[nodiscard]] juce::String getSelectedRoformerModel() const;
     [[nodiscard]] static juce::String sourceName(int sourceIndex);
 
     void applyUserConfiguration();
@@ -274,6 +285,7 @@ private:
         MixSettings settings,
         juce::File originalMediaFile);
     [[nodiscard]] RuntimeConfiguration currentRuntimeConfiguration() const;
+    void loadRoformerModels();
     [[nodiscard]] MixSettings currentMixSettings() const;
     void setSeparationMessage(const juce::String& message);
     void setMediaMessage(const juce::String& message);
@@ -354,6 +366,9 @@ private:
     std::vector<float> recordedRight_;
     mutable std::mutex runtimeControlMutex_;
     RuntimeConfiguration activeRuntimeConfiguration_{};
+    mutable std::mutex roformerMutex_;
+    std::vector<RoformerModel> roformerModels_;
+    juce::String selectedRoformerModel_;
 
     juce::AudioBuffer<float> dryDelay_;
     int dryDelayIndex_ = 0;

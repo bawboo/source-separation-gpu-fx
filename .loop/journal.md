@@ -181,3 +181,46 @@ OK
 **Note:** D1 已由 CUDA 可見性與真實模型 `cuda:0` 分離共同證明；下一輪依 priority 轉向 A4。
 
 ---
+
+## Iteration 5 — 2026-08-23T13:06:41.1788895+08:00
+**Inherited baseline:** 工作樹只有外部 driver 持續更新的 `.loop/driver.log` 與 `.loop/lastrun.log`；上一輪 record 完整且 cheap tier exit 0，無 crash-mid-write 跡象。Windows repository 解析路徑正確；branch=`loop/melband-roformer`，remote 與 tag 均為空，符合本 loop 不設 remote／無目標 tag。
+**Hypothesis:** 若 processor 能從固定 manifest 載入 99 模型、拒絕未知 ID、保存有效 RoFormer 選擇並讓 runtime configuration 採用該選擇，A4 的「模型清單／選擇」子路徑會先變成可驗證基礎，因為後續 worker 路由可依同一個穩定 ID 決策。
+**Change-set:** `plugin/PluginProcessor.h/.cpp` 新增 RoFormer model DTO、manifest 定位/解析、thread-safe catalog getter 與 validated selection，選擇後 runtime configuration 使用穩定 model ID 與 2-stem layout；`tests/ui_configuration_smoke.cpp` 新增 99/57 統計、未知 ID 拒絕、有效 ID 保存 assertions。
+**TDD RED:** `cmd /c .loop\checks\cheap.cmd`（exit 1）
+```text
+error C2039: 'getRoformerModels': 並非 'HTDemucsGpuFXAudioProcessor' 的成員
+error C2039: 'selectRoformerModel': 並非 'HTDemucsGpuFXAudioProcessor' 的成員
+error C2039: 'getSelectedRoformerModel': 並非 'HTDemucsGpuFXAudioProcessor' 的成員
+```
+**Cheap GREEN:** `cmd /c .loop\checks\cheap.cmd`（exit 0）
+```text
+HTDemucsGpuFX_Standalone.vcxproj -> ...\Standalone\HTDemucs GPU FX.exe
+htdemucs_ui_configuration_smoke.vcxproj -> ...\htdemucs_ui_configuration_smoke.exe
+default_panel=general ... models=4 ... PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s
+OK
+Ran 2 tests in 0.056s
+OK
+```
+**Full verification:** `cmd /c .loop\checks\full.cmd`（exit 0）
+```text
+=== ui_configuration_smoke ===
+default_panel=general ... PASS
+=== media_io_smoke ===
+audio_import=true quick_vocals=true quick_accompany=true raw_stem_unchanged=true mix_controls=true video_import=true mp4_replace_audio=true mp4_bytes=31942 PASS
+=== record_mode_smoke (auto/GPU) ===
+backend=auto recorded_seconds=1.00426 preview_seconds=1.00426 progress=1 inference_ms=194.875 ... mix_controls=true ... PASS=true
+[full] htdemucs_roformer_smoke not built yet - A8 still open
+```
+`python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"`（exit 1；仍有未完成 backlog）
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 31 changed path(s) within policy
+```
+**Criteria:** C1: fail（full.cmd exit 0，但必要的 roformer smoke 尚不存在） · C2: fail（backlog checker exit 1） · C3: pass
+**Metric:** 4 個 backlog item passing（best so far: 4；improved: false）
+**Decision:** continue
+**Note:** catalog／selection 子路徑已通過 TDD 與完整回歸，但 A4 尚缺真實 RoFormer worker 啟動/結果載入路由，不得翻為 pass；下一輪維持 A4 priority 完成該路由。
+
+---
