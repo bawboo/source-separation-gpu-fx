@@ -180709,3 +180709,29 @@ LOOP STATUS: running â€” iter-10 recovered inherited htdemucs_roformer_smoke CMa
 [driver] agent process exited rc=0
 [scope] OK ¡X 41 changed path(s) within policy
 [driver] iteration 11 launching  2026-08-23T22:04:40+0800
+Checkpoint committed cleanly, working tree is clean.
+
+LOOP STATUS: running â€” iter 11 added the README RoFormer section (A10 now passes); 11/12 backlog items passing, only M-ENUM remains.
+[driver] agent process exited rc=0
+[scope] OK ¡X 43 changed path(s) within policy
+[driver] iteration 12 launching  2026-08-23T22:08:52+0800
+[driver] iteration 12 launching  2026-08-23T22:13:45+0800
+Reading additional input from stdin...
+2026-08-23T14:13:46.967844Z ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions` at line 97 column 5
+OpenAI Codex v0.144.1
+--------
+workdir: C:\CodexProjects\SourceSeparation_GPU_FX\HTDemucs_GPU_FX_Codex_Transfer_2026-08-22
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a02ef8-7103-7da3-b214-9abe410ad468
+--------
+user
+Read the file .loop/ITERATION_PROMPT.md in the current directory and follow it exactly: execute exactly ONE loop iteration, then stop with the LOOP STATUS line.
+ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 27th, 2026 5:07 PM.
+ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 27th, 2026 5:07 PM.
+[driver] agent process exited rc=1
+[driver] usage/rate limit detected â€” sleeping 1200s then retrying (not counted as a failed launch)

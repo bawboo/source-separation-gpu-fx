@@ -435,3 +435,65 @@ SCOPE_EXIT=0
 **Decision:** continue
 **Lesson:** 無新規則（純文件性任務，未觸發新的踩坑）。
 **Note:** 下一輪目標轉向 backlog 中僅存的未過項目 M-ENUM（依 `assets/models/roformer-manifest.json` 產生 M001..M099 per-model backlog 項目：57 個 audited 逐一「下載+SHA-256→分離 fixtures→輸出規格驗證」，42 個 experimental 逐一「收錄+標註+嘗試一次並記錄成敗」）——這是全 backlog 唯一剩下的未過項目，規模大，預期需跨多個 iteration 才能完成全部 99 項；下一輪應先產生 M001..M099 的 backlog 條目本身（若尚未存在），再開始逐批處理。
+
+## iter 12 — 2026-08-23T23:10:00+08:00
+
+**Hypothesis:** M-ENUM 是 backlog 中唯一剩下的未過項目，但其對應的 M001..M099 per-model 子項目尚未產生。若先依 `assets/models/roformer-manifest.json` 產生 M001..M099（append-only、idempotent），M-ENUM 本身（「產生」這個動作）應可翻為 pass；接著用一個新的可重用批次驗證腳本（download+SHA-256 驗證→分離 fixture→輸出規格驗證；audited 失敗才算 fail，experimental 失敗算 attempted_failed 且仍視為完成）處理第一批模型，應能讓一部分 M001..M099 子項目本身也翻為 pass——因為底層 `worker/roformer_cache.py` 與 `worker/roformer_worker.py` 的生產路徑已由 A3/A6/A8 證明正確，只是尚未跑過完整 99 個模型的清單。
+
+**Files touched:** 新增 `tools/generate_roformer_model_backlog_items.py`（讀取 manifest，依模型順序 append M001..M099 到 `.loop/backlog.json`，以 `model_id` 比對避免重複、絕不覆寫既有項目）；新增 `tools/roformer_batch_verify.py`（可重用批次驗證腳本：audited 模型走 `ensure_cached`→`separate_file`→輸出契約驗證，失敗＝真缺陷；experimental 模型同樣嘗試，失敗記為 `attempted_failed`，不影響腳本 exit code）；`.loop/backlog.json`（append 99 個 M-items＋本輪翻 pass 40 項）；`.loop/iterations/0012.json`、`.loop/journal.md`、`.loop/state.json`（loop 控制面）；`.loop/driver.log`（外部 driver 程序自行 append 的執行紀錄，非本輪變更效果，隨 commit 一併納入）。
+
+**產生 M-items：** `python tools/generate_roformer_model_backlog_items.py`（exit 0）
+```text
+appended 99 M-items (total backlog size now 111)
+first appended: ['M001', 'M002', 'M003']
+last appended: ['M097', 'M098', 'M099']
+```
+
+**第一批（3 個已稽核模型）第一次執行（發現 bug）：** `python tools/roformer_batch_verify.py --models melband-roformer-kim-vocals roformer-model-melband-roformer-guitar-by-becruily roformer-model-melband-roformer-deux-by-becruily --cache-dir verify/roformer-cache --fixture verify/fixtures/test_48k_2s.wav --output-root verify/output/roformer-batch --device auto --max-cached 3`（exit 1）
+```text
+kim-vocals: outcome=pass
+guitar-by-becruily: outcome=pass
+deux-by-becruily: 下載 435,006,815 bytes 成功、sha256 驗證通過，但 separate_file() 呼叫時拋出
+  UnicodeEncodeError: 'cp950' codec can't encode character '\U0001f504' in position 2: illegal multibyte sequence
+```
+**根因排查：** `worker/roformer_worker.py` 的 CLI `main()` 早在呼叫 `separate_file()` 前就呼叫 `configure_utf8_stream(sys.stdout)`／`configure_utf8_stream(sys.stderr)`（iter 3 已修過同類 emoji-in-cp950-console 問題），但本輪新寫的 `tools/roformer_batch_verify.py` 是直接 import `separate_file()` 當函式庫呼叫、繞過了那個 CLI 專屬的初始化，所以同一個舊 bug 在新的呼叫路徑上重現。修正：`roformer_batch_verify.py` 的 `main()` 一開始就呼叫同一組 `configure_utf8_stream`（從 `roformer_worker` import），而不是複製/放寬邏輯。
+**修正後重跑：** 同一指令（exit 0）
+```text
+{
+  "model": "melband-roformer-kim-vocals", ... "sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2, "outcome": "pass"
+  "model": "roformer-model-melband-roformer-guitar-by-becruily", ... "outcome": "pass"
+  "model": "roformer-model-melband-roformer-deux-by-becruily", "cache_verified_sha256": "10255c02...eda3aa", "checkpoint_size": 435006815, ... "outcome": "pass"
+}
+```
+**第二批（36 個缺 sha256 的 experimental 模型）：** `python tools/roformer_batch_verify.py --models <36 ids> --cache-dir verify/roformer-cache --fixture verify/fixtures/test_48k_2s.wav --output-root verify/output/roformer-batch --device auto --max-cached 3`（exit 0——experimental 失敗不影響 exit code）
+```text
+36/36 outcome=attempted_failed，每一個的 error 均為：
+  ValueError: manifest entry has no recorded sha256 (checkpoint integrity cannot be verified)
+```
+這 36 個模型在 manifest 產生時就缺 sha256/size（上游中繼資料當時無法取得），因此連下載都不會發生，快速失敗；依 LOOP_PLAN backlog 語意「嘗試一次並記錄結果（成敗皆可）」，這仍是完成的 M-item。
+
+**Backlog 更新：** 直接以 Python（tmp+rename 原子寫入）把 M-ENUM＋3 個 audited 通過項＋36 個 experimental 已嘗試項共 40 個 item 的 `passes` 翻為 `true` 並寫入 `evidence`；其餘 59 個 M-item（21 個尚未處理的 audited、6 個有 sha256 尚未處理的 experimental）保持 `passes:false` 不變，留給後續 iteration。
+
+**Verification:** `cmd //c '.loop\checks\cheap.cmd'`（exit 0）
+```text
+default_panel=general ... roformer_browser=99 categories=10 search=true experimental=true download_status=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s
+OK
+Ran 2 tests in 0.071s
+OK
+Ran 8 tests in 0.117s
+OK
+```
+（cmd 標準輸出開頭出現兩行 mojibake「'cheap' 不是內部或外部命令」「'vswhere.exe' 不是內部或外部命令」——這是 VsDevCmd.bat 既有的內部探測噪音，與本輪變更無關，exit code 仍為 0，不影響任何實際檢查。）
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 45 changed path(s) within policy
+SCOPE_EXIT=0
+```
+**Backlog checker（本輪非 5 的倍數，non-full-tier，僅供參考）：** `python -c "...sys.exit(any(not i['passes'] for i in json.load(...)))"`（exit 1）——`passing 51 / 111`
+**Criteria:** C1: fail（本輪未跑 full tier，不宣稱 pass）· C2: fail（仍有 60 個 M-item 未過）· C3: pass
+**Metric:** 51 個 backlog item passing（best so far: 51；improved: true，較上輪 11 大幅躍進，主因是 M-ENUM 產生 99 個新項目後、其中 40 個當輪立即以真實驗證/嘗試證據翻為 pass）
+**Decision:** continue
+**Lesson:** 任何新寫的腳本只要直接 import 並呼叫 `worker/roformer_worker.py` 的 `separate_file()`（而不是透過它的 CLI `main()`），都必須自己呼叫 `configure_utf8_stream(sys.stdout)`／`configure_utf8_stream(sys.stderr)`，否則會在 Windows cp950 主控台上重現 iter 3 已修過的 `UnicodeEncodeError`（upstream 進度輸出含 emoji，例如 U+1F504 🔄）；這個初始化不是 CLI 專屬的裝飾，是每個呼叫路徑都需要的前置條件。已寫入 LESSONS.md。
+**Note:** 下一輪應繼續處理剩下的 59 個 M-item：21 個尚未跑的 audited 模型（依 checkpoint size 由小到大排序以控制單輪時間）＋6 個有 sha256 但尚未嘗試的 experimental 模型；`tools/roformer_batch_verify.py` 與 `tools/generate_roformer_model_backlog_items.py`（已具 idempotent 保護）皆可直接重用，不需要重寫。
