@@ -1,6 +1,6 @@
 {
-  "status": "running",
-  "stop_reason": null,
+  "status": "paused",
+  "stop_reason": "user_pause_required",
   "iteration": 12,
   "max_iterations": 60,
   "stall_threshold": 6,
@@ -12,5 +12,5 @@
     "loop_branch": "loop/melband-roformer"
   },
   "started_at": "2026-08-23T10:50:55+08:00",
-  "updated_at": "2026-08-23T23:10:00+08:00"
+  "updated_at": "2026-08-23T22:34:19+08:00"
 }

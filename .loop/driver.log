@@ -180735,3 +180735,16 @@ ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/
 ERROR: You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Aug 27th, 2026 5:07 PM.
 [driver] agent process exited rc=1
 [driver] usage/rate limit detected — sleeping 1200s then retrying (not counted as a failed launch)
+LOOP STATUS: running — iter 12: generated M001-M099 backlog items and verified first batch (40/99 flipped pass; backlog 11→51/111); C1/C2 still fail, C3 pass; decision=continue.
+[driver] agent process exited rc=0
+[scope] OK �X 46 changed path(s) within policy
+[driver] iteration 13 launching  2026-08-23T22:19:26+0800
+Waiting for the batch-verify download/verification of the 4 de-reverb-echo models to complete in the background.
+[driver] agent process exited rc=0
+[scope] VIOLATIONS:
+  verify/  (outside allow_paths)
+[driver] state.json → status=blocked stop_reason=blocked_permission_required
+[driver] stop: scope violation detected by check_scope.py — user approval required
+[driver] done 2026-08-23T22:32:09+0800. Final: status=blocked stop_reason=blocked_permission_required. See .loop/FINAL_REPORT.md and .loop/journal.md
+[driver] stale .loop/STOP removed (status='blocked')
+[driver] stop: agent set status='blocked' (stop_reason=blocked_permission_required) after 12 iterations

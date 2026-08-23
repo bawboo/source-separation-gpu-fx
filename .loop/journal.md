@@ -497,3 +497,9 @@ SCOPE_EXIT=0
 **Decision:** continue
 **Lesson:** 任何新寫的腳本只要直接 import 並呼叫 `worker/roformer_worker.py` 的 `separate_file()`（而不是透過它的 CLI `main()`），都必須自己呼叫 `configure_utf8_stream(sys.stdout)`／`configure_utf8_stream(sys.stderr)`，否則會在 Windows cp950 主控台上重現 iter 3 已修過的 `UnicodeEncodeError`（upstream 進度輸出含 emoji，例如 U+1F504 🔄）；這個初始化不是 CLI 專屬的裝飾，是每個呼叫路徑都需要的前置條件。已寫入 LESSONS.md。
 **Note:** 下一輪應繼續處理剩下的 59 個 M-item：21 個尚未跑的 audited 模型（依 checkpoint size 由小到大排序以控制單輪時間）＋6 個有 sha256 但尚未嘗試的 experimental 模型；`tools/roformer_batch_verify.py` 與 `tools/generate_roformer_model_backlog_items.py`（已具 idempotent 保護）皆可直接重用，不需要重寫。
+
+## Operator note — 2026-08-23T22:45+08:00（使用者要求暫停）
+- 使用者指示「暫停，但不要遺失工作階段」。STOP 檔已投放；同時 iteration 13 因 agent 提前結束（背景下載未等完、未寫 record/commit）觸發外部 scope 檢查：移交樹內出現不該存在的相對路徑 `verify/roformer-cache/`（290MB 部分下載 .ckpt.part）。driver 依設計鎖 blocked 停機。
+- 孤兒下載程序已自行結束；殘留 `verify/` 目錄留待續跑時清理（norule 未刪）。
+- 狀態由 blocked 改為 paused/user_pause_required（使用者主動暫停）。進度無損：iter 12 完成、backlog 51/111 綠（A1–A10、D1、M-ENUM＋39 M 項）、checkpoints 至 `b812e00`＋iter-12 commit。
+- 續跑程序：status 改回 running/null → `bash .loop/run_loop.sh`。續跑前 STEER 已備妥（見 .loop/STEER.md）。
