@@ -618,3 +618,80 @@ OK
 **Decision:** continue
 **Lesson:** 無新規則——本輪嚴格遵循既有 LESSONS（絕對路徑單引號、禁背景、直接呼叫 htfx-roformer python.exe、批次跑完後確認 kim-vocals 仍在快取）以及 STEER 的風險最小化指令（優先驗證已完整快取、零下載的模型），未觸發新的踩坑。唯一值得記錄的操作性觀察：`ensure_cached` 沒有斷點續傳，任何 `.ckpt.part` 殘留在下次呼叫時會被整檔覆蓋重下，不能省下已下載的部分位元組——這解釋了為何本輪優先選字節數與 manifest size 完全吻合的 M031/M032（真正「零下載」）而非位元組數僅差 ~1% 的 M037（仍會觸發全新完整下載）。
 **Note:** 下一輪可考慮先處理 M037（de-reverb-echo-by-sucial，需要完整重新下載 ~836MB，非資源續傳，抓 15 分鐘下載止損）；其後依 checkpoint size 由小到大處理 ~913MB 級距的 gabox/instv6/voc-fv 系列（M004/M006–M014/M022/M023 等 12 個同尺寸模型）。`tools/roformer_batch_verify.py` 與快取續住 `melband-roformer-kim-vocals` 的固定流程持續適用；仍剩 48 個 audited M-item 待驗證，estimé需要多輪、每輪同步完成 1–4 個以符合 60 分鐘 iteration_timeout。
+
+## iter 15 — 2026-08-24T23:20:00+08:00
+
+**Hypothesis:** 本輪無 STEER，依 LOOP_PLAN 常態推進剩餘 48 個 audited M-item。先用 `curl --max-time 60` 對 HuggingFace 做 60 秒吞吐量取樣，量出約 2.67MB/s——遠快於 iter-14 兩次 40 分鐘逾時的情況，推斷當時是行動網路暫時壅塞而非系統性問題。據此依 checkpoint 尺寸由小到大挑選 2 個 audited 模型（M037 de-reverb-echo-by-sucial 836MB、M004 denoise-debleed-gabox 913MB）逐一同步驗證，預期零失敗；若 Bash 工具把長時間下載自動轉為背景執行，一律用 `TaskOutput(block=true)` 反覆阻塞等待到 completed，絕不因此結束 turn（避免重演 iter-13/iter-14 的孤兒程序事故）。
+
+**Files touched:** `.loop/backlog.json`（M037／M004 翻 pass＋evidence）、`.loop/iterations/0015.json`、`.loop/journal.md`、`.loop/state.json`、`.loop/LESSONS.md`（新增 1 條 SIGN）、`.loop/driver.log`（外部 driver 自行 append）。未修改任何 `plugin/`／`cpp/`／`worker/`／`tests/` 原始碼。
+
+**Step 1 — 吞吐量取樣：** `curl -sS -L -o /dev/null --max-time 60 -w '...' https://huggingface.co/Politrees/UVR_resources/.../dereverb-echo_mel_band_roformer_sdr_10.0169.ckpt`（exit 28，逾時屬預期，僅取樣用）：
+```text
+http_code=200 size_download=160526645 time_total=60.062091 speed_download_Bps=2672678
+```
+約 2.67MB/s，836MB 全檔預估 5–6 分鐘可下載完成——確認網路目前正常，決定本輪批次為 2 個 audited 模型。
+
+**Step 2 — M037（de-reverb-echo-by-sucial，836MB，全新下載）：** `C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-echo-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3`。此次呼叫被 Bash 工具自動轉為背景執行（未主動要求）；依新教訓改用 `TaskOutput(bskhcyb65, block=true, timeout=600000)` 反覆阻塞等待（第一次逾時仍 running，第二次拿到 completed），全程未結束 turn。exit 0：
+```json
+{
+  "model": "roformer-model-melband-roformer-de-reverb-echo-by-sucial",
+  "cache_verified_sha256": "cd2b737a394cfb80cd48cc9fcbaf89f5f4062f6b93066c2911617a06d8b7860a",
+  "checkpoint_size": 835997896,
+  "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+  "outcome": "pass"
+}
+```
+
+**Step 3 — M004（denoise-debleed-gabox，913MB，全新下載）：** 同一支腳本改帶 `--models melband-roformer-denoise-debleed-gabox`，這次在前景同步完成（未觸發背景轉移）。exit 0：
+```json
+{
+  "model": "melband-roformer-denoise-debleed-gabox",
+  "cache_verified_sha256": "91aa7a546ed2e93482e4629c982d35b0d258bb3de6eeab497fd91658cc86c7fd",
+  "checkpoint_size": 913026650,
+  "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+  "outcome": "pass"
+}
+```
+
+**快取狀態：** 兩次下載後 `verify/roformer-cache/` 內為 `melband-roformer-kim-vocals`＋`roformer-model-melband-roformer-de-reverb-echo-by-sucial`＋`melband-roformer-denoise-debleed-gabox`（3 項，`max_cached=3`）；`melband-roformer-kim-vocals` 的 mtime（22:15，iter-14 重新觸碰）比被擠出的兩個 sucial 舊項新，故本輪未被驅逐，無需重新觸碰。
+
+**Backlog 更新：** 以一次性腳本（tmp+rename 原子寫入，用畢即刪）把 M037／M004 的 `passes` 翻為 `true` 並寫入含指令、sha256、size、separation 規格的 `evidence`；63 → 65 個 backlog item passing。
+
+**本輪為 5 的倍數（iteration 15），依協定跑 full tier：**
+
+`cmd //c '.loop\checks\cheap.cmd'`（exit 0）：
+```text
+default_panel=general ... roformer_browser=99 categories=10 search=true experimental=true download_status=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s
+OK
+Ran 2 tests in 0.068s
+OK
+Ran 8 tests in 0.101s
+OK
+```
+
+`python .loop/check_scope.py`（exit 0）：
+```text
+[scope] OK — 49 changed path(s) within policy
+```
+
+`cmd //c '.loop\checks\full.cmd'`（exit 0，standalone＋4 個 smoke 全 PASS）：
+```text
+=== ui_configuration_smoke ===
+... roformer_browser=99 categories=10 search=true experimental=true download_status=true ... PASS
+=== media_io_smoke ===
+audio_import=true quick_vocals=true quick_accompany=true raw_stem_unchanged=true mix_controls=true video_import=true mp4_replace_audio=true mp4_bytes=31942 PASS
+=== record_mode_smoke (auto/GPU) ===
+backend=auto recorded_seconds=1.00426 preview_seconds=1.00426 progress=1 inference_ms=226.121 full_mix_energy=360.007 muted_stem_energy=2.3891 bypass_original_energy=356.806 mix_controls=true status=Ready to preview · htdemucs · GPU PASS=true
+=== roformer_smoke ===
+roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/instrumental roformer_export_naming=true roformer_sample_rate=44100 roformer_channels=2 roformer_bit_depth=32float roformer_finite=true PASS
+```
+
+**Backlog checker（C2）：** `python -c "...sys.exit(any(not i['passes'] for i in json.load(...)))"`（exit 1）—— passing 65/111，仍有 46 個 M-item 未過，C2 未過。
+
+**Criteria:** C1: pass（full tier 全綠，本輪已跑）· C2: fail（46 個 M-item 仍未過）· C3: pass
+**Metric:** 65 個 backlog item passing（best so far: 65；improved: true，較上輪 63 增加 2）
+**Decision:** continue
+**Lesson:** (1) Bash 工具偶爾會在未要求的情況下把長時間指令自動轉為背景執行——這不違反「禁止背景」硬規則本身，正確處理是立刻用 `TaskOutput(block=true)` 反覆阻塞等待到 completed，絕不能因看到「running in background」字樣就結束 turn。(2) 本輪實測 HuggingFace 吞吐量恢復正常（≈2.67MB/s），先前 iter-14 兩次 40 分鐘逾時的根因較可能是當時網路環境暫時性壅塞，非批次大小或程式邏輯問題；建議往後每輪先用 60 秒 `curl --max-time 60` 取樣目前吞吐量，據此動態決定本輪批次大小。已寫入 LESSONS.md。
+**Note:** 下一輪應繼續處理剩餘 46 個 audited M-item（均為 ~913MB 級距的 gabox/instv6/voc-fv/kimmel/karaoke 等系列，可依 `tools/roformer_batch_verify.py` 既有流程逐批 2–3 個同步驗證）；下下一輪（iteration 20）將再次是 5 的倍數，記得再跑一次 full tier。批次跑完後、進 cheap/full tier 前，務必確認 `melband-roformer-kim-vocals` 仍在 `verify/roformer-cache/` 內（不在則用 `worker/roformer_cache.py --model melband-roformer-kim-vocals` 重新觸碰）。
