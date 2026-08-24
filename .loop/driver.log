@@ -180889,3 +180889,9 @@ LOOP STATUS: running â€” iter-31 verified M025+M026 (voc-gabox-fv2, crowd-aufr33
 [driver] agent process exited rc=0
 [scope] OK ¡X 66 changed path(s) within policy
 [driver] iteration 32 launching  2026-08-25T02:38:45+0800
+Checkpoint committed successfully. Iteration complete.
+
+LOOP STATUS: running â€” iter-32 M027+M028 (denoise-aufr33/denoise-aufr33-aggr) verified via manifest-resolved config mirror, 95/117 backlog passing
+[driver] agent process exited rc=0
+[scope] OK ¡X 67 changed path(s) within policy
+[driver] iteration 33 launching  2026-08-25T02:47:15+0800

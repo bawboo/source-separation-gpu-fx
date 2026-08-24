@@ -1,0 +1,22 @@
+{
+  "iteration": 33,
+  "timestamp": "2026-08-25T03:10:00+08:00",
+  "hypothesis": "M030 (roformer-model-mel-roformer-viperx-1143, priority 41) is the next-highest-priority backlog item with passes:false. Its manifest config_url (github.com/nomadkaraoke/python-audio-separator releases) already matches the upstream mel_band_roformer package's own data/overrides.json config override for the same checkpoint filename (verified by inspecting site-packages/mel_band_roformer/data/overrides.json before running anything) and a live curl HEAD/range check confirmed both the config and a checkpoint byte-range return 200/206 -- so this model does not need the iter-31/iter-32 manual-config-preplacement workaround; a plain tools/roformer_batch_verify.py run should download checkpoint+config and pass outright. Also hypothesized that GitHub-hosted checkpoints (M030) would download fast enough to fit multiple models this iteration, but a 45s and a 30s curl throughput sample against the next-priority HuggingFace-hosted model (M033, big-beta-6-by-unwa, 1.48 GB) both measured only ~0.42-0.55 MB/s (vs ~7.9 MB/s for the GitHub host serving M030) -- at that rate M033 alone would take ~47-50 min, too large a share of the 60 min iteration_timeout alongside required verification steps, so the batch was shrunk mid-iteration to M030 only per the hard rule 'if a batch is too big to finish synchronously, shrink the batch', leaving M033 for the next iteration with this throughput reading handed off.",
+  "files_touched": [
+    ".loop/backlog.json",
+    "verify/roformer-cache/roformer-model-mel-roformer-viperx-1143/model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt",
+    "verify/roformer-cache/roformer-model-mel-roformer-viperx-1143/model_mel_band_roformer_ep_3005_sdr_11.4360.yaml"
+  ],
+  "commands": [
+    {"cmd": "curl --max-time 45 -L -r 0-30000000 -o /dev/null -w ... https://github.com/nomadkaraoke/python-audio-separator/releases/download/model-configs/model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt (throughput probe)", "exit_code": 0, "timed_out": false},
+    {"cmd": "curl --max-time 45/30 -L -r 0-... -o /dev/null -w ... https://huggingface.co/Politrees/UVR_resources/.../melband_roformer_big_beta6.ckpt (throughput probe, x2)", "exit_code": 28, "timed_out": true},
+    {"cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-mel-roformer-viperx-1143 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --max-cached 3", "exit_code": 0, "timed_out": false},
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd'", "exit_code": 0, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 96, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}

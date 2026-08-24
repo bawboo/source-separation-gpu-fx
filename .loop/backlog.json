@@ -740,12 +740,12 @@
   {
     "id": "M030",
     "title": "M030: roformer-model-mel-roformer-viperx-1143（audited, category=vocals）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 41,
     "source": "plan",
     "model_id": "roformer-model-mel-roformer-viperx-1143",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter-33: tools/roformer_batch_verify.py --models roformer-model-mel-roformer-viperx-1143 --cache-dir verify/roformer-cache --fixture verify/fixtures/test_48k_2s.wav --output-root verify/output/roformer-batch --max-cached 3 -> outcome=pass; cache_verified_sha256=21b9d0958e35b8ebfbe2afe69bbd5444e5ffe2f5d80ae0d583b833d2f3c0d139 (matches manifest sha256); separation: sample_rate=48000 frames=96000 channels=2 subtype=FLOAT finite=true num_outputs=2",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-mel-roformer-viperx-1143 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
