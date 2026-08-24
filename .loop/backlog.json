@@ -1328,11 +1328,11 @@
   {
     "id": "B2",
     "title": "B2: 每模式「預設模型＋同類替代清單」映射 — 4-stem→htdemucs、6-stem→htdemucs_6s、人聲→melband-roformer-kim-vocals、吉他→guitar 類 audited 優先、卡拉OK→karaoke 類、去混響→dereverb 類…；audited 優先為預設、experimental 保留標註；使用者可在模式內切換模型。",
-    "passes": false,
+    "passes": true,
     "priority": 11.2,
     "source": "user",
-    "evidence": null,
-    "check": "TODO: 由執行本項的 iteration 依 LOOP_PLAN 定義具體驗證指令（ui_configuration_smoke 擴充，見 B4）。"
+    "evidence": "iter 19: plugin/PluginProcessor.cpp -- added onSeparationModeChanged()/selectHtdemucsModel()/selectRoformerCategoryDefault() so choosing a separation-mode combo entry auto-selects that mode's default model: 4-stem separation -> htdemucs, 6-stem separation -> htdemucs_6s, each RoFormer manifest category (10 total) -> that category's audited-first model (fallback to first-listed if none audited), while locking roformerCategoryBox_ to the chosen category so the RoFormer model browser only shows same-category alternatives the user can still pick from. tests/ui_configuration_smoke.cpp extended with B2 assertions: 4-stem -> model index 0 (htdemucs); 6-stem -> model index 2 (htdemucs_6s); Vocals separation mode -> roformerCategory locked to \"vocals\" + processor->getSelectedRoformerModel() == \"melband-roformer-big-beta5e\" (audited) + status text contains \"Audited\"; Guitar separation mode -> roformerCategory locked to \"guitar\" + selected model == \"roformer-model-melband-roformer-guitar-by-becruily\". cmd //c .loop\\checks\\cheap.cmd exit 0 (ui_configuration_smoke PASS incl. separation_mode_defaults=true; roformer manifest validator 99/57/42 PASS).",
+    "check": "cmd //c '.loop\\checks\\cheap.cmd' (ui_configuration_smoke asserts: choosing 4-stem/6-stem separation mode defaults modelBox_ to htdemucs/htdemucs_6s; choosing a RoFormer-category separation mode locks roformerCategoryBox_ to that category and selects its audited-first model, verified for Vocals and Guitar categories)"
   },
   {
     "id": "B3",

@@ -180805,3 +180805,9 @@ LOOP STATUS: running â€” iter-17 verified M001/M002/M003 (71/111 backlog passing
 [driver] agent process exited rc=0
 [scope] OK ¡X 52 changed path(s) within policy
 [driver] iteration 18 launching  2026-08-24T23:26:55+0800
+Checkpoint complete, working tree clean. Iteration 18 finished successfully.
+
+LOOP STATUS: running â€” B1 (mode-first UX gate) implemented and verified; 72/115 backlog items passing
+[driver] agent process exited rc=0
+[scope] OK ¡X 53 changed path(s) within policy
+[driver] iteration 19 launching  2026-08-24T23:41:35+0800

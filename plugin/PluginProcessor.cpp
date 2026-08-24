@@ -3141,12 +3141,13 @@ public:
             separationModeCategories.addIfNotAlreadyThere(model.category);
         }
         separationModeCategories.sort(true);
+        separationModeCategories_ = separationModeCategories;
         for (const auto& category : separationModeCategories) {
             separationModeBox_.addItem(
                 category.substring(0, 1).toUpperCase() + category.substring(1),
                 separationModeBox_.getNumItems() + 1);
         }
-        separationModeBox_.onChange = [this] { updateSixSourceControls(); };
+        separationModeBox_.onChange = [this] { onSeparationModeChanged(); };
         addAndMakeVisible(separationModeBox_);
 
         modeLabel_.setText("Mode", juce::dontSendNotification);
@@ -3820,6 +3821,67 @@ private:
             juce::dontSendNotification);
     }
 
+    void selectHtdemucsModel(int comboIndex) {
+        modelBox_.setSelectedItemIndex(comboIndex, juce::dontSendNotification);
+        setChoice("model", comboIndex);
+        if (processor_.isModelInstalled(modelBox_.getText())) {
+            processor_.applyUserConfiguration();
+        }
+    }
+
+    void selectRoformerCategoryDefault(const juce::String& category) {
+        for (int index = 0; index < roformerCategoryBox_.getNumItems(); ++index) {
+            if (roformerCategoryBox_.getItemText(index).equalsIgnoreCase(category)) {
+                roformerCategoryBox_.setSelectedItemIndex(index, juce::dontSendNotification);
+                break;
+            }
+        }
+        roformerSearch_.clear();
+        refreshRoformerBrowser();
+
+        // audited-first default: prefer an audited model in this category,
+        // falling back to the first model of the category if none is audited.
+        juce::String defaultId;
+        for (const auto& model : processor_.getRoformerModels()) {
+            if (model.category == category && model.audited) {
+                defaultId = model.id;
+                break;
+            }
+        }
+        if (defaultId.isEmpty()) {
+            for (const auto& model : processor_.getRoformerModels()) {
+                if (model.category == category) {
+                    defaultId = model.id;
+                    break;
+                }
+            }
+        }
+        const auto found = std::find(
+            visibleRoformerIds_.begin(), visibleRoformerIds_.end(), defaultId);
+        if (found != visibleRoformerIds_.end()) {
+            const auto index =
+                static_cast<int>(std::distance(visibleRoformerIds_.begin(), found));
+            roformerModelBox_.setSelectedItemIndex(index, juce::dontSendNotification);
+            processor_.selectRoformerModel(defaultId);
+        }
+        updateRoformerStatus();
+    }
+
+    void onSeparationModeChanged() {
+        const auto index = separationModeBox_.getSelectedItemIndex();
+        if (index == 0) {
+            selectHtdemucsModel(0);  // 4-stem separation -> htdemucs
+        } else if (index == 1) {
+            selectHtdemucsModel(2);  // 6-stem separation -> htdemucs_6s
+        } else if (index >= 2) {
+            const auto categoryIndex = index - 2;
+            if (categoryIndex >= 0 && categoryIndex < separationModeCategories_.size()) {
+                selectRoformerCategoryDefault(separationModeCategories_[categoryIndex]);
+            }
+        }
+        updateSixSourceControls();
+    }
+
     void updatePanelVisibility() {
         simpleTitle_.setVisible(!advancedPanel_);
         simpleFile_.setVisible(!advancedPanel_);
@@ -4025,6 +4087,7 @@ private:
     juce::TextButton accompanyOnlyButton_;
     juce::Label separationModeLabel_;
     juce::ComboBox separationModeBox_;
+    juce::StringArray separationModeCategories_;
     juce::Label modeLabel_;
     juce::ComboBox modeBox_;
     juce::TextButton fullScreenButton_;

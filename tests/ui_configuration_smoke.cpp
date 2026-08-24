@@ -349,6 +349,53 @@ int run() {
                 drumsSlider->isEnabled() && outputTrimSlider->isEnabled(),
             "model/RoFormer/slider controls did not enable after choosing a "
             "separation mode");
+    require(model->getSelectedItemIndex() == 0,
+            "B2: choosing 4-stem separation did not default the model box to "
+            "htdemucs");
+
+    separationMode->setSelectedItemIndex(1, juce::sendNotificationSync);
+    juce::Thread::sleep(60);
+    juce::Timer::callPendingTimersSynchronously();
+    require(model->getSelectedItemIndex() == 2,
+            "B2: choosing 6-stem separation did not default the model box to "
+            "htdemucs_6s");
+
+    int vocalsModeIndex = -1;
+    for (int index = 0; index < separationMode->getNumItems(); ++index) {
+        if (separationMode->getItemText(index) == "Vocals") {
+            vocalsModeIndex = index;
+            break;
+        }
+    }
+    require(vocalsModeIndex >= 0, "Vocals separation mode entry is missing");
+    separationMode->setSelectedItemIndex(vocalsModeIndex, juce::sendNotificationSync);
+    juce::Thread::sleep(60);
+    juce::Timer::callPendingTimersSynchronously();
+    require(roformerCategory->getText() == "vocals",
+            "B2: choosing the Vocals separation mode did not lock the RoFormer "
+            "category filter");
+    require(processor->getSelectedRoformerModel() == "melband-roformer-big-beta5e",
+            "B2: choosing the Vocals separation mode did not default to the "
+            "audited-first vocals model");
+    require(roformerStatus->getText().contains("Audited"),
+            "B2: Vocals separation mode default model should be marked Audited");
+
+    int guitarModeIndex = -1;
+    for (int index = 0; index < separationMode->getNumItems(); ++index) {
+        if (separationMode->getItemText(index) == "Guitar") {
+            guitarModeIndex = index;
+            break;
+        }
+    }
+    require(guitarModeIndex >= 0, "Guitar separation mode entry is missing");
+    separationMode->setSelectedItemIndex(guitarModeIndex, juce::sendNotificationSync);
+    juce::Thread::sleep(60);
+    juce::Timer::callPendingTimersSynchronously();
+    require(roformerCategory->getText() == "guitar" &&
+                processor->getSelectedRoformerModel() ==
+                    "roformer-model-melband-roformer-guitar-by-becruily",
+            "B2: choosing the Guitar separation mode did not default to its "
+            "audited model");
 
     roformerCategory->setText("vocals", juce::sendNotificationSync);
     require(roformerModel->getNumItems() == 24,
@@ -421,6 +468,7 @@ int run() {
                  " roformer_browser=99 categories=10 search=true"
                  " experimental=true download_status=true"
                  " separation_mode_gate=true separation_modes=12"
+                 " separation_mode_defaults=true"
                  " roformer_stem_labels=vocals/instrumental"
                  " roformer_stem_label_categories=8 roformer_export_naming=true PASS\n";
     return 0;

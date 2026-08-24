@@ -843,3 +843,32 @@ backlog checker（informational only，本輪非 5 的倍數，非強制）→ e
 **Metric:** backlog_items_passing = 72（較上輪 71 增加 1：B1）；improved: true。
 **Decision:** continue
 **Note（交接給 iteration 19）：** B1 已完成並有印出證據；下一輪依 backlog priority 應接續 B2（每模式預設模型＋同類替代清單映射）。B2 目前只是 UI 選單存在，尚未真正把「選了某個模式」連動到「自動選取該模式的預設模型」——這是 B2 要做的事（B1 只負責「選之前鎖住、選之後解鎖」，不負責選了什麼）。B3（拉桿依 stem 數量/模式 gating 的精細版）與 B4（smoke 全面鎖定＋full tier）在 B2 之後。剩餘 40 個 audited M-item 待 B1–B4 全綠後恢復行軍。下一次 5 的倍數在 iteration 20，記得跑 full tier；批次跑完 M-item 前務必確認 melband-roformer-kim-vocals 仍在快取內（本輪未觸碰快取，無需重新 touch）。
+
+## Iteration 19 — 2026-08-25T01:10:00+08:00
+
+**Hypothesis:** iter-18 完成 B1（模式優先閘控）並交接下一輪做 B2：把「選了哪個模式」連動到「自動選取該模式的預設模型」。本輪 hypothesis：新增 `onSeparationModeChanged()`（掛在 `separationModeBox_.onChange`），對 2 個 HTDemucs 模式呼叫 `selectHtdemucsModel(0)`／`selectHtdemucsModel(2)`，對 10 個 RoFormer 類別模式呼叫 `selectRoformerCategoryDefault(category)`——後者把 `roformerCategoryBox_` 鎖到該類別並自動選取該類別「audited 優先」的預設模型（無 audited 才退回該類別第一個列出的模型），使用者選定模式後仍可在同類別內經 `roformerModelBox_` 切換替代模型；因為新邏輯只是在 B1 既有的 disabled/enabled 閘控之上疊加「選取」動作、未取代既有邏輯，預期不會回歸既有四個 smoke test。
+
+**Files touched:**
+- `plugin/PluginProcessor.cpp`：新增 `separationModeCategories_` member（建構時與下拉選單類別清單同步，供 onChange handler 反查原始（未大寫化）類別字串）；新增 `selectHtdemucsModel(int)`／`selectRoformerCategoryDefault(const juce::String&)`／`onSeparationModeChanged()` 三個 helper；`separationModeBox_.onChange` 由 `updateSixSourceControls()` 改為 `onSeparationModeChanged()`（內部仍會呼叫 `updateSixSourceControls()`，B1 行為不變）。
+- `tests/ui_configuration_smoke.cpp`：新增 B2 斷言——選「4-stem separation」後 `model->getSelectedItemIndex()==0`（htdemucs）；選「6-stem separation」後 `==2`（htdemucs_6s）；選「Vocals」類別模式後 `roformerCategory->getText()=="vocals"` 且 `processor->getSelectedRoformerModel()=="melband-roformer-big-beta5e"`（該類別 audited 優先模型）且下載狀態文字含 "Audited"；選「Guitar」類別模式後類別鎖定 "guitar" 且選中 `roformer-model-melband-roformer-guitar-by-becruily`。PASS 行印出字串新增 `separation_mode_defaults=true`。
+- `.loop/backlog.json`：B2 `passes` 翻為 `true`（evidence 含指令、斷言摘要）。
+
+**Verification commands + output（實際印出）：**
+
+`cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.002s / OK
+Ran 2 tests in 0.075s / OK
+Ran 8 tests in 0.180s / OK
+```
+
+`python .loop/check_scope.py` → exit 0：`[scope] OK — 53 changed path(s) within policy`
+
+backlog checker（informational only，本輪非 5 的倍數 19%5!=0，非強制）→ exit 1（115 項中仍有 42 項 passes=false：B3／B4 ＋ 40 個 audited M-item）。
+
+**Criteria:** C1 fail（本輪未跑 full tier，非收斂檢查輪）／C2 fail（backlog 尚有未過項目）／C3 pass（scope 無違規）。
+**Metric:** backlog_items_passing = 73（較上輪 72 增加 1：B2）；improved: true。
+**Decision:** continue
+**Note（交接給 iteration 20）：** B1／B2 已完成並有印出證據；iteration 20 是 5 的倍數，依協定必須跑 full tier（`cmd //c .loop\checks\full.cmd` ＋ backlog checker）。下一輪依 backlog priority 應接續 B3（拉桿依 stem 數量/模式做精細 gating——目前 B1 的 `updateSixSourceControls()` 已依 `modelBox_` 的 6-stem 判斷各 stem 拉桿 enable/disable，B3 需要把這個判斷也同步進 RoFormer 2-stem 模式的呈現，例如 RoFormer 模式下只顯示/啟用對應的兩軌控制而非全部 6 條）；B4（smoke 全面鎖定＋full tier）在 B3 之後。剩餘 40 個 audited M-item 待 B1–B4 全綠後恢復行軍。批次跑 M-item 前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪未觸碰快取，無需重新 touch）。
