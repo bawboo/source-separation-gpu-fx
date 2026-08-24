@@ -1,0 +1,23 @@
+{
+  "iteration": 32,
+  "timestamp": "2026-08-25T02:50:00+08:00",
+  "hypothesis": "iter-31 handoff notes flagged M027 (roformer-model-mel-roformer-denoise-aufr33, priority 38) and M028 (roformer-model-mel-roformer-denoise-aufr33-aggr, priority 39) as belonging to the same upstream 'no config override' family already discovered for M026 (crowd-aufr33-viperx): the mel_band_roformer package's own DEFAULT_CONFIG_BASE_URL resolution 404s for these checkpoints. Hypothesis: (a) inspecting assets/models/roformer-manifest.json for both model ids will show tools/generate_roformer_manifest.py's LEGACY_AUDITED_CONFIG_URLS dict (added 2026-08-23, before this failure mode was even hit at runtime) already resolves config_url to the same Politrees/UVR_resources pinned-commit mirror used to fix M026 in iter-31, with a recorded config_sha256 — so downloading that config_url, verifying its SHA-256 against config_sha256, and pre-placing it at cache_dir/<model_id>/<expected_config_filename> (relying on the upstream package's download.py 'skip if target exists' logic, same mechanism as iter-31) should let a synchronous tools/roformer_batch_verify.py run for both models pass without needing a fresh HF mirror search; (b) melband-roformer-kim-vocals (needed by the hardcoded ui_configuration_smoke RoFormer route test) will survive the rolling cache eviction (max_cached=3) because by mtime it is newer than the two currently-cached M-items from iter-31 (voc-gabox-fv2, crowd-aufr33-viperx), so evict_oldest() drops those two first as the two new denoise-aufr33 models are added, not kim-vocals.",
+  "files_touched": [
+    ".loop/backlog.json",
+    "verify/roformer-cache/roformer-model-mel-roformer-denoise-aufr33/denoise_mel_band_roformer_aufr33_sdr_27.9959_config.yaml",
+    "verify/roformer-cache/roformer-model-mel-roformer-denoise-aufr33-aggr/denoise_mel_band_roformer_aufr33_aggr_sdr_27.9768_config.yaml"
+  ],
+  "commands": [
+    {"cmd": "curl --max-time 45 -L -r 0-20000000 -o /dev/null -w speed/size/time/http_code (denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt via Politrees/UVR_resources)", "exit_code": 0, "timed_out": false},
+    {"cmd": "curl -sL -o <scratch>/denoise_mel_band_roformer_aufr33_sdr_27.9959_config.yaml <manifest config_url>; sha256sum (matched manifest config_sha256 5d7d83b2e9d232da60941b717b0abdc345155d45cff3f79715cdb2790ba18c36)", "exit_code": 0, "timed_out": false},
+    {"cmd": "curl -sL -o <scratch>/denoise_mel_band_roformer_aufr33_aggr_sdr_27.9768_config.yaml <manifest config_url>; sha256sum (matched same manifest config_sha256)", "exit_code": 0, "timed_out": false},
+    {"cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-mel-roformer-denoise-aufr33 roformer-model-mel-roformer-denoise-aufr33-aggr --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --max-cached 3", "exit_code": 0, "timed_out": false},
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd'", "exit_code": 0, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 95, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}

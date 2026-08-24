@@ -677,23 +677,53 @@
   {
     "id": "M027",
     "title": "M027: roformer-model-mel-roformer-denoise-aufr33（audited, category=denoise）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 38,
     "source": "plan",
     "model_id": "roformer-model-mel-roformer-denoise-aufr33",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "command": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-mel-roformer-denoise-aufr33 roformer-model-mel-roformer-denoise-aufr33-aggr --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --max-cached 3",
+      "exit_code": 0,
+      "sha256": "7c1c39191edc34e942ca7f2346ce6b6c0e1208a5f76349ffce6f696bd12910de",
+      "checkpoint_size": 913097300,
+      "config_source": "manifest config_url (Politrees/UVR_resources mirror, pinned commit 495f5b4625eb092fe1fbe336f0b67c847566e52e), pre-verified against manifest config_sha256 5d7d83b2e9d232da60941b717b0abdc345155d45cff3f79715cdb2790ba18c36 and placed at expected cache filename before batch run (upstream mel_band_roformer package config download otherwise 404s)",
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models roformer-model-mel-roformer-denoise-aufr33 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M028",
     "title": "M028: roformer-model-mel-roformer-denoise-aufr33-aggr（audited, category=denoise）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 39,
     "source": "plan",
     "model_id": "roformer-model-mel-roformer-denoise-aufr33-aggr",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "command": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-mel-roformer-denoise-aufr33 roformer-model-mel-roformer-denoise-aufr33-aggr --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --max-cached 3",
+      "exit_code": 0,
+      "sha256": "a25e3b233722cd81e2de7b8e798a3fef29d4b9799ccacda60b0dc958a1e2a5bb",
+      "checkpoint_size": 913097300,
+      "config_source": "manifest config_url (Politrees/UVR_resources mirror, pinned commit 495f5b4625eb092fe1fbe336f0b67c847566e52e), pre-verified against manifest config_sha256 5d7d83b2e9d232da60941b717b0abdc345155d45cff3f79715cdb2790ba18c36 and placed at expected cache filename before batch run (upstream mel_band_roformer package config download otherwise 404s)",
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models roformer-model-mel-roformer-denoise-aufr33-aggr --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {

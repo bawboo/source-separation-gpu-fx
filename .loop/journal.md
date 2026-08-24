@@ -1542,3 +1542,65 @@ Ran 8 tests in 0.105s / OK
 **Decision:** continue
 **Lesson：** 本輪遇到新的失敗模式並成功排除——upstream `mel_band_roformer` 套件的 config URL 解析在部分 bulk-imported 條目上是死的（docstring 已自承），且該套件自己的 `overrides.json` 修補點不在 repo scope 內、也不該碰。正確排除法：先用 checkpoint 的 SHA-256 在 HuggingFace 上找同一份權重的其他鏡像 repo，若鏡像 repo 同一次 commit 內連同 config 檔一起上傳且 checkpoint LFS oid 與已驗證的 SHA-256 完全一致，即可信任該 config 為正牌設定；再利用 `download.py::_download_config()` 的「目標檔案已存在即跳過下載」邏輯，把驗證過的 config 直接放進（repo 外、允許建立/刪除的）`verify/roformer-cache/<model_slug>/<expected_config_filename>`，不需要碰任何 repo 內檔案或 third-party 套件安裝目錄。已寫入 `.loop/LESSONS.md`。
 **Note（交接給 iteration 32）：** M025、M026 已完成並有印出證據。剩餘 backlog：24 個 audited M-item（下一個優先序：M027 `roformer-model-mel-roformer-denoise-aufr33` priority 38、M028 `roformer-model-mel-roformer-denoise-aufr33-aggr` priority 39...）。**注意：M027／M028 的 checkpoint 檔名同樣屬於本輪發現的「無 config override」家族**（已用 python 檢查 `overrides.json` 的 `configs` 表，確認 `denoise_mel_band_roformer_aufr33_*` 系列的 config key 也不存在）——下一輪批次前應先比照本輪流程（HF SHA-256 交叉比對找鏡像 repo 的 config，而非直接假設 `roformer_batch_verify.py` 能一次到位），並預留額外時間；若找不到 SHA-256 完全比對的鏡像 repo，不可用架構相近的其他 config 替代（會有 shape mismatch 或靜默錯誤風險），該 M-item 應保持 `passes:false` 並記錄為 `blocked` 交接。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存，mtime 02:26:05）；下一次 5 的倍數在 iteration 35，屆時才需再強制跑 full tier；距離 max_iterations=60 還有充裕空間，backlog 仍有 24 項未過，遠未達 converged 門檻。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria，留待後續視需要另案處理。
+
+## iter-32 (2026-08-25T02:50:00+08:00)
+
+**Hypothesis：** iter-31 交接筆記指出 M027（`roformer-model-mel-roformer-denoise-aufr33`，priority 38）與 M028（`roformer-model-mel-roformer-denoise-aufr33-aggr`，priority 39）同屬 iter-31 發現的「無 config override」家族（upstream `mel_band_roformer` 套件自身的 `DEFAULT_CONFIG_BASE_URL` 解析對這批 checkpoint 會 404）。假設：(a) 檢視 `assets/models/roformer-manifest.json` 會發現這兩個模型的 `config_url` 欄位早在 2026-08-23（`tools/generate_roformer_manifest.py` 的 `LEGACY_AUDITED_CONFIG_URLS` 字典建立時，早於本次失敗模式在執行期被實際踩到之前）就已經指向與 iter-31 修好 M026 時用的同一個 Politrees/UVR_resources 鎖定 commit 鏡像 repo，且已記錄 `config_sha256`——因此不需要像 iter-31 那樣重新在 HuggingFace 上搜尋鏡像 repo，只需下載該 `config_url`、驗證 SHA-256 與 `config_sha256` 相符，再放進 `cache_dir/<model_id>/<套件預期的 config 檔名>`（沿用 iter-31 確認過的「`download.py` 目標檔案已存在即跳過下載」機制），即可讓 `tools/roformer_batch_verify.py` 同步一次通過兩個模型；(b) `melband-roformer-kim-vocals`（`ui_configuration_smoke` 硬編碼 RoFormer 路由測試所需）依 mtime 比 iter-31 留下的兩個快取項目（voc-gabox-fv2、crowd-aufr33-viperx）都新，新增兩個 denoise-aufr33 模型後 `evict_oldest()` 應優先丟棄那兩個舊項目，kim-vocals 應倖存。
+
+**變更：**
+- 無原始碼變更（本輪為 M-item 資料驗證批次，不改動任何 `plugin/`／`cpp/`／`worker/`／`tests/` 程式碼）。
+- `.loop/backlog.json`：M027、M028 `passes` 翻為 `true`，`evidence` 記錄本輪指令、exit code、SHA-256、checkpoint 大小、config 來源與輸出規格。
+- `verify/roformer-cache/roformer-model-mel-roformer-denoise-aufr33/denoise_mel_band_roformer_aufr33_sdr_27.9959_config.yaml`：新增（cache 目錄，repo 外，允許建立/刪除）。
+- `verify/roformer-cache/roformer-model-mel-roformer-denoise-aufr33-aggr/denoise_mel_band_roformer_aufr33_aggr_sdr_27.9768_config.yaml`：新增（同上）。
+
+**Verification commands + output（實際印出）：**
+
+`curl --max-time 45 -L -r 0-20000000 -o /dev/null -w '...'`（denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt via Politrees/UVR_resources）→ `speed=6263203 bytes/s size=20000001 time=3.193254 http_code=206`（約 6.3 MB/s，913MB 約 150 秒）。
+
+比對 `assets/models/roformer-manifest.json` 中 M027／M028 兩筆條目：兩者的 `config_url` 都已是 `https://huggingface.co/Politrees/UVR_resources/resolve/495f5b4625eb092fe1fbe336f0b67c847566e52e/Roformer_models/<config filename>`，`config_sha256` 皆為 `5d7d83b2e9d232da60941b717b0abdc345155d45cff3f79715cdb2790ba18c36`（兩個模型架構相同、config 內容逐位元組相同，僅 checkpoint 不同）。分別下載兩個 config 到 scratch 目錄後 `sha256sum` 比對：兩者皆與 manifest 記錄的 `config_sha256` 完全相符。將驗證過的 config 複製進對應 cache 子目錄，檔名與套件預期（manifest `config` 欄位）完全一致。
+
+`C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-mel-roformer-denoise-aufr33 roformer-model-mel-roformer-denoise-aufr33-aggr --cache-dir 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache' --fixture 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav' --output-root 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch' --max-cached 3` → exit 0：
+```json
+[
+  {
+    "model": "roformer-model-mel-roformer-denoise-aufr33",
+    "category": "denoise",
+    "audited": true,
+    "cache_verified_sha256": "7c1c39191edc34e942ca7f2346ce6b6c0e1208a5f76349ffce6f696bd12910de",
+    "checkpoint_size": 913097300,
+    "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+    "outcome": "pass"
+  },
+  {
+    "model": "roformer-model-mel-roformer-denoise-aufr33-aggr",
+    "category": "denoise",
+    "audited": true,
+    "cache_verified_sha256": "a25e3b233722cd81e2de7b8e798a3fef29d4b9799ccacda60b0dc958a1e2a5bb",
+    "checkpoint_size": 913097300,
+    "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+    "outcome": "pass"
+  }
+]
+```
+下載後複驗快取目錄 mtime：`melband-roformer-kim-vocals`（02:36:19，本輪未變動）、`roformer-model-mel-roformer-denoise-aufr33`（02:43:14）、`roformer-model-mel-roformer-denoise-aufr33-aggr`（02:43:57）——如預期擠掉 `melband-roformer-voc-gabox-fv2`／`roformer-model-mel-roformer-crowd-aufr33-viperx`（iter-31 留下的兩個快取項目），kim-vocals 安然倖存於快取內。兩個 checkpoint 檔案 `sha256sum` 複驗與 manifest 記錄值完全相符。
+
+**Full tier：** 本輪 iteration number 32、32 % 5 != 0，且非宣告 converged，依協定不強制執行。
+
+`cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s / OK
+Ran 2 tests in 0.092s / OK
+Ran 8 tests in 0.110s / OK
+```
+
+**Backlog checker（僅供參考，非本輪 C2 判定依據——full tier 未跑）：** 直接檢視 `.loop/backlog.json`：117 項中仍有 22 項 `passes:false`（22 個剩餘 audited M-item）。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 66 changed path(s) within policy`
+
+**Criteria:** C1 fail（本輪未跑 full tier，依協定不可宣稱 pass）／C2 fail（backlog 仍有 22 項未過）／C3 pass（scope 無違規）。AND 規則下未同時全過，非 converged。
+**Metric:** backlog_items_passing = 95（較上輪 93 增加 2：M027、M028）；improved: true。
+**Decision:** continue
+**Lesson：** 無新 SIGN——本輪驗證了 iter-31 SIGN 的一個推論：當同一個「無 config override」家族的多個模型在 `generate_roformer_manifest.py` 的 `LEGACY_AUDITED_CONFIG_URLS` 字典裡已經被預先解析過（即便當時可能是為了另一個模型才加的），後續踩到同一失敗模式的模型可以直接讀 manifest 的 `config_url`／`config_sha256` 欄位使用，不需要重新做一次 HF SHA-256 鏡像搜尋——但仍必須重新下載並驗證 SHA-256，不可只信任欄位存在就跳過驗證。
+**Note（交接給 iteration 33）：** M027、M028 已完成並有印出證據。剩餘 backlog：22 個 audited M-item（下一個優先序：M030 `roformer-model-mel-roformer-viperx-1143` priority 41、M033 `roformer-model-melband-roformer-big-beta-6-by-unwa` priority 44、M034 `roformer-model-melband-roformer-big-beta-6x-by-unwa` priority 45、M035 `roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris` priority 46...）。**建議下一輪批次前，先檢查 M030／M033／M034／M035 這幾個模型在 `assets/models/roformer-manifest.json` 中的 `config_url` 是否也落在 `CONFIG_FALLBACK`（`raw.githubusercontent.com/TRvlvr/application_data/...`，本輪與 iter-31 已知會 404 的路徑）——若是，先比照本輪流程（manifest 若已有 `LEGACY_AUDITED_CONFIG_URLS` 解析過的鏡像 URL 就直接用；否則才需要重新做 HF SHA-256 鏡像搜尋），避免臨場才發現 config 缺失而浪費批次時間。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存，mtime 02:36:19）；下一次 5 的倍數在 iteration 35，屆時才需再強制跑 full tier；距離 max_iterations=60 還有充裕空間，backlog 仍有 22 項未過，遠未達 converged 門檻。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria，留待後續視需要另案處理。
