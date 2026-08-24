@@ -180853,3 +180853,9 @@ LOOP STATUS: running â€” iter-25 M010+M011 verified + full tier PASS, 81/117 bac
 [driver] agent process exited rc=0
 [scope] OK ¡X 60 changed path(s) within policy
 [driver] iteration 26 launching  2026-08-25T01:48:22+0800
+Checkpoint committed successfully. This iteration's change-set is complete: M012 (melband-roformer-instv6) and M013 (melband-roformer-instv6n) verified end-to-end and flipped to `passes:true`, backlog metric improved from 81â†’83, cheap tier and scope check passed, and the commit is recorded on `loop/melband-roformer`.
+
+LOOP STATUS: running â€” iter-26 continue, M012+M013 verified (instv6/instv6n), 83/117 backlog passing, C1/C2 fail (full tier not due until iter-30), C3 pass
+[driver] agent process exited rc=0
+[scope] OK ¡X 61 changed path(s) within policy
+[driver] iteration 27 launching  2026-08-25T01:56:57+0800
