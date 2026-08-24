@@ -3130,6 +3130,25 @@ public:
         addAndMakeVisible(vocalsOnlyButton_);
         addAndMakeVisible(accompanyOnlyButton_);
 
+        separationModeLabel_.setText("Separation mode", juce::dontSendNotification);
+        addAndMakeVisible(separationModeLabel_);
+        separationModeBox_.setName("Separation mode");
+        separationModeBox_.setTextWhenNothingSelected("Choose a separation mode...");
+        separationModeBox_.addItem("4-stem separation", 1);
+        separationModeBox_.addItem("6-stem separation", 2);
+        juce::StringArray separationModeCategories;
+        for (const auto& model : processor_.getRoformerModels()) {
+            separationModeCategories.addIfNotAlreadyThere(model.category);
+        }
+        separationModeCategories.sort(true);
+        for (const auto& category : separationModeCategories) {
+            separationModeBox_.addItem(
+                category.substring(0, 1).toUpperCase() + category.substring(1),
+                separationModeBox_.getNumItems() + 1);
+        }
+        separationModeBox_.onChange = [this] { updateSixSourceControls(); };
+        addAndMakeVisible(separationModeBox_);
+
         modeLabel_.setText("Mode", juce::dontSendNotification);
         addAndMakeVisible(modeLabel_);
         addAndMakeVisible(modeBox_);
@@ -3162,6 +3181,7 @@ public:
             stemSliders_[index].setSliderStyle(juce::Slider::LinearHorizontal);
             stemSliders_[index].setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 24);
             stemSliders_[index].setTextValueSuffix(" dB");
+            stemSliders_[index].setName(stemIds[index]);
             addAndMakeVisible(stemLabels_[index]);
             addAndMakeVisible(stemSliders_[index]);
             stemAttachments_[index] = std::make_unique<SliderAttachment>(
@@ -3173,6 +3193,7 @@ public:
         outputSlider_.setSliderStyle(juce::Slider::LinearHorizontal);
         outputSlider_.setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 24);
         outputSlider_.setTextValueSuffix(" dB");
+        outputSlider_.setName("outputTrim");
         addAndMakeVisible(outputLabel_);
         addAndMakeVisible(outputSlider_);
         outputAttachment_ = std::make_unique<SliderAttachment>(
@@ -3416,6 +3437,11 @@ public:
             return;
         }
 
+        auto sepModeRow = area.removeFromTop(30);
+        separationModeLabel_.setBounds(sepModeRow.removeFromLeft(150));
+        separationModeBox_.setBounds(sepModeRow.removeFromLeft(300));
+        area.removeFromTop(6);
+
         auto modeRow = area.removeFromTop(30);
         modeLabel_.setBounds(modeRow.removeFromLeft(72));
         modeBox_.setBounds(modeRow.removeFromLeft(260));
@@ -3507,7 +3533,7 @@ private:
     }
 
     [[nodiscard]] int designHeight() const noexcept {
-        return advancedPanel_ ? (advancedVisible_ ? 790 : 540) : 260;
+        return advancedPanel_ ? (advancedVisible_ ? 826 : 576) : 260;
     }
 
     void chooseMediaFile() {
@@ -3800,7 +3826,8 @@ private:
         vocalsOnlyButton_.setVisible(!advancedPanel_);
         accompanyOnlyButton_.setVisible(!advancedPanel_);
 
-        for (auto* component : std::array<juce::Component*, 11>{
+        for (auto* component : std::array<juce::Component*, 13>{
+                 &separationModeLabel_, &separationModeBox_,
                  &modeLabel_, &modeBox_, &fullScreenButton_, &scaleButton_,
                  &outputLabel_, &outputSlider_, &bypassButton_, &advancedButton_,
                  &cpuWarning_, &metrics_, &resetWorker_}) {
@@ -3824,11 +3851,15 @@ private:
     }
 
     void updateSixSourceControls() {
+        const bool modeChosen = separationModeBox_.getSelectedItemIndex() >= 0;
         const bool sixSources = modelBox_.getSelectedItemIndex() == 2;
-        for (std::size_t index = 4; index < stemSliders_.size(); ++index) {
-            stemSliders_[index].setEnabled(sixSources);
-            stemLabels_[index].setEnabled(sixSources);
+        for (std::size_t index = 0; index < stemSliders_.size(); ++index) {
+            const bool enabled = modeChosen && (index < 4 || sixSources);
+            stemSliders_[index].setEnabled(enabled);
+            stemLabels_[index].setEnabled(enabled);
         }
+        outputSlider_.setEnabled(modeChosen);
+        outputLabel_.setEnabled(modeChosen);
     }
 
     void updateVisibility() {
@@ -3895,9 +3926,11 @@ private:
         exportButton_.setEnabled(!recording && !busy && processor_.hasPreview());
         cancelButton_.setVisible((recordMode && (separationBusy || mediaBusy)) || modelBusy);
         const bool configurationEnabled = !recording && !busy;
+        const bool modeChosen = separationModeBox_.getSelectedItemIndex() >= 0;
+        separationModeBox_.setEnabled(configurationEnabled);
         modeBox_.setEnabled(configurationEnabled);
         segmentBox_.setEnabled(configurationEnabled);
-        modelBox_.setEnabled(configurationEnabled);
+        modelBox_.setEnabled(configurationEnabled && modeChosen);
         const bool selectedModelInstalled =
             processor_.isModelInstalled(modelBox_.getText());
         modelDownloadButton_.setButtonText(
@@ -3905,7 +3938,10 @@ private:
                 ? "Installed"
                 : (modelBusy ? "Downloading..." : "Download selected model"));
         modelDownloadButton_.setEnabled(
-            advancedVisible_ && configurationEnabled && !selectedModelInstalled);
+            advancedVisible_ && configurationEnabled && modeChosen && !selectedModelInstalled);
+        roformerCategoryBox_.setEnabled(modeChosen);
+        roformerSearch_.setEnabled(modeChosen);
+        roformerModelBox_.setEnabled(modeChosen);
         computeBox_.setEnabled(configurationEnabled);
         gpuSlider_.setEnabled(
             configurationEnabled && computeBox_.getSelectedItemIndex() == 1);
@@ -3987,6 +4023,8 @@ private:
     juce::Label simpleFile_;
     juce::TextButton vocalsOnlyButton_;
     juce::TextButton accompanyOnlyButton_;
+    juce::Label separationModeLabel_;
+    juce::ComboBox separationModeBox_;
     juce::Label modeLabel_;
     juce::ComboBox modeBox_;
     juce::TextButton fullScreenButton_;

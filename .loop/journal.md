@@ -814,3 +814,32 @@ OK
 
 **已執行動作：** 以一次性腳本（tmp+rename 原子寫入，用畢即刪）把 B1–B4 append 進 `.loop/backlog.json`（`source:"user"`, priority 11.1–11.4, `passes:false`）；總項目數 111 → 115（passing 仍 71，B 項尚未開始）。STEER.md 已在本則 journal 記錄寫入後刪除（符合協定：quote 後才可刪）。
 **交接給 iteration 18：** 依使用者指示優先序（「優先於剩餘 M 項」），下一輪應以 B1（模式優先 UX 面板第一層）為 hypothesis 開始，暫緩 M 項行軍；B1–B4 全綠後再回頭繼續處理剩餘 40 個 audited M-item。
+
+## Iteration 18 — 2026-08-25T00:05:00+08:00
+
+**Hypothesis:** iter-17 收尾時記錄了使用者 STEER（模式優先 UX 回饋）並把 B1–B4 append 進 backlog，交接本輪從 B1 開始（暫緩剩餘 43 個 audited M-item 的行軍）。本輪 hypothesis：在進階面板新增第一層「Separation mode」下拉選單（2 個 HTDemucs 軌數模式 + 10 個 RoFormer manifest 類別 = 12 項，預設未選取），並把 modelBox_／modelDownloadButton_／RoFormer browser 三元件（category/search/model）／全部 stem 拉桿／output 拉桿的 enable 條件都加上「已選模式」這個 AND 條件（而非取代既有的 configurationEnabled／sixSources 條件），藉此在不回歸既有四個 smoke test 的前提下滿足 B1 的驗收（以擴充後的 ui_configuration_smoke 驗證）。
+
+**Files touched:**
+- `plugin/PluginProcessor.cpp`：新增 `separationModeLabel_`／`separationModeBox_` 成員與建構、layout（新增一列，designHeight 540/790 → 576/826）、`updatePanelVisibility()` 併入可見性陣列、`updateSixSourceControls()` 改為同時檢查 modeChosen（涵蓋全部 6 個 stem 拉桿與 output 拉桿）、`timerCallback()` 新增 modelBox_／modelDownloadButton_／roformerCategoryBox_／roformerSearch_／roformerModelBox_ 的 modeChosen 閘控；stemSliders_ 與 outputSlider_ 加上 `setName()` 供測試辨識。
+- `tests/ui_configuration_smoke.cpp`：更新既有尺寸斷言（720×540→720×576、790→826、recollapse 540→576）；新增斷言——separationMode combo 存在／預設未選取／12 項／可見；選模式前 model／roformerCategory／roformerSearch／roformerModel／drumsGain／outputTrim 皆為 disabled；`sendNotificationSync` 選取模式後（sleep 120ms + `callPendingTimersSynchronously`）皆變 enabled。
+- `.loop/backlog.json`：B1 `passes` 翻為 `true`（evidence 見下）。
+
+**Verification commands + output（實際印出，摘錄關鍵行）：**
+
+`cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s / OK
+Ran 2 tests in 0.048s / OK
+Ran 8 tests in 0.092s / OK
+```
+
+`python .loop/check_scope.py` → exit 0：`[scope] OK — 52 changed path(s) within policy`
+
+backlog checker（informational only，本輪非 5 的倍數，非強制）→ exit 1（總計 115 項中仍有 43 項 passes=false：B2–B4 ＋ 40 個 audited M-item）。
+
+**Criteria:** C1 fail（本輪未跑 full tier，非收斂檢查輪）／C2 fail（backlog 尚有未過項目）／C3 pass（scope 無違規）。
+**Metric:** backlog_items_passing = 72（較上輪 71 增加 1：B1）；improved: true。
+**Decision:** continue
+**Note（交接給 iteration 19）：** B1 已完成並有印出證據；下一輪依 backlog priority 應接續 B2（每模式預設模型＋同類替代清單映射）。B2 目前只是 UI 選單存在，尚未真正把「選了某個模式」連動到「自動選取該模式的預設模型」——這是 B2 要做的事（B1 只負責「選之前鎖住、選之後解鎖」，不負責選了什麼）。B3（拉桿依 stem 數量/模式 gating 的精細版）與 B4（smoke 全面鎖定＋full tier）在 B2 之後。剩餘 40 個 audited M-item 待 B1–B4 全綠後恢復行軍。下一次 5 的倍數在 iteration 20，記得跑 full tier；批次跑完 M-item 前務必確認 melband-roformer-kim-vocals 仍在快取內（本輪未觸碰快取，無需重新 touch）。

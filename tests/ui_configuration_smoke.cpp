@@ -286,14 +286,26 @@ int run() {
             "Record button is not red");
 
     panelSwitch->onClick();
-    require(editor->getWidth() == 720 && editor->getHeight() == 540,
+    require(editor->getWidth() == 720 && editor->getHeight() == 576,
             "advanced panel size mismatch");
     require(record->isVisible() && exportMedia->isVisible() &&
                 !exportVocals->isVisible() && !exportAccompany->isVisible(),
             "advanced panel control visibility mismatch");
 
+    auto* separationMode = findNamedComponent<juce::ComboBox>(
+        components, "Separation mode");
+    require(separationMode != nullptr, "Separation mode selector was not found");
+    require(separationMode->isVisible(),
+            "Separation mode selector is hidden in the advanced panel");
+    require(separationMode->getSelectedItemIndex() == -1,
+            "Separation mode should start unselected");
+    require(separationMode->getItemText(0) == "4-stem separation" &&
+                separationMode->getItemText(1) == "6-stem separation" &&
+                separationMode->getNumItems() == 12,
+            "Separation mode list mismatch (2 HTDemucs + 10 RoFormer categories)");
+
     advanced->onClick();
-    require(editor->getHeight() == 790, "expanded editor size mismatch");
+    require(editor->getHeight() == 826, "expanded editor size mismatch");
     require(segment->isVisible() && model->isVisible() && compute->isVisible(),
             "Advanced options did not become visible");
     require(advanced->getButtonText() == "Advanced options v",
@@ -318,6 +330,25 @@ int run() {
             "RoFormer category browser mismatch");
     require(roformerModel->getNumItems() == 99,
             "RoFormer browser did not expose all 99 models");
+
+    auto* drumsSlider = findNamedComponent<juce::Slider>(components, "drumsGain");
+    auto* outputTrimSlider = findNamedComponent<juce::Slider>(components, "outputTrim");
+    require(drumsSlider != nullptr && outputTrimSlider != nullptr,
+            "stem/output gain sliders were not found");
+    require(!model->isEnabled() && !roformerCategory->isEnabled() &&
+                !roformerSearch->isEnabled() && !roformerModel->isEnabled() &&
+                !drumsSlider->isEnabled() && !outputTrimSlider->isEnabled(),
+            "model/RoFormer/slider controls were not disabled before a separation "
+            "mode was chosen");
+
+    separationMode->setSelectedItemIndex(0, juce::sendNotificationSync);
+    juce::Thread::sleep(120);
+    juce::Timer::callPendingTimersSynchronously();
+    require(model->isEnabled() && roformerCategory->isEnabled() &&
+                roformerSearch->isEnabled() && roformerModel->isEnabled() &&
+                drumsSlider->isEnabled() && outputTrimSlider->isEnabled(),
+            "model/RoFormer/slider controls did not enable after choosing a "
+            "separation mode");
 
     roformerCategory->setText("vocals", juce::sendNotificationSync);
     require(roformerModel->getNumItems() == 24,
@@ -344,7 +375,7 @@ int run() {
             "CPU slow-mode warning was not displayed");
 
     advanced->onClick();
-    require(editor->getHeight() == 540, "recollapsed editor size mismatch");
+    require(editor->getHeight() == 576, "recollapsed editor size mismatch");
     require(!segment->isVisible() && !model->isVisible() && !compute->isVisible(),
             "Advanced options remained visible after recollapse");
 
@@ -389,6 +420,7 @@ int run() {
                  " roformer_stems=2 roformer_seconds=2"
                  " roformer_browser=99 categories=10 search=true"
                  " experimental=true download_status=true"
+                 " separation_mode_gate=true separation_modes=12"
                  " roformer_stem_labels=vocals/instrumental"
                  " roformer_stem_label_categories=8 roformer_export_naming=true PASS\n";
     return 0;

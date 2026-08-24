@@ -1319,11 +1319,11 @@
   {
     "id": "B1",
     "title": "B1: 模式優先 UX — 面板第一層改為「分離模式」選單（模式清單由 manifest 類別＋HTDemucs 能力生成：4-stem、6-stem、人聲、伴奏/instrumental、卡拉OK、吉他、去混響、去噪…含 experimental）；未選模式前，模型選單與所有可調拉桿 disabled。",
-    "passes": false,
+    "passes": true,
     "priority": 11.1,
     "source": "user",
-    "evidence": null,
-    "check": "TODO: 由執行本項的 iteration 依 LOOP_PLAN 定義具體驗證指令（ui_configuration_smoke 擴充，見 B4）。"
+    "evidence": "iter 18: plugin/PluginProcessor.cpp -- added separationModeBox_ (first-tier combo, 2 HTDemucs stem-count modes + 10 RoFormer manifest categories = 12 items, unselected by default); modelBox_/modelDownloadButton_/roformerCategoryBox_/roformerSearch_/roformerModelBox_/all stemSliders_/outputSlider_ gated disabled until a mode is chosen. tests/ui_configuration_smoke.cpp extended to assert disabled-before-choice and enabled-after-choice for all of the above. cmd //c .loop\\checks\\cheap.cmd exit 0 (ui_configuration_smoke PASS incl. separation_mode_gate=true separation_modes=12; roformer manifest validator 99/57/42 PASS).",
+    "check": "cmd //c '.loop\\checks\\cheap.cmd' (ui_configuration_smoke asserts: separationMode combo exists/unselected/12 items; model+RoFormer browser+stem/output sliders disabled pre-choice, enabled post-choice)"
   },
   {
     "id": "B2",

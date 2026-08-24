@@ -180799,3 +180799,9 @@ LOOP STATUS: running â€” iter-16 verified 3 audited M-items (M006 inst-gabox-bv2
 [driver] agent process exited rc=0
 [scope] OK ¡X 51 changed path(s) within policy
 [driver] iteration 17 launching  2026-08-24T23:09:09+0800
+Checkpoint committed cleanly. This iteration is complete.
+
+LOOP STATUS: running â€” iter-17 verified M001/M002/M003 (71/111 backlog passing); STEER B1â€“B4 UX-pivot tickets appended for iteration 18
+[driver] agent process exited rc=0
+[scope] OK ¡X 52 changed path(s) within policy
+[driver] iteration 18 launching  2026-08-24T23:26:55+0800
