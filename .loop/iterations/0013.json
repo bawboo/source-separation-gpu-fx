@@ -1,0 +1,34 @@
+{
+  "iteration": 13,
+  "timestamp": "2026-08-24T20:31:02+08:00",
+  "hypothesis": "STEER.md（續跑後一次性指令）要求：先清理移交樹內誤建的相對路徑 verify/ 快取殘留、之後快取一律用絕對路徑、audited 模型批次縮小為每輪同步完成 2-4 個（全程同步、不留背景工作）。若照做，M-ENUM 剩下的 60 個 M-item 應能穩定推進而不再重演 iter-13 incident（提前結束/背景工作未完成/相對路徑污染）；預期本輪能讓 4 個 audited（M038/M039/M040/M041，皆為 sucial 系列最小的 dereverb checkpoint）與 6 個 experimental（M074/M085/M086/M087/M088/M091，syh99999/kimberley-jensen 系列）共 10 個 M-item 翻為 pass，因為底層下載/驗證/分離路徑已由前幾輪證明可用，只是尚未跑過這批模型 id。",
+  "files_touched": [
+    "verify/ (stray relative-path cache dir under the transfer tree; deleted, cache exception per LESSONS SIGN iter 13)",
+    ".loop/backlog.json",
+    ".loop/iterations/0013.json",
+    ".loop/journal.md",
+    ".loop/LESSONS.md",
+    ".loop/state.json",
+    ".loop/STEER.md (deleted after journal entry written, one-shot directive consumed)",
+    ".loop/driver.log",
+    ".loop/lastrun.log"
+  ],
+  "commands": [
+    {"cmd": "rm -rf verify/ (stray relative-path cache remnant inside transfer tree; cache exception, allowed to delete)", "exit_code": 0, "timed_out": false},
+    {"cmd": "C:\\Users\\<user>\\anaconda3\\Scripts\\conda.exe run -n htfx-roformer python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-echo-fused-by-sucial roformer-model-melband-roformer-de-reverb-echo-v2-by-sucial ... (conda run wrapper itself hits UnicodeEncodeError in cp950 console when printing captured child stdout; abandoned this invocation form)", "exit_code": 1, "timed_out": false},
+    {"cmd": "C:\\Users\\<user>\\anaconda3\\envs\\htfx-roformer\\python.exe tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-echo-fused-by-sucial roformer-model-melband-roformer-de-reverb-echo-v2-by-sucial --cache-dir C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\roformer-cache --fixture C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\fixtures\\test_48k_2s.wav --output-root C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\output\\roformer-batch --device auto --max-cached 3", "exit_code": 0, "timed_out": false},
+    {"cmd": "C:\\Users\\<user>\\anaconda3\\envs\\htfx-roformer\\python.exe tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-big-by-sucial roformer-model-melband-roformer-de-reverb-super-big-by-sucial --cache-dir C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\roformer-cache --fixture C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\fixtures\\test_48k_2s.wav --output-root C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\output\\roformer-batch --device auto --max-cached 3", "exit_code": 0, "timed_out": false},
+    {"cmd": "C:\\Users\\<user>\\anaconda3\\envs\\htfx-roformer\\python.exe tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-big-syhft-v1-by-syh99999 roformer-model-melband-roformer-kim-syhft-by-syh99999 roformer-model-melband-roformer-kim-syhft-v2-5-by-syh99999 roformer-model-melband-roformer-kim-syhft-v2-by-syh99999 roformer-model-melband-roformer-kim-syhft-v3-by-syh99999 roformer-model-melband-roformer-vocals-by-kimberley-jensen --cache-dir C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\roformer-cache --fixture C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\fixtures\\test_48k_2s.wav --output-root C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\output\\roformer-batch --device auto --max-cached 3 (ran to completion synchronously in this turn via TaskOutput block=true; not left unfinished)", "exit_code": 0, "timed_out": false},
+    {"cmd": "python .loop/_iter13_flip.py (throwaway helper, flipped 10 M-items to passes=true with evidence, then deleted)", "exit_code": 0, "timed_out": false},
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd' (first run, before re-caching kim-vocals)", "exit_code": 1, "timed_out": false},
+    {"cmd": "C:\\Users\\<user>\\anaconda3\\envs\\htfx-roformer\\python.exe worker/roformer_cache.py --model melband-roformer-kim-vocals --cache-dir C:\\CodexProjects\\SourceSeparation_GPU_FX\\verify\\roformer-cache (root-cause fix: re-touch kim-vocals so rolling cache keeps it resident for the smoke test)", "exit_code": 0, "timed_out": false},
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd' (re-run after fix)", "exit_code": 0, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false},
+    {"cmd": "python -c \"import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))\" (informational only; full tier not due this iteration, 13 % 5 != 0)", "exit_code": 1, "timed_out": false}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 61, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}

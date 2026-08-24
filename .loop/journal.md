@@ -503,3 +503,52 @@ SCOPE_EXIT=0
 - 孤兒下載程序已自行結束；殘留 `verify/` 目錄留待續跑時清理（norule 未刪）。
 - 狀態由 blocked 改為 paused/user_pause_required（使用者主動暫停）。進度無損：iter 12 完成、backlog 51/111 綠（A1–A10、D1、M-ENUM＋39 M 項）、checkpoints 至 `b812e00`＋iter-12 commit。
 - 續跑程序：status 改回 running/null → `bash .loop/run_loop.sh`。續跑前 STEER 已備妥（見 .loop/STEER.md）。
+
+## iter 13 — 2026-08-24T20:31:02+08:00
+
+**STEER.md（續跑後一次性指令，本輪引用後刪除）：**
+> （續跑後第一個 iteration 的一次性指令）
+> 1. 先清理移交樹內誤建的 `verify/` 目錄（相對路徑 bug 的殘留，含部分下載 .ckpt.part——屬快取例外可刪），確認 `git status` 乾淨後再開始本輪 change-set。
+> 2. 之後所有模型快取操作一律使用絕對路徑 C:\CodexProjects\SourceSeparation_GPU_FX\verify\roformer-cache\。
+> 3. audited 模型批次縮小為每輪同步完成 2–4 個（下載→SHA-256→分離→驗證→記錄，全部在本輪內完成，不留背景工作）。
+
+**Hypothesis:** 依 STEER 指令執行，M-ENUM 剩下的 60 個 M-item 應能穩定推進而不再重演 iter-13 incident（相對路徑污染／提前結束留下背景工作）；本輪目標 4 個 audited（M038/M039/M040/M041，sucial 系列體積最小的 dereverb checkpoint）＋6 個 experimental（M074/M085/M086/M087/M088/M091，syh99999／kimberley-jensen 系列）共 10 個 M-item 翻為 pass。
+
+**Files touched:** 刪除移交樹內誤建的相對 `verify/`（僅含一個 290MB 部分下載 `.ckpt.part`，快取例外可刪）；`.loop/backlog.json`（10 個 M-item 翻 pass＋evidence）；`.loop/iterations/0013.json`、`.loop/journal.md`、`.loop/LESSONS.md`、`.loop/state.json`、`.loop/STEER.md`（刪除，一次性指令已消費）、`.loop/driver.log`、`.loop/lastrun.log`（外部 driver 自行 append，隨 commit 一併納入）。未修改任何 `plugin/`／`cpp/`／`worker/`／`tests/` 原始碼。
+
+**Step 1 — 清理：** `rm -rf verify/`（移交樹內的相對路徑殘留）後 `git status --porcelain=v1 -uall` 僅剩 `.loop/driver.log`／`.loop/lastrun.log`／`.loop/state.json` 三個既有追蹤檔的修改（operator pause/resume 遺留），確認乾淨後才開始本輪 change-set。
+
+**Step 2 — 批次驗證（新踩坑：`conda run` 不能用）：** 第一次嘗試 `conda.exe run -n htfx-roformer python tools/roformer_batch_verify.py ...`（exit 1）——不是 `separate_file()` 的 emoji/cp950 老問題（`configure_utf8_stream` 已在腳本 `main()` 開頭呼叫），而是 `conda run` 包裝器本身：它把子行程的 stdout 完整捕捉後，用**自己的** `sys.stdout`（綁在 cp950 主控台、未被子行程的 utf8 重新設定影響）`print()` 出來，一樣的 `UnicodeEncodeError: 'cp950' codec can't encode character '�'`。改用 `htfx-roformer` env 的 python.exe 絕對路徑直接呼叫（`C:\Users\<user>\anaconda3\envs\htfx-roformer\python.exe tools/roformer_batch_verify.py ...`，略過 `conda run` 這層轉印）即可正常運作。已寫入 LESSONS.md。
+
+**批次 1（2 個 audited，M041/M038）：** exit 0，`outcome=pass` × 2（sha256 皆驗證通過；separation sample_rate=48000 frames=96000 channels=2 subtype=FLOAT finite=true num_outputs=2）。
+**批次 2（2 個 audited，M039/M040）：** exit 0，`outcome=pass` × 2（同上規格）。
+**批次 3（6 個 experimental，M074/M085/M086/M087/M088/M091）：** 因指令輸出量大，工具自動轉入背景執行；本輪以 `TaskOutput(block=true)` 同步等待其完成（未提前結束 turn，遵守 LESSONS iter-13 教訓）。exit 0（experimental 失敗不影響腳本 exit code）；6/6 皆 `outcome=attempted_failed`——checkpoint 全數下載＋sha256 驗證通過，但 `separate_file()` 呼叫時皆因上游 config yaml（`config_vocals_mel_band_roformer_*_ft.yaml` / `vocals_mel_band_roformer.yaml`）在 `raw.githubusercontent.com/TRvlvr/application_data` 回 404（上游中繼資料本身缺失，非本專案程式碼缺陷）而 `RuntimeError`。依 LOOP_PLAN backlog 語意（「嘗試一次並記錄結果，成敗皆可」），這是完成的 M-item，記為 `attempted_failed`。
+
+**Backlog 更新：** 以一次性腳本（tmp+rename 原子寫入，用畢即刪）把上述 10 個 M-item 的 `passes` 翻為 `true` 並寫入含指令、sha256、size、separation 規格或失敗原因的 `evidence`；51 → 61 個 backlog item passing。
+
+**Step 3 — 驗證發現的真實回歸（本輪造成，本輪修正）：** 第一次 `cmd //c '.loop\checks\cheap.cmd'`（exit 1）：
+```text
+ui_configuration_smoke fatal: RoFormer C++ route did not start
+```
+根因排查：`tests/ui_configuration_smoke.cpp` 硬編碼選用 `melband-roformer-kim-vocals` 跑 RoFormer C++ 路由；`plugin/PluginProcessor.cpp` 的 `beginSeparation()` 在呼叫前會先檢查 `isModelInstalled(configuration.modelName)`——若模型不在 `verify/roformer-cache/` 內，直接回傳 `false`（不會自動下載，下載是另一個 UI 動作）。本輪批次驗證的 10 個模型陸續寫入同一個共用的滾動快取（`max_cached=3`，LRU by mtime），把 `melband-roformer-kim-vocals` 擠出快取，使 smoke test 的硬編碼前提被破壞——這是本輪 change-set 的真實副作用（不是繼承的壞掉狀態），必須修根因而非放寬斷言。修正：`python worker/roformer_cache.py --model melband-roformer-kim-vocals --cache-dir C:\CodexProjects\SourceSeparation_GPU_FX\verify\roformer-cache` 重新下載+驗證並把它變回最近觸碰（cache_dir_entries 確認 kim-vocals 回到快取內）。重跑 `cmd //c '.loop\checks\cheap.cmd'`（exit 0）：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.002s
+OK
+Ran 2 tests in 0.076s
+OK
+Ran 8 tests in 0.253s
+OK
+```
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 48 changed path(s) within policy
+SCOPE_EXIT=0
+```
+**Backlog checker（本輪非 5 的倍數，non-full-tier，僅供參考）：** exit 1 —— passing 61/111。
+**Criteria:** C1: fail（本輪未跑 full tier，不宣稱 pass）· C2: fail（仍有 50 個 M-item 未過）· C3: pass
+**Metric:** 61 個 backlog item passing（best so far: 61；improved: true，較上輪 51 增加 10）
+**Decision:** continue
+**Lesson:** (1) 呼叫 `worker/roformer_worker.py` 相關腳本一律用 `htfx-roformer` env 的 python.exe 絕對路徑（`C:\Users\<user>\anaconda3\envs\htfx-roformer\python.exe`）直接執行，不要包一層 `conda run`——`conda run` 的輸出轉印邏輯本身在 Windows cp950 主控台上會對含 emoji 的子行程輸出拋 `UnicodeEncodeError`，即使子行程自己已呼叫過 `configure_utf8_stream`，因為壞掉的是 `conda run` 自己的 print，不是子行程的 stream。(2) `ui_configuration_smoke` 的 RoFormer C++ 路由測試硬編碼依賴 `melband-roformer-kim-vocals` 必須常駐 `verify/roformer-cache/`（`beginSeparation()` 不會自動下載未安裝模型）；任何在同一個共用滾動快取（`max_cached=3`）內批次跑其他模型的 M-item 驗證，都可能把 kim-vocals 擠出快取而讓 cheap/full tier 的 UI smoke 失敗——批次跑完 M-item 後、執行 cheap/full tier 之前，必須確認（必要時重新觸碰）kim-vocals 仍在快取內。已寫入 LESSONS.md。
+**Note:** 下一輪應繼續處理剩下的 50 個 audited M-item（依 checkpoint size 由小到大，下一批約 913MB 級距的 gabox/instv6 系列共 ~14 個同尺寸模型）；`tools/roformer_batch_verify.py` 與 `tools/generate_roformer_model_backlog_items.py` 皆可直接重用。每輪批次跑完後、進 cheap/full tier 前，務必確認 `melband-roformer-kim-vocals` 仍在 `verify/roformer-cache/` 內（不在則重新觸碰），避免重演本輪的 smoke test 回歸。

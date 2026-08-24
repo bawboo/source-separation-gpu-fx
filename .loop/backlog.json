@@ -506,45 +506,45 @@
   {
     "id": "M038",
     "title": "M038: roformer-model-melband-roformer-de-reverb-echo-v2-by-sucial（audited, category=dereverb）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 49,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-de-reverb-echo-v2-by-sucial",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter 13: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-echo-v2-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch (exit 0; outcome=pass; sha256=396432f5af25992fe82d0286634bd879027c073721db6ab10199e75459708b9f; size=455862568; separation sample_rate=48000 frames=96000 channels=2 subtype=FLOAT finite=true num_outputs=2)",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-echo-v2-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M039",
     "title": "M039: roformer-model-melband-roformer-de-reverb-big-by-sucial（audited, category=dereverb）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 50,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-de-reverb-big-by-sucial",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter 13: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-big-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch (exit 0; outcome=pass; sha256=0506455e74ffc02bbec700df9863ae243597034003815f1418227c6dee33b6ea; size=455864012; separation sample_rate=48000 frames=96000 channels=2 subtype=FLOAT finite=true num_outputs=2)",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-big-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M040",
     "title": "M040: roformer-model-melband-roformer-de-reverb-super-big-by-sucial（audited, category=dereverb）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 51,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-de-reverb-super-big-by-sucial",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter 13: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-super-big-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch (exit 0; outcome=pass; sha256=26dda242bce4405555f2d6086d079fe8cc23f1f04e02e501d2689bfe3ece0489; size=455864012; separation sample_rate=48000 frames=96000 channels=2 subtype=FLOAT finite=true num_outputs=2)",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-super-big-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M041",
     "title": "M041: roformer-model-melband-roformer-de-reverb-echo-fused-by-sucial（audited, category=dereverb）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 52,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-de-reverb-echo-fused-by-sucial",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter 13: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-echo-fused-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch (exit 0; outcome=pass; sha256=1596b1063238f487d54a0510a8c92cb28c000c803a271dd618ac49efc99ef3f7; size=455776577; separation sample_rate=48000 frames=96000 channels=2 subtype=FLOAT finite=true num_outputs=2)",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-echo-fused-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
@@ -902,12 +902,12 @@
   {
     "id": "M074",
     "title": "M074: roformer-model-melband-roformer-kim-big-syhft-v1-by-syh99999（experimental, category=general）—— 已收錄進 registry/UI 並標註 experimental；嘗試一次分離並記錄結果（成敗皆可）",
-    "passes": false,
+    "passes": true,
     "priority": 85,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-big-syhft-v1-by-syh99999",
     "audited": false,
-    "evidence": null,
+    "evidence": "iter 13: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-big-syhft-v1-by-syh99999 ... (exit 0 for batch; per-model outcome=attempted_failed; checkpoint downloaded+sha256-verified (1,479,738,496 bytes); upstream config_vocals_mel_band_roformer_big_v1_ft.yaml 404s on raw.githubusercontent.com (config not published) -> separate_file RuntimeError, recorded as attempted_failed per LOOP_PLAN experimental semantics)",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-big-syhft-v1-by-syh99999 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
@@ -1023,45 +1023,45 @@
   {
     "id": "M085",
     "title": "M085: roformer-model-melband-roformer-kim-syhft-by-syh99999（experimental, category=general）—— 已收錄進 registry/UI 並標註 experimental；嘗試一次分離並記錄結果（成敗皆可）",
-    "passes": false,
+    "passes": true,
     "priority": 96,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-syhft-by-syh99999",
     "audited": false,
-    "evidence": null,
+    "evidence": "iter 13: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-syhft-by-syh99999 ... (exit 0 for batch; per-model outcome=attempted_failed; checkpoint downloaded+sha256-verified (913,096,702 bytes); upstream config_vocals_mel_band_roformer_ft.yaml 404s -> attempted_failed)",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-syhft-by-syh99999 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M086",
     "title": "M086: roformer-model-melband-roformer-kim-syhft-v2-5-by-syh99999（experimental, category=general）—— 已收錄進 registry/UI 並標註 experimental；嘗試一次分離並記錄結果（成敗皆可）",
-    "passes": false,
+    "passes": true,
     "priority": 97,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-syhft-v2-5-by-syh99999",
     "audited": false,
-    "evidence": null,
+    "evidence": "iter 13: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-syhft-v2-5-by-syh99999 ... (exit 0 for batch; per-model outcome=attempted_failed; checkpoint downloaded+sha256-verified (913,090,472 bytes); upstream config_vocals_mel_band_roformer_ft.yaml 404s -> attempted_failed)",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-syhft-v2-5-by-syh99999 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M087",
     "title": "M087: roformer-model-melband-roformer-kim-syhft-v2-by-syh99999（experimental, category=general）—— 已收錄進 registry/UI 並標註 experimental；嘗試一次分離並記錄結果（成敗皆可）",
-    "passes": false,
+    "passes": true,
     "priority": 98,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-syhft-v2-by-syh99999",
     "audited": false,
-    "evidence": null,
+    "evidence": "iter 13: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-syhft-v2-by-syh99999 ... (exit 0 for batch; per-model outcome=attempted_failed; checkpoint downloaded+sha256-verified (913,095,346 bytes); upstream config_vocals_mel_band_roformer_ft.yaml 404s -> attempted_failed)",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-syhft-v2-by-syh99999 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M088",
     "title": "M088: roformer-model-melband-roformer-kim-syhft-v3-by-syh99999（experimental, category=general）—— 已收錄進 registry/UI 並標註 experimental；嘗試一次分離並記錄結果（成敗皆可）",
-    "passes": false,
+    "passes": true,
     "priority": 99,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-syhft-v3-by-syh99999",
     "audited": false,
-    "evidence": null,
+    "evidence": "iter 13: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-syhft-v3-by-syh99999 ... (exit 0 for batch; per-model outcome=attempted_failed; checkpoint downloaded+sha256-verified (913,090,472 bytes); upstream config_vocals_mel_band_roformer_ft.yaml 404s -> attempted_failed)",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-syhft-v3-by-syh99999 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
@@ -1089,12 +1089,12 @@
   {
     "id": "M091",
     "title": "M091: roformer-model-melband-roformer-vocals-by-kimberley-jensen（experimental, category=vocals）—— 已收錄進 registry/UI 並標註 experimental；嘗試一次分離並記錄結果（成敗皆可）",
-    "passes": false,
+    "passes": true,
     "priority": 102,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-vocals-by-kimberley-jensen",
     "audited": false,
-    "evidence": null,
+    "evidence": "iter 13: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-vocals-by-kimberley-jensen ... (exit 0 for batch; per-model outcome=attempted_failed; checkpoint downloaded+sha256-verified (913,106,900 bytes); upstream vocals_mel_band_roformer.yaml 404s -> attempted_failed)",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-vocals-by-kimberley-jensen --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
