@@ -99,34 +99,74 @@
   {
     "id": "M001",
     "title": "M001: melband-roformer-big-beta5e（audited, category=vocals）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 12,
     "source": "plan",
     "model_id": "melband-roformer-big-beta5e",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-big-beta5e --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3",
+      "sha256": "32b876e1163716a9a007438b5a5107069586aa9b9ca653a5f63013b1edf6920c",
+      "checkpoint_size": 1479749810,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass",
+      "note": "iter 17: first attempt in a 3-model batch hit a transient ConnectionResetError mid-download (empty cache dir left behind); solo retry succeeded cleanly."
+    },
     "check": "python tools/roformer_batch_verify.py --models melband-roformer-big-beta5e --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M002",
     "title": "M002: melband-roformer-big-beta6（audited, category=vocals）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 13,
     "source": "plan",
     "model_id": "melband-roformer-big-beta6",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-big-beta5e melband-roformer-big-beta6 melband-roformer-big-beta7 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3",
+      "sha256": "f51cbb94b4ed5c36cb36fd2024236a8af3ed6886567981702ad6f094b2c6c820",
+      "checkpoint_size": 1557078584,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models melband-roformer-big-beta6 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M003",
     "title": "M003: melband-roformer-big-beta7（audited, category=vocals）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 14,
     "source": "plan",
     "model_id": "melband-roformer-big-beta7",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-big-beta5e melband-roformer-big-beta6 melband-roformer-big-beta7 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3",
+      "sha256": "9d68b9a8689a3500c45d3418a7811934e557760db07285f483088a0965b0eb88",
+      "checkpoint_size": 944675923,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models melband-roformer-big-beta7 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
@@ -1275,5 +1315,41 @@
     "audited": false,
     "evidence": "iter 12: python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-vocals-v2-by-gabox ... (exit 0) — attempted once as required for experimental models; manifest entry has no recorded sha256 (upstream metadata unavailable), so checkpoint integrity cannot be verified; outcome=attempted_failed recorded per LOOP_PLAN semantics (成敗皆可, attempt+record is sufficient).",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-vocals-v2-by-gabox --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
+  },
+  {
+    "id": "B1",
+    "title": "B1: 模式優先 UX — 面板第一層改為「分離模式」選單（模式清單由 manifest 類別＋HTDemucs 能力生成：4-stem、6-stem、人聲、伴奏/instrumental、卡拉OK、吉他、去混響、去噪…含 experimental）；未選模式前，模型選單與所有可調拉桿 disabled。",
+    "passes": false,
+    "priority": 11.1,
+    "source": "user",
+    "evidence": null,
+    "check": "TODO: 由執行本項的 iteration 依 LOOP_PLAN 定義具體驗證指令（ui_configuration_smoke 擴充，見 B4）。"
+  },
+  {
+    "id": "B2",
+    "title": "B2: 每模式「預設模型＋同類替代清單」映射 — 4-stem→htdemucs、6-stem→htdemucs_6s、人聲→melband-roformer-kim-vocals、吉他→guitar 類 audited 優先、卡拉OK→karaoke 類、去混響→dereverb 類…；audited 優先為預設、experimental 保留標註；使用者可在模式內切換模型。",
+    "passes": false,
+    "priority": 11.2,
+    "source": "user",
+    "evidence": null,
+    "check": "TODO: 由執行本項的 iteration 依 LOOP_PLAN 定義具體驗證指令（ui_configuration_smoke 擴充，見 B4）。"
+  },
+  {
+    "id": "B3",
+    "title": "B3: 拉桿 gating — 模式＋模型選定後才 enable 對應參數（4/6-stem 才顯示/啟用各 stem 音量拉桿；2-stem 模式只呈現對應兩軌控制）。",
+    "passes": false,
+    "priority": 11.3,
+    "source": "user",
+    "evidence": null,
+    "check": "TODO: 由執行本項的 iteration 依 LOOP_PLAN 定義具體驗證指令（ui_configuration_smoke 擴充，見 B4）。"
+  },
+  {
+    "id": "B4",
+    "title": "B4: ui_configuration_smoke 擴充鎖住 B1–B3 行為（disabled→enabled 轉換、各模式預設模型正確、模式清單存在），並保持四個 smoke 全綠。",
+    "passes": false,
+    "priority": 11.4,
+    "source": "user",
+    "evidence": null,
+    "check": "cmd //c '.loop\\checks\full.cmd'（四個 smoke 全 PASS，含擴充後的 ui_configuration_smoke 斷言）"
   }
 ]

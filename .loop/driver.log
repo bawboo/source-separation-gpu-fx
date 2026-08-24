@@ -180793,3 +180793,9 @@ LOOP STATUS: running â€” iter-15: verified M037+M004 (65/111 backlog passing), f
 [driver] agent process exited rc=0
 [scope] OK ¡X 50 changed path(s) within policy
 [driver] iteration 16 launching  2026-08-24T22:55:04+0800
+Checkpoint committed successfully.
+
+LOOP STATUS: running â€” iter-16 verified 3 audited M-items (M006 inst-gabox-bv2, M007 inst-gabox-fv3, M008 inst-gabox3); 68/111 backlog passing (C1 fail: full tier not due, C2 fail: 43 M-items remain, C3 pass); committed 933d323.
+[driver] agent process exited rc=0
+[scope] OK ¡X 51 changed path(s) within policy
+[driver] iteration 17 launching  2026-08-24T23:09:09+0800

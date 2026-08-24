@@ -744,3 +744,73 @@ OK
 **Decision:** continue
 **Lesson:** 無新 lesson——本輪吞吐量量測（7.33MB/s，來自 GaboxR67/MelBandRoformers 這個 HF repo）再次確認 iter-15 的推論：先前逾時是網路暫時壅塞而非批次設計問題；不同 HF repo/CDN 節點的吞吐量會有差異（本輪 7.33MB/s vs iter-15 的 2.67MB/s），每輪開頭量測仍是必要的動態依據。
 **Note:** 下一輪繼續處理剩餘 43 個 audited M-item（多為 913MB 級距的 instv6/instv6n/instv7n/voc-fv/karaoke/kimmel/unwa 系列，依 `tools/roformer_batch_verify.py` 既有流程逐批 2–3 個）；下一次 5 的倍數在 iteration 20，記得跑 full tier。批次跑完後、進 cheap/full tier 前，務必確認 `melband-roformer-kim-vocals` 仍在快取內。
+
+## Iteration 17 — 2026-08-24T23:23:54+08:00
+
+**Hypothesis：** 本輪無 STOP/STEER，依常態推進剩餘 43 個 audited M-item；改依 backlog `priority` 欄位挑選優先序最高的三項 M001／M002／M003（unwa 的 big-beta5e／big-beta6／big-beta7 家族，category=vocals），checkpoint 尺寸較先前批次更大（945MB–1.56GB，先前多為 913MB 級距）。先以 60 秒 curl 對 `pcunwa/Mel-Band-Roformer-big`（HF）量測吞吐量，量出 ~11.0MB/s，估算三檔合計 ~3.98GB 於單輪同步呼叫內可行，預期三者皆完成下載＋SHA-256＋分離並翻為 pass。
+
+**Files touched：** `.loop/backlog.json`（M001／M002／M003 翻 pass＋evidence）、`.loop/iterations/0017.json`、`.loop/journal.md`、`.loop/state.json`、`.loop/driver.log`（外部 driver 自行 append）。未修改任何 `plugin/`／`cpp/`／`worker/`／`tests/` 原始碼。
+
+**Step 1 — 吞吐量取樣：** `curl -sS -L -o /dev/null --max-time 60 -w '...' https://huggingface.co/pcunwa/Mel-Band-Roformer-big/resolve/main/big_beta5e.ckpt`（exit 28，逾時屬預期，僅取樣）：
+```text
+http_code=200 size_download=662260776 time_total=59.999209 speed_download=11037825
+```
+≈11.0MB/s，判斷本輪批次 3 個安全。
+
+**Step 2 — 三模型批次呼叫（前景同步，未觸發背景轉移）：** `tools/roformer_batch_verify.py --models melband-roformer-big-beta5e melband-roformer-big-beta6 melband-roformer-big-beta7 ...`（exit 1）：M002／M003 皆 pass，M001（big-beta5e，隊列中第一個、最早開始下載）在 checkpoint 下載途中遇到暫時性 `ConnectionResetError`（遠端主機強制關閉連線），留下空的 `verify/roformer-cache/melband-roformer-big-beta5e/` 目錄，outcome=fail：
+```json
+{"model": "melband-roformer-big-beta6", "checkpoint_size": 1557078584, "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2}, "outcome": "pass"}
+{"model": "melband-roformer-big-beta7", "checkpoint_size": 944675923, "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2}, "outcome": "pass"}
+```
+
+**Step 3 — M001 單獨重試：** 同一支腳本改帶 `--models melband-roformer-big-beta5e`，這次整檔重新下載成功（無斷點續傳，符合 LESSONS SIGN iter-15 的既知行為），exit 0：
+```json
+{"model": "melband-roformer-big-beta5e", "cache_verified_sha256": "32b876e1163716a9a007438b5a5107069586aa9b9ca653a5f63013b1edf6920c", "checkpoint_size": 1479749810, "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2}, "outcome": "pass"}
+```
+
+**快取狀態：** 三次下載後（`max_cached=3`）依 LRU 擠出 iter-16 留下的三項，包含 `melband-roformer-kim-vocals`。已用 `worker/roformer_cache.py --model melband-roformer-kim-vocals --cache-dir <絕對路徑>` 重新觸碰（exit 0），此舉把最舊的 `melband-roformer-big-beta6`（證據已寫入 backlog，無需保留快取檔）擠出。跑 cheap tier 前確認快取內容為 `melband-roformer-big-beta5e`／`melband-roformer-big-beta7`／`melband-roformer-kim-vocals`（3 項，含 kim-vocals）。
+
+**Backlog 更新：** 以一次性腳本（tmp+rename 原子寫入，用畢即刪）把 M001／M002／M003 的 `passes` 翻為 `true` 並寫入含指令、sha256、size、separation 規格的 `evidence`（M001 額外註記本輪的暫時性連線重置與重試經過）；68 → 71 個 backlog item passing。
+
+**Cheap tier（本輪非 5 的倍數，不需 full tier）：** `cmd //c '.loop\checks\cheap.cmd'`（exit 0）：
+```text
+default_panel=general ... roformer_browser=99 categories=10 search=true experimental=true download_status=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.002s
+OK
+Ran 2 tests in 0.064s
+OK
+Ran 8 tests in 0.189s
+OK
+```
+
+**Scope（C3）：** `python .loop/check_scope.py`（exit 0）：
+```text
+[scope] OK — 52 changed path(s) within policy
+```
+
+**Backlog checker（C2，informational——本輪未跑 full tier）：** exit 1 —— passing 71/111，仍有 40 個 M-item 未過。
+
+**Criteria:** C1: fail（本輪未跑 full tier，非 5 的倍數）· C2: fail（40 個 M-item 仍未過）· C3: pass
+**Metric:** 71 個 backlog item passing（best so far: 71；improved: true，較上輪 68 增加 3）
+**Decision:** continue
+**Lesson:** 批次呼叫中若隊列第一個模型的 checkpoint 下載途中遇到暫時性 `ConnectionResetError`（非本專案程式邏輯問題，屬 HF 端連線抖動），batch verify 會把該模型標記 fail 但**繼續處理隊列其餘模型**（本輪 M002／M003 仍正常完成並 pass）；留在快取內的失敗項目目錄會是空的（無 `.ckpt`/`.yaml` 殘留），可直接對該單一模型重跑同一支腳本重試，無需清理即可整檔重新下載成功。這不是新規則，只是印證既有「ensure_cached 無斷點續傳」設計下、部分批次失敗時的正確恢復方式：不要因為批次回傳 exit 1 就判定整批失敗或視為系統性問題——逐一檢查每個模型的 `outcome` 欄位，只重跑真正 fail 的那些。
+**Note:** 下一輪繼續處理剩餘 40 個 audited M-item（依 backlog priority 排序，下一批為 M005/M009/M010/M011 等）；下一次 5 的倍數在 iteration 20，記得跑 full tier。批次跑完後、進 cheap/full tier 前，務必確認 `melband-roformer-kim-vocals` 仍在快取內。
+
+**STEER.md（iter 17 收尾階段發現，於 M001–M003 hypothesis 已執行＋驗證完畢之後才出現於檔案系統——本輪 step 3 檢查時尚不存在，屬時序競態；依協定「一輪一個 hypothesis」原則，不推翻已完成並已驗證的 M001–M003 工作，改為：先完成本輪 checkpoint，並依協定將以下指示原文列出、把使用者交辦的 4 個工單登記進 backlog，交給下一輪從 B1 開始）：**
+```text
+（使用者指示，2026-08-24 投放——優先於剩餘 M 項）
+使用者實際試用後回饋：「進階模式太難用。改成先選『要分什麼』的模式（例如吉他分離模式），每個模式有預設模型（4 軌分離預設 htdemucs），但可換同類其他模型。選擇完畢後，可調整的拉桿才變成可控。」
+
+請本輪先把以下四個 user 工單 append 進 backlog（source:"user"，priority 用浮點數插在 M 項之前），然後從 B1 開始做：
+
+- B1 (priority 11.1)：模式優先 UX——面板第一層改為「分離模式」選單，模式清單由 manifest 類別＋HTDemucs 能力生成（至少含：4-stem 分離、6-stem 分離、人聲、伴奏/instrumental、卡拉OK、吉他、去混響、去噪；experimental 類別照 manifest）。未選模式前，模型選單與所有可調拉桿 disabled。
+- B2 (priority 11.2)：每模式「預設模型＋同類替代清單」映射——4-stem→htdemucs、6-stem→htdemucs_6s、人聲→melband-roformer-kim-vocals、吉他→guitar 類 audited 優先、卡拉OK→karaoke 類、去混響→dereverb 類…；audited 優先為預設、experimental 保留標註；使用者可在模式內切換模型。
+- B3 (priority 11.3)：拉桿 gating——模式＋模型選定後才 enable 對應參數（4/6-stem 才顯示/啟用各 stem 音量拉桿；2-stem 模式只呈現對應兩軌控制）。
+- B4 (priority 11.4)：ui_configuration_smoke 擴充鎖住以上行為（disabled→enabled 轉換、各模式預設模型正確、模式清單存在），並保持四個 smoke 全綠。
+
+規則不變：一輪一個 hypothesis（B1→B2→B3→B4 分輪做）、禁背景、路徑單引號。B 項全綠後再回頭繼續 M 項行軍。
+```
+
+**已執行動作：** 以一次性腳本（tmp+rename 原子寫入，用畢即刪）把 B1–B4 append 進 `.loop/backlog.json`（`source:"user"`, priority 11.1–11.4, `passes:false`）；總項目數 111 → 115（passing 仍 71，B 項尚未開始）。STEER.md 已在本則 journal 記錄寫入後刪除（符合協定：quote 後才可刪）。
+**交接給 iteration 18：** 依使用者指示優先序（「優先於剩餘 M 項」），下一輪應以 B1（模式優先 UX 面板第一層）為 hypothesis 開始，暫緩 M 項行軍；B1–B4 全綠後再回頭繼續處理剩餘 40 個 audited M-item。
