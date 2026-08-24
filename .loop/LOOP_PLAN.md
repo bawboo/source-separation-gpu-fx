@@ -58,7 +58,7 @@ Provenance — network: asked · install: asked · git: asked · delete: asked �
 - max_iterations: 60 (asked)
 - stall_threshold: 6 consecutive iterations without improvement (asked)
 - max_wall_time: none（`MAX_WALL_MINUTES=0`——配合跨用量 reset 續跑）(asked)
-- iteration_timeout: 40 min（`ITERATION_TIMEOUT_MINUTES=40`——懸死防護）(asked)
+- iteration_timeout: 60 min（`ITERATION_TIMEOUT_MINUTES=60`；2026-08-24 由 40 修訂——慢速網路下同步下載大模型兩度超時）(asked, amended)
 - improvement epsilon: 任一 criterion 轉 pass 或任一 backlog 項目轉 passes=true (inferred)
 
 ## 7. Failure / stall policy
@@ -79,3 +79,4 @@ Broken verification harness (command errors twice in a row): always pause-and-as
 ## Amendments
 - iter 0, 2026-08-23T11:20+08:00: §9 AGENT_CMD_JSON: claude.exe headless → codex.exe `exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox`（原因：claude CLI 在本機未登入（"Not logged in"），headless 無法認證；codex exec 實測已認證可用。引擎仍為 B、其餘不變。使用者已於 2026-08-23 授權自行運行維護）
 - iter 0, 2026-08-23T11:20+08:00: §4 追加使用者規則：絕不允許刪除 `C:\CodexProjects\SourceSeparation_GPU_FX\` 專案根目錄以外的任何檔案（已寫入 LESSONS.md SIGN）
+- iter 14, 2026-08-24T22:15+08:00: §6 iteration_timeout: 40 → 60 min（連續兩次同步模型下載超時；配合 STEER 單模型批次＋15 分下載止損。操作性 ceiling 調整，未放寬任何完成標準）

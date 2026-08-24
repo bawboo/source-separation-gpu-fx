@@ -1,1 +1,1 @@
-Waiting for the background batch-verify job (`bkgx7way3`) and its Monitor (`bj6rqpxas`) to signal completion — no further action until then.
+[driver] hang guard: agent exceeded the iteration timeout and was killed

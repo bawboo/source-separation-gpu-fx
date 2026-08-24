@@ -557,3 +557,7 @@ SCOPE_EXIT=0
 - iteration 14 重蹈兩個舊病：(1) 背景任務＋Monitor 後結束 turn（headless -p 不會被喚醒）→ 無 record 無 commit；(2) 絕對路徑未引號經 bash 傳遞 → repo 內畸形目錄 `CodexProjectsSourceSeparation_GPU_FXverifyroformer-cache/`（229MB 部分下載）→ scope 鎖機（防護正確動作）。
 - 處置：畸形目錄整個**搬移**（非刪除）至 `verify\quarantine\iter14-mangled-cache\`；無孤兒程序；兩條規則升級為 ITERATION_PROMPT 硬規則＋LESSONS SIGN。
 - 狀態 blocked→running，driver 重啟續跑（下一輪仍記為 iteration 14）。
+
+## Operator note — 2026-08-24T22:15+08:00（兩振超時處置）
+- iteration 14 第 2、3 次嘗試均 40 分鐘超時（claude -p 無中途輸出，推測慢速行動網路下同步下載大模型未完）。driver 依設計兩振鎖 blocked/stalled_no_state_update。
+- 修訂 §6 iteration_timeout 40→60 min（Amendments 已記）；STEER（單模型批次＋15 分下載止損）未被消費、下輪生效。狀態解鎖 running，driver 重啟。

@@ -1,10 +1,10 @@
 # FINAL REPORT — loop run
 
 - status: **blocked**
-- stop_reason: `blocked_permission_required`
+- stop_reason: `stalled_no_state_update`
 - iterations: 13 / max 60
 - best_metric: 61
-- started_at: 2026-08-23T10:50:55+08:00  ·  updated_at: 2026-08-24T20:46:48+08:00
+- started_at: 2026-08-23T10:50:55+08:00  ·  updated_at: 2026-08-24T22:08:52+08:00
 - git: origin `main`@`24bfb70f2c4de22ba92996cdcee08ac8ecbff9e6` → loop branch `loop/melband-roformer` (switch back / merge is your call)
 
 | iter | decision | status | metric | criteria |
