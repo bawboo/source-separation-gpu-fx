@@ -1652,3 +1652,66 @@ Ran 8 tests in 0.122s / OK
 **Decision:** continue
 **Lesson：** 無新 SIGN——本輪操作性觀察（強化既有 SIGN iter-15 的建議，非新規則）：同一批次內不同模型的下載主機吞吐量可能差異一個數量級以上（本輪 GitHub release 主機 ~7.9 MB/s vs HuggingFace 主機 ~0.42–0.55 MB/s，同一時間點量測），批次大小不能只看檔案大小或「上輪跑幾個」的慣例，每輪動手前應對「本輪實際要下載的那個網域」各花一次 30–45 秒 curl range 測速，而非只測一次就套用到整批。
 **Note（交接給 iteration 34）：** M030 已完成並有印出證據。剩餘 backlog：21 個 audited M-item（下一個優先序：M033 `roformer-model-melband-roformer-big-beta-6-by-unwa` priority 44、M034 `roformer-model-melband-roformer-big-beta-6x-by-unwa` priority 45、M035 `roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris` priority 46、M036 `roformer-model-melband-roformer-de-reverb-by-anvuew` priority 47...）。M033／M034 皆為 HuggingFace（`huggingface.co/Politrees/UVR_resources/...`）主機、檔案分別約 1.48 GB／1.63 GB——本輪測到吞吐量僅 ~0.42–0.55 MB/s，下一輪動手前務必重新測速（HF CDN 速度會隨時間浮動，本輪的量測不保證下一輪仍成立）；若吞吐量仍慢，建議單輪只做一個 HF 大檔（甚至評估用 `curl --max-time` 分段續傳降低單次逾時風險），或改為優先處理批次中檔案較小／非 HF 主機的其他 audited 項目（若後續 priority 中有）以維持 metric 持續進步。M033／M034 的 config override 已在上游 `site-packages/mel_band_roformer/data/overrides.json` 確認存在且網址與本地 manifest `config_url` 一致（本輪已用 curl 驗證過兩者 config 皆 200，僅 checkpoint 尚未下載驗證）——這兩個不屬於 iter-31/32 記錄的「無 config override」故障家族，下一輪不需要重做 HF SHA-256 鏡像搜尋，直接跑 `tools/roformer_batch_verify.py` 即可（只是要抓時間預算）。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存）；下一次 5 的倍數在 iteration 35，屆時需強制跑 full tier；距離 max_iterations=60 還有充裕空間（本輪為第 33 輪），backlog 仍有 21 項未過，遠未達 converged 門檻。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria。
+
+## iter-34 (2026-08-25T03:30:00+08:00)
+
+**Hypothesis：** iter-33 交接筆記指出下一優先序為 M033（`roformer-model-melband-roformer-big-beta-6-by-unwa`，priority 44）與 M034（`roformer-model-melband-roformer-big-beta-6x-by-unwa`，priority 45），皆為 HuggingFace `Politrees/UVR_resources` 主機，且該筆記已用 curl 確認兩者的 config override 在上游套件 `site-packages/mel_band_roformer/data/overrides.json` 中已存在且與本地 manifest `config_url` 一致（不屬於 iter-31/32 記錄的「無 config override」故障家族），不需要手動 pre-place config 的繞過流程。動手前先對同主機做一次 40 秒 curl range 測速，量到約 0.6 MB/s（略優於 iter-33 量到的 0.42–0.55 MB/s，但仍屬慢速）——以此推算單一 1.5–1.7GB checkpoint 若真的維持此龜速，下載本身就要 40 分鐘，對單輪 iteration_timeout 有風險，因此計畫先只做 M033，時間夠再視情況加做 M034。
+
+**Files touched：** `.loop/backlog.json`（M033、M034 翻為 passes:true）、`verify/roformer-cache/roformer-model-melband-roformer-big-beta-6-by-unwa/`、`verify/roformer-cache/roformer-model-melband-roformer-big-beta-6x-by-unwa/`（皆為 cache 目錄，repo 外允許路徑）。
+
+**Verification（M033+M034 批次驗證，皆用 Bash run_in_background + TaskOutput(block=true) 同步阻塞等待，未離開 turn）：**
+
+curl 測速（40s range probe）→ `speed=623941 bytes/s size=25155976 time=40.317848 http_code=206`（timeout exit 28，僅用於測速，非下載失敗）。
+
+M033 批次驗證 exit 0（實際下載耗時遠低於測速推估的 40 分鐘，僅約 15–20 分鐘完成整個下載+分離）：
+```json
+[
+  {
+    "model": "roformer-model-melband-roformer-big-beta-6-by-unwa",
+    "category": "general",
+    "audited": true,
+    "cache_verified_sha256": "f51cbb94b4ed5c36cb36fd2024236a8af3ed6886567981702ad6f094b2c6c820",
+    "checkpoint_size": 1557078584,
+    "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+    "outcome": "pass"
+  }
+]
+```
+
+時間預算尚有餘裕，臨場加做 M034，批次驗證 exit 0：
+```json
+[
+  {
+    "model": "roformer-model-melband-roformer-big-beta-6x-by-unwa",
+    "category": "general",
+    "audited": true,
+    "cache_verified_sha256": "e16d702f4e20f13d60b293541c1dea75cb4414a5846b36780e28ef70352a4e5c",
+    "checkpoint_size": 1708527586,
+    "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+    "outcome": "pass"
+  }
+]
+```
+
+`cache_verified_sha256` 兩者皆與 manifest 記錄值完全相符。下載後複驗快取目錄：`melband-roformer-kim-vocals`（mtime 02:55，本輪未變動，安然倖存）、`roformer-model-melband-roformer-big-beta-6-by-unwa`（03:12）、`roformer-model-melband-roformer-big-beta-6x-by-unwa`（03:15）——如預期擠掉 iter-33 留下的 `roformer-model-mel-roformer-denoise-aufr33-aggr`／`roformer-model-mel-roformer-viperx-1143`（max_cached=3，LRU by mtime）。
+
+**Cheap tier：** `cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.002s / OK
+Ran 2 tests in 0.071s / OK
+Ran 8 tests in 0.089s / OK
+```
+
+**Full tier：** 本輪 iteration number 34、34 % 5 != 0，且非宣告 converged，依協定不強制執行。
+
+**Backlog checker（僅供參考，非本輪 C2 判定依據——full tier 未跑）：** 直接檢視 `.loop/backlog.json`：117 項中仍有 19 項 `passes:false`。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 68 changed path(s) within policy`
+
+**Criteria:** C1 fail（本輪未跑 full tier，依協定不可宣稱 pass）／C2 fail（backlog 仍有 19 項未過）／C3 pass（scope 無違規）。AND 規則下未同時全過，非 converged。
+**Metric:** backlog_items_passing = 98（較上輪 96 增加 2：M033、M034）；improved: true。
+**Decision:** continue
+**Lesson：** 無新 SIGN——本輪操作性觀察再次驗證 iter-33 的既有建議（測速僅供參考，不可線性外推整個檔案的下載時間）：curl range 測速量到 ~0.6 MB/s，若線性外推 1.5–1.7GB 檔案需約 40–48 分鐘，但實際批次驗證（含 HTTP 完整下載＋分離）兩個模型合計僅約 20–25 分鐘完成，顯示前 30MB 的 range 測速可能受 CDN 冷啟動或連線暖身影響，低估了穩態吞吐量。日後仍應測速以抓保守批次大小，但不必因單次測速偏慢就直接放棄多模型批次——可以先啟動第一個模型的下載並同步阻塞等待，實際完成時間比預估快時再臨場加做下一個，而非在測速當下就一次性決定整輪批次大小。
+**Note（交接給 iteration 35）：** M033、M034 已完成並有印出證據。剩餘 backlog：19 個 audited M-item（下一個優先序：M035 `roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris` priority 46、M036 `roformer-model-melband-roformer-de-reverb-by-anvuew` priority 47、M042 `roformer-model-melband-roformer-de-reverb-less-aggressive-by-anvuew` priority 53、M043 `roformer-model-melband-roformer-de-reverb-mono-by-anvuew` priority 54...）。**下一次 5 的倍數在 iteration 35（即下一輪）——依協定必須強制跑 full tier（`cmd //c '.loop\checks\full.cmd'`）＋backlog checker，即使不宣告 convergence 也要跑；請先確認 full.cmd 的預期執行時間並預留足夠時間預算，不要被本輪的模型下載批次擠壓掉。** 批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存，mtime 02:55）；距離 max_iterations=60 還有充裕空間（本輪為第 34 輪），backlog 仍有 19 項未過，遠未達 converged 門檻。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria。

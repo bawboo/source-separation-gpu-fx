@@ -799,23 +799,55 @@
   {
     "id": "M033",
     "title": "M033: roformer-model-melband-roformer-big-beta-6-by-unwa（audited, category=general）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 44,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-big-beta-6-by-unwa",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "model": "roformer-model-melband-roformer-big-beta-6-by-unwa",
+      "category": "general",
+      "audited": true,
+      "cache_verified_sha256": "f51cbb94b4ed5c36cb36fd2024236a8af3ed6886567981702ad6f094b2c6c820",
+      "checkpoint_size": 1557078584,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass",
+      "note": "iter-34: config override already correct in manifest/site-packages overrides.json (same host as M030/M032 family, not the broken-config family); direct batch_verify run, no manual config pre-place needed."
+    },
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-big-beta-6-by-unwa --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M034",
     "title": "M034: roformer-model-melband-roformer-big-beta-6x-by-unwa（audited, category=general）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 45,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-big-beta-6x-by-unwa",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "model": "roformer-model-melband-roformer-big-beta-6x-by-unwa",
+      "category": "general",
+      "audited": true,
+      "cache_verified_sha256": "e16d702f4e20f13d60b293541c1dea75cb4414a5846b36780e28ef70352a4e5c",
+      "checkpoint_size": 1708527586,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass",
+      "note": "iter-34: same batch as M033; HF throughput measured ~0.6 MB/s via curl range probe before starting, both downloads completed well within budget."
+    },
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-big-beta-6x-by-unwa --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
