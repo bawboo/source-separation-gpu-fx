@@ -853,23 +853,47 @@
   {
     "id": "M035",
     "title": "M035: roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris（audited, category=denoise）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 46,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "cache_verified_sha256": "a9a9d10faa7f8997676a78e66d741d7acb9cc449334763f3c8f626d68ec6e575",
+      "checkpoint_size": 913102724,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M036",
     "title": "M036: roformer-model-melband-roformer-de-reverb-by-anvuew（audited, category=dereverb）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 47,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-de-reverb-by-anvuew",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "cache_verified_sha256": "9262877b87e9ebb0fb808a456b0a411fa677f5df31c8383c1254af531c078970",
+      "checkpoint_size": 913107578,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-de-reverb-by-anvuew --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {

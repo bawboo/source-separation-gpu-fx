@@ -180901,3 +180901,9 @@ LOOP STATUS: running — iter-33 continue: M030 (viperx-1143) verified pass, bac
 [driver] agent process exited rc=0
 [scope] OK �X 68 changed path(s) within policy
 [driver] iteration 34 launching  2026-08-25T02:57:32+0800
+Checkpoint 成功，工作樹乾淨。
+
+LOOP STATUS: running — M033+M034 audited RoFormer models verified (big-beta-6/big-beta-6x by unwa), 98/117 backlog passing; iter-35 must run full tier (multiple of 5)
+[driver] agent process exited rc=0
+[scope] OK �X 69 changed path(s) within policy
+[driver] iteration 35 launching  2026-08-25T03:18:44+0800

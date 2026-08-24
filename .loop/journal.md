@@ -1715,3 +1715,76 @@ Ran 8 tests in 0.089s / OK
 **Decision:** continue
 **Lesson：** 無新 SIGN——本輪操作性觀察再次驗證 iter-33 的既有建議（測速僅供參考，不可線性外推整個檔案的下載時間）：curl range 測速量到 ~0.6 MB/s，若線性外推 1.5–1.7GB 檔案需約 40–48 分鐘，但實際批次驗證（含 HTTP 完整下載＋分離）兩個模型合計僅約 20–25 分鐘完成，顯示前 30MB 的 range 測速可能受 CDN 冷啟動或連線暖身影響，低估了穩態吞吐量。日後仍應測速以抓保守批次大小，但不必因單次測速偏慢就直接放棄多模型批次——可以先啟動第一個模型的下載並同步阻塞等待，實際完成時間比預估快時再臨場加做下一個，而非在測速當下就一次性決定整輪批次大小。
 **Note（交接給 iteration 35）：** M033、M034 已完成並有印出證據。剩餘 backlog：19 個 audited M-item（下一個優先序：M035 `roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris` priority 46、M036 `roformer-model-melband-roformer-de-reverb-by-anvuew` priority 47、M042 `roformer-model-melband-roformer-de-reverb-less-aggressive-by-anvuew` priority 53、M043 `roformer-model-melband-roformer-de-reverb-mono-by-anvuew` priority 54...）。**下一次 5 的倍數在 iteration 35（即下一輪）——依協定必須強制跑 full tier（`cmd //c '.loop\checks\full.cmd'`）＋backlog checker，即使不宣告 convergence 也要跑；請先確認 full.cmd 的預期執行時間並預留足夠時間預算，不要被本輪的模型下載批次擠壓掉。** 批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存，mtime 02:55）；距離 max_iterations=60 還有充裕空間（本輪為第 34 輪），backlog 仍有 19 項未過，遠未達 converged 門檻。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria。
+
+## iter-35 (2026-08-25T03:25:12+08:00)
+
+**Hypothesis：** 本輪 iteration number 35 為 5 的倍數，依協定必須強制執行 full tier（無論是否宣告 convergence）。同時延續 iter-34 交接筆記的優先序，處理 backlog 最高優先序未過項 M035（`roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris`，priority 46，checkpoint 在 HuggingFace `Politrees/UVR_resources` 主機）與 M036（`roformer-model-melband-roformer-de-reverb-by-anvuew`，priority 47，checkpoint 同一快速主機、config 在另一個 HuggingFace 主機 `anvuew/dereverb_mel_band_roformer`）。兩者 manifest 內 `config_url` 皆非 iter-31/32 記錄的「無 config override」故障家族（HF 主機直接可解析，非死掉的 GitHub raw 404 路徑），預期 `tools/roformer_batch_verify.py` 可直接一次過、不需手動 pre-place config。動手前對 Politrees 主機做 30MB range 測速，量到約 8.96 MB/s（遠優於 iter-33/34 量到的 0.42–0.6 MB/s），推算單一 ~913MB checkpoint 僅需約 100 秒，判斷本輪批次可容納兩個模型＋強制 full tier 皆在 60 分鐘 iteration_timeout 內完成。
+
+**Files touched：** `.loop/backlog.json`（M035、M036 翻為 passes:true）、`verify/roformer-cache/roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris/`、`verify/roformer-cache/roformer-model-melband-roformer-de-reverb-by-anvuew/`（皆為 cache 目錄，repo 外允許路徑）。
+
+**Verification（M035+M036 批次驗證）：**
+
+30MB range 測速：`speed=8961467 bytes/s size=30000001 time=3.347666 http_code=206`。
+
+M035 批次驗證 exit 0：
+```json
+[
+  {
+    "model": "roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris",
+    "category": "denoise",
+    "audited": true,
+    "cache_verified_sha256": "a9a9d10faa7f8997676a78e66d741d7acb9cc449334763f3c8f626d68ec6e575",
+    "checkpoint_size": 913102724,
+    "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+    "outcome": "pass"
+  }
+]
+```
+
+M036 批次驗證 exit 0：
+```json
+[
+  {
+    "model": "roformer-model-melband-roformer-de-reverb-by-anvuew",
+    "category": "dereverb",
+    "audited": true,
+    "cache_verified_sha256": "9262877b87e9ebb0fb808a456b0a411fa677f5df31c8383c1254af531c078970",
+    "checkpoint_size": 913107578,
+    "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+    "outcome": "pass"
+  }
+]
+```
+
+`cache_verified_sha256` 兩者皆與 manifest 記錄值完全相符。下載後複驗快取目錄：`melband-roformer-kim-vocals`（mtime 03:16，本輪未變動，安然倖存）、`roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris`（03:21）、`roformer-model-melband-roformer-de-reverb-by-anvuew`（03:22）——如預期擠掉 iter-34 留下的 `roformer-model-melband-roformer-big-beta-6-by-unwa`／`-6x-by-unwa`（max_cached=3，LRU by mtime）。
+
+**Cheap tier：** `cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s / OK
+Ran 2 tests in 0.064s / OK
+Ran 8 tests in 0.089s / OK
+```
+
+**Full tier（本輪 iteration number 35、35 % 5 == 0，依協定強制執行）：** `cmd //c '.loop\checks\full.cmd'` → exit 0：
+```text
+=== ui_configuration_smoke ===
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+=== media_io_smoke ===
+audio_import=true quick_vocals=true quick_accompany=true raw_stem_unchanged=true mix_controls=true video_import=true mp4_replace_audio=true mp4_bytes=31942 PASS
+=== record_mode_smoke (auto/GPU) ===
+backend=auto recorded_seconds=1.00426 preview_seconds=1.00426 progress=1 inference_ms=193.174 full_mix_energy=360.007 muted_stem_energy=2.3891 bypass_original_energy=356.806 mix_controls=true status=Ready to preview · htdemucs · GPU PASS=true
+=== roformer_smoke ===
+roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/instrumental roformer_export_naming=true roformer_sample_rate=44100 roformer_channels=2 roformer_bit_depth=32float roformer_finite=true PASS
+```
+
+**Backlog checker（本輪為強制執行輪，非僅供參考）：** `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` → exit 1（117 項中仍有 17 項 `passes:false`）。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 69 changed path(s) within policy`
+
+**Criteria:** C1 pass（full tier 本輪確實執行且 exit 0，含 roformer_smoke PASS）／C2 fail（backlog 仍有 17 項未過）／C3 pass（scope 無違規）。AND 規則下未同時全過，非 converged；本輪 C2 fail 故不觸發宣告 convergence 前的 fresh-context 獨立重驗子代理步驟。
+**Metric:** backlog_items_passing = 100（較上輪 98 增加 2：M035、M036）；improved: true。
+**Decision:** continue
+**Lesson：** 無新 SIGN——本輪操作性觀察：iter-33/34 量到的 HuggingFace `Politrees/UVR_resources` 慢速吞吐量（~0.4–0.6 MB/s）並非該主機的穩定基線，本輪同一主機量到 ~8.96 MB/s（快約 15–20 倍），兩個 913MB 級模型的下載＋分離合計僅約 1 分鐘完成——這進一步印證 iter-34 既有結論（測速結果易受當下 CDN 節點/壅塞狀況影響、不可視為固定值），每輪動手前仍應重新測速，但不必因過去幾輪偏慢就預設保守到只做一個模型；吞吐量恢復正常時，「測速→啟動下載→視實際完成時間臨場加碼」的策略讓本輪同時完成兩個模型下載又仍有餘裕跑完強制 full tier。
+**Note（交接給 iteration 36）：** M035、M036 已完成並有印出證據；本輪同時已完成強制 full tier（C1 pass，含 roformer_smoke）。剩餘 backlog：17 個 audited M-item（下一個優先序：M042 `roformer-model-melband-roformer-de-reverb-less-aggressive-by-anvuew` priority 53、M043 `roformer-model-melband-roformer-de-reverb-mono-by-anvuew` priority 54、M050 `roformer-model-melband-roformer-instrumental-by-becruily` priority 61、M053 `roformer-model-melband-roformer-instrumental-by-gabox` priority 64...）。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存，mtime 03:16）；下一次 5 的倍數在 iteration 40，之前無需強制 full tier（但 cheap tier 每輪仍必跑）。距離 max_iterations=60 還有充裕空間（本輪為第 35 輪），backlog 仍有 17 項未過，遠未達 converged 門檻。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria。
