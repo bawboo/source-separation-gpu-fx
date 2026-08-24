@@ -1,0 +1,18 @@
+{
+  "iteration": 28,
+  "timestamp": "2026-08-25T03:10:00+08:00",
+  "hypothesis": "iter-27 handoff notes point to M019 (melband-roformer-kimmel-ft, priority 30) and M020 (melband-roformer-kimmel-ft2, priority 31) as the next-highest-priority failing audited backlog items. A synchronous roformer_batch_verify.py run for both should flip them to passes:true, and since kim-vocals is the newest cache entry (mtime 02:02, ahead of instv7n/karaoke-gabox from iter-27), adding 2 new models to the max_cached=3 rolling cache should evict instv7n/karaoke-gabox and leave kim-vocals intact.",
+  "files_touched": [".loop/backlog.json"],
+  "commands": [
+    {"cmd": "curl --max-time 45 -L -r 0-20000000 -o /dev/null -w speed/size/time/http_code (kimmel_unwa_ft.ckpt)", "exit_code": 0, "timed_out": false},
+    {"cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-kimmel-ft melband-roformer-kimmel-ft2 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --max-cached 3", "exit_code": 0, "timed_out": false},
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd'", "exit_code": 0, "timed_out": false},
+    {"cmd": "python -c \"import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))\"", "exit_code": 1, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 87, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}

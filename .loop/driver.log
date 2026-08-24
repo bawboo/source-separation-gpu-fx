@@ -180859,3 +180859,9 @@ LOOP STATUS: running â€” iter-26 continue, M012+M013 verified (instv6/instv6n), 
 [driver] agent process exited rc=0
 [scope] OK ¡X 61 changed path(s) within policy
 [driver] iteration 27 launching  2026-08-25T01:56:57+0800
+Commit succeeded. Checkpointing complete for this iteration.
+
+LOOP STATUS: running â€” iter-27: M014+M017 audited RoFormer models verified (instv7n/karaoke-gabox), 85/117 backlog passing, cheap tier PASS, C1/C2 fail pending mandatory full tier at iter-30
+[driver] agent process exited rc=0
+[scope] OK ¡X 62 changed path(s) within policy
+[driver] iteration 28 launching  2026-08-25T02:04:54+0800
