@@ -3960,6 +3960,23 @@ private:
         modelLabel_.setVisible(modelControlsVisible);
         modelBox_.setVisible(modelControlsVisible);
         modelDownloadButton_.setVisible(modelControlsVisible);
+
+        // D3: mirror D2 in the opposite direction -- hide the RoFormer
+        // browser trio (category/search/model) plus the download-status
+        // readout and every label above them while an HTDemucs mode is
+        // active. Before this fix these stayed visible and enabled for any
+        // chosen mode, so interacting with roformerModelBox_ while an
+        // HTDemucs mode was displayed would silently hijack
+        // currentRuntimeConfiguration() over to the RoFormer route.
+        const bool roformerControlsVisible =
+            advancedPanel_ && advancedVisible_ && roformerMode;
+        for (auto* component : std::array<juce::Component*, 8>{
+                 &roformerCategoryLabel_, &roformerCategoryBox_,
+                 &roformerSearchLabel_, &roformerSearch_,
+                 &roformerModelLabel_, &roformerModelBox_,
+                 &roformerStatusLabel_, &roformerStatus_}) {
+            component->setVisible(roformerControlsVisible);
+        }
     }
 
     void updateVisibility() {
@@ -4047,9 +4064,13 @@ private:
         modelDownloadButton_.setEnabled(
             advancedVisible_ && configurationEnabled && modeChosen &&
             !roformerModeActive && !selectedModelInstalled);
-        roformerCategoryBox_.setEnabled(modeChosen);
-        roformerSearch_.setEnabled(modeChosen);
-        roformerModelBox_.setEnabled(modeChosen);
+        // D3: only interactive while a RoFormer mode is actually the active
+        // route -- selecting a model here otherwise silently overrides
+        // currentRuntimeConfiguration() even while an HTDemucs mode is
+        // displayed as chosen. Mirrors modelBox_'s D2 gating in reverse.
+        roformerCategoryBox_.setEnabled(modeChosen && roformerModeActive);
+        roformerSearch_.setEnabled(modeChosen && roformerModeActive);
+        roformerModelBox_.setEnabled(modeChosen && roformerModeActive);
         computeBox_.setEnabled(configurationEnabled);
         gpuSlider_.setEnabled(
             configurationEnabled && computeBox_.getSelectedItemIndex() == 1);

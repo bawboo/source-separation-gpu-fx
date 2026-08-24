@@ -180829,3 +180829,9 @@ LOOP STATUS: running â€” iter-21 flipped B4 (ui_configuration_smoke now covers a
 [driver] agent process exited rc=0
 [scope] OK ¡X 56 changed path(s) within policy
 [driver] iteration 22 launching  2026-08-25T00:51:49+0800
+Commit succeeded, clean working tree. Iteration 22 is complete per protocol.
+
+**LOOP STATUS: running â€” D2 done (modelBox_ disable/hide gated on RoFormer mode, mirroring B3), 76/117 backlog passing, D3 discovered and appended for iteration 23**
+[driver] agent process exited rc=0
+[scope] OK ¡X 57 changed path(s) within policy
+[driver] iteration 23 launching  2026-08-25T01:10:58+0800

@@ -1008,3 +1008,46 @@ Ran 8 tests in 0.068s / OK
 **Discovered（D3，已 append 進 backlog，不吸收進本次 change-set）：** 實作 D2 時發現鏡像缺口——`roformerCategoryBox_`／`roformerSearch_`／`roformerModelBox_` 目前只受 `modeChosen` 門控，不管目前是不是 RoFormer 分類模式。使用者在 HTDemucs 模式下這三顆控制項仍是 enabled/visible，若去操作 `roformerModelBox_` 會呼叫 `processor_.selectRoformerModel()`，直接設定 `selectedRoformerModel_`，讓 `currentRuntimeConfiguration()` 立刻改用 RoFormer 路由——即使 `separationModeBox_` 畫面上還顯示著 HTDemucs 模式，比 D2 的「可互動但無效」更嚴重（是「可互動且會悄悄改變實際路由」）。已記錄為 D3、priority 11.6，留給下一輪視 priority 排序處理。
 
 **Note（交接給 iteration 23）：** D2 已完成並有印出證據。剩餘 backlog：D3（discovered，本輪新增，RoFormer 瀏覽器三元件在 HTDemucs 模式下的鏡像 gating 缺口）與 40 個 audited M-item（下載＋SHA-256 驗證→分離→輸出格式驗證）。下一輪可選：(a) D3——範圍小、與 D2/B3 的 gating pattern 高度相似，可直接沿用同一個 `roformerModeSelected()` 判斷式（方向相反：HTDemucs 模式時隱藏/停用 RoFormer 瀏覽器三元件＋`roformerStatus_`），或 (b) 依 priority 繼續 M-item 批次（每輪 2–4 個 audited 模型，批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內——本輪未觸碰快取，無需重新 touch）。下一次 5 的倍數在 iteration 25，記得依協定跑 full tier（C1／C2 才有本輪未取得的 full tier 證據）。
+
+## iter-23 (2026-08-25T01:26:18+08:00)
+
+**Hypothesis：** iter-22 交接筆記與其發現的 D3（discovered、priority 11.6，目前 failing 項目中優先序最高）指出 D2 的鏡像缺口——`roformerCategoryBox_`／`roformerSearch_`／`roformerModelBox_`（與 `roformerStatus_`）在 `timerCallback()` 裡只受 `modeChosen` 門控，不管目前是不是 RoFormer 分類模式；所以選定 HTDemucs 模式（4-stem／6-stem）時這三顆控制項仍保持 enabled 且 visible，操作 `roformerModelBox_` 會呼叫 `processor_.selectRoformerModel()`，即使 `separationModeBox_` 畫面上還顯示 HTDemucs 模式，也會悄悄把 `currentRuntimeConfiguration()` 改成 RoFormer 路由。假設：比照 D2 已建立的 gating pattern、方向相反——在 `updateSixSourceControls()` 新增 `roformerControlsVisible = advancedPanel_ && advancedVisible_ && roformerMode` 區塊，把 RoFormer 瀏覽器三元件＋`roformerStatus_`＋四個配對 label 一起隱藏（HTDemucs 模式時），並把 `timerCallback()` 內三顆控制項的 `setEnabled(modeChosen)` 改成 `setEnabled(modeChosen && roformerModeActive)`，可以讓 D3 翻為 `passes:true`（有 cheap tier 證據），且不會使既有四個 smoke test 退步，因為改動沿用與 D2 完全相同的掛載點（`timerCallback()`／`updateSixSourceControls()`），只新增一個門控條件，未更動底層分離路由邏輯。
+
+**變更：**
+- `plugin/PluginProcessor.cpp`：
+  - `updateSixSourceControls()`：在既有 D2 `modelControlsVisible` 區塊之後，新增 `roformerControlsVisible = advancedPanel_ && advancedVisible_ && roformerMode`，套用到 `roformerCategoryLabel_`／`roformerCategoryBox_`／`roformerSearchLabel_`／`roformerSearch_`／`roformerModelLabel_`／`roformerModelBox_`／`roformerStatusLabel_`／`roformerStatus_` 共 8 個元件的 `setVisible()`（用同一個 `std::array<juce::Component*, 8>` 迴圈寫法，與建構子裡 `addAndMakeVisible` 那組完全對應）。
+  - `timerCallback()`：`roformerCategoryBox_.setEnabled(modeChosen)`／`roformerSearch_.setEnabled(modeChosen)`／`roformerModelBox_.setEnabled(modeChosen)` 改為 `setEnabled(modeChosen && roformerModeActive)`（`roformerModeActive` 已由 D2 在同一函式頂端算好，直接複用）。
+  - 未新增任何呼叫點：`advancedButton_.onClick` 已在 iter-22（D2）補過 `updateSixSourceControls()`，同一個掛載點對 D3 同樣有效，不需要再改。
+- `tests/ui_configuration_smoke.cpp`：
+  - 展開 Advanced options、尚未選任何模式時：原本斷言 RoFormer 三元件＋status 為 visible，改為斷言全部 hidden（D3 之前這裡本來就是舊行為想修正的錯誤預期，不是為了通過測試而弱化斷言）。
+  - 選 4-stem 模式後：原本單一 `waitUntil` 同時斷言 model 與 RoFormer 三元件全部 enabled，拆成兩個斷言——model/滑桿 enabled 維持不變，RoFormer 三元件＋status 改斷言 disabled 且 hidden（新增 `D3: the RoFormer browser trio should stay disabled/hidden in an HTDemucs (4-stem) separation mode`）。
+  - 選 6-stem 模式後：新增一個 `D3` 斷言（`!roformerCategory->isVisible() && !roformerCategory->isEnabled()`），確認第二個 HTDemucs 分支同樣正確。
+  - Vocals／Guitar RoFormer 模式的既有 `waitUntil` 述詞裡追加三元件／status 的 `isVisible()` 檢查（不只檢查 `roformerCategory->getText()` 與預設模型 id）。
+  - 切回 4-stem 後：在既有 D2 model 復原斷言之後，新增一個 `D3` `waitUntil`，斷言三元件重新 hidden／disabled。
+  - B4 迴圈（走遍全部 10 個 RoFormer 分類）原本的 `waitUntil` 述詞只檢查三元件 `isEnabled()`，追加 `isVisible()`（含 `roformerStatus->isVisible()`），並把提示訊息從 `B4/D2` 改成 `B4/D2/D3`。
+  - 收合 Advanced options 的既有斷言追加 `!roformerCategory->isVisible()`。
+
+**Verification commands + output（實際印出）：**
+
+`cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s / OK
+Ran 2 tests in 0.057s / OK
+Ran 8 tests in 0.072s / OK
+```
+
+同一支已建置 exe 另外本機獨立重跑 8 次確認穩定性：8/8 exit 0（無 1 次失敗，本輪改動未觸發 iter-20 記錄過的 `waitUntil`/timer race）。
+
+**Full tier：** 本輪 iteration number 23、23 % 5 != 0，且非宣告 converged，依協定不強制執行；D3 backlog 項目本身沒有 `check` 欄位要求 full tier 證據（與 iter-22 的 D2 相同情形），故本輪僅以 cheap tier 證據翻牌，符合協定第 9 步「proof was printed this run」的最低要求。
+
+**Backlog checker（僅供參考，非本輪 C2 判定依據——full tier 未跑）：** `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` → exit 1（117 項中仍有 40 項 `passes:false`：40 個 audited M-item）。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 57 changed path(s) within policy`
+
+**Criteria:** C1 fail（本輪未跑 full tier，依協定不可宣稱 pass）／C2 fail（backlog 仍有 40 項未過）／C3 pass（scope 無違規）。AND 規則下未同時全過，非 converged。
+**Metric:** backlog_items_passing = 77（較上輪 76 增加 1：D3）；improved: true。
+**Decision:** continue
+**Lesson：** 無新 SIGN——本輪假設如預期成立，D2 建立的兩個掛載點（`timerCallback()` 的 enabled 邏輯、`updateSixSourceControls()` 的 visible 邏輯，且 `advancedButton_.onClick` 已在 iter-22 補過對 `updateSixSourceControls()` 的呼叫）對 D3 的鏡像 gating 同樣直接適用，過程中未發現先前記錄之外的驚訝之處。
+**Note（交接給 iteration 24）：** D1–D3 皆已完成並有印出證據（modelBox_ 與 RoFormer 瀏覽器三元件現在互為鏡像 gating，任一時刻只有其中一組會 visible/enabled）。剩餘 backlog 只剩 40 個 audited M-item（下載＋SHA-256 驗證→分離→輸出格式驗證，優先序由 M005 開始 priority 16 起跳）。下一輪建議開始批次處理 M-item（每輪 2–4 個 audited 模型，批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內——本輪未觸碰快取，無需重新 touch；批次前建議先用 60 秒 `curl --max-time 60` 量測目前下載吞吐量以決定本輪批次大小，見 LESSONS iter-15 SIGN）。下一次 5 的倍數在 iteration 25，記得依協定跑 full tier。
