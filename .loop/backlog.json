@@ -1445,45 +1445,45 @@
   {
     "id": "M080",
     "title": "M080: roformer-model-melband-roformer-kim-inst-v1-e-plus-by-unwa（audited, category=instrumental）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 91,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-inst-v1-e-plus-by-unwa",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter-39 tools/roformer_batch_verify.py exit 0: cache_verified_sha256=6a4ddba739f0352407fb6e18b29206b82318ec427fe37fcedb0f83241e4e15fb checkpoint_size=913090472 separation={sample_rate:48000,frames:96000,channels:2,subtype:FLOAT,finite:true,num_outputs:2} outcome=pass; sha256 matches assets/models/roformer-manifest.json",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-inst-v1-e-plus-by-unwa --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M081",
     "title": "M081: roformer-model-melband-roformer-kim-inst-v2-by-unwa（audited, category=instrumental）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 92,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-inst-v2-by-unwa",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter-39 tools/roformer_batch_verify.py exit 0: cache_verified_sha256=bd19766620f7d6f58fdf7aaada7e89907fe41bc64490ce3faa9a6dab15d6e1f2 checkpoint_size=1574477088 separation={sample_rate:48000,frames:96000,channels:2,subtype:FLOAT,finite:true,num_outputs:2} outcome=pass; sha256 matches assets/models/roformer-manifest.json",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-inst-v2-by-unwa --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M082",
     "title": "M082: roformer-model-melband-roformer-kim-instvoc-duality-v1-by-unwa（audited, category=instvoc）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 93,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-instvoc-duality-v1-by-unwa",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter-39 tools/roformer_batch_verify.py exit 0: cache_verified_sha256=4640a59d454bf9f69d67460592ab71e7cdce3afa0c0a6f0cf4500bb4ac0b8381 checkpoint_size=1719116358 separation={sample_rate:48000,frames:96000,channels:2,subtype:FLOAT,finite:true,num_outputs:2} outcome=pass; sha256 matches assets/models/roformer-manifest.json",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-instvoc-duality-v1-by-unwa --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M083",
     "title": "M083: roformer-model-melband-roformer-kim-instvoc-duality-v2-by-unwa（audited, category=instvoc）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 94,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-instvoc-duality-v2-by-unwa",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter-39 tools/roformer_batch_verify.py exit 0: cache_verified_sha256=b4a69558708f2857e36ac86a0e03ed95c4e3d8b9c5b8113963987d0d7df7e20f checkpoint_size=1719116358 separation={sample_rate:48000,frames:96000,channels:2,subtype:FLOAT,finite:true,num_outputs:2} outcome=pass; sha256 matches assets/models/roformer-manifest.json",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-instvoc-duality-v2-by-unwa --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
@@ -1544,12 +1544,12 @@
   {
     "id": "M089",
     "title": "M089: roformer-model-melband-roformer-vocals-by-becruily（audited, category=vocals）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 100,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-vocals-by-becruily",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter-39 tools/roformer_batch_verify.py exit 0: cache_verified_sha256=a05961310cc55fbb901290c2e8be02682942f73522b6ac76bf2ec11e347ed95a checkpoint_size=913107578 separation={sample_rate:48000,frames:96000,channels:2,subtype:FLOAT,finite:true,num_outputs:2} outcome=pass; sha256 matches assets/models/roformer-manifest.json",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-vocals-by-becruily --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {

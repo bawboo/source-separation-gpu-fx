@@ -180925,3 +180925,9 @@ LOOP STATUS: running â€” iter-37 verified M069+M070+M072+M073 (karaoke-becruily/
 [driver] agent process exited rc=0
 [scope] OK ¡X 72 changed path(s) within policy
 [driver] iteration 38 launching  2026-08-25T03:51:05+0800
+Checkpoint committed cleanly. Iteration complete.
+
+LOOP STATUS: running â€” iter-38 verified M075/M076/M078/M079 audited RoFormer models (912/117 â†’ 112/117 backlog passing), cheap tier + scope check pass, checkpoint committed
+[driver] agent process exited rc=0
+[scope] OK ¡X 73 changed path(s) within policy
+[driver] iteration 39 launching  2026-08-25T03:58:35+0800

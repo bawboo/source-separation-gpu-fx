@@ -1951,3 +1951,55 @@ Ran 8 tests in 0.152s / OK
 **Decision:** continue
 **Lesson：** 無新 SIGN——本輪再次印證 SIGN iter-13/20 記錄的 LRU 擠出流程（`max_cached=3` 批次內第 3 個新模型即會擠出 `melband-roformer-kim-vocals`），既有的批次後重新觸碰流程已足夠應付。M079 的 raw.githubusercontent.com config 主機經預檢確認正常，未觸發任何死連結問題。
 **Note（交接給 iteration 39）：** M075、M076、M078、M079 已完成並有印出證據；`melband-roformer-kim-vocals` 已於本輪內重新觸碰確認存活。剩餘 backlog：5 個 audited M-item——M080（`roformer-model-melband-roformer-kim-inst-v1-e-plus-by-unwa` priority 91）、M081（`roformer-model-melband-roformer-kim-inst-v2-by-unwa` priority 92）、M082（`roformer-model-melband-roformer-kim-instvoc-duality-v1-by-unwa` priority 93）、M083（`roformer-model-melband-roformer-kim-instvoc-duality-v2-by-unwa` priority 94，M082/M083 manifest 記載主機為 `github.com`，非慣常 huggingface.co，下一輪動手前應先確認可正常存取）、M089（`roformer-model-melband-roformer-vocals-by-becruily` priority 100）。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內；批次途中也需留意是否被擠出。下一次 5 的倍數在 iteration 40——屆時必須強制跑 full tier（含 fresh-context 獨立重驗子代理步驟，若當時 backlog 已全數 passes:true 才需要獨立重驗步驟；即使未 converged，40 這一輪仍須跑 full tier 本身）。距離 max_iterations=60 還有餘裕（本輪為第 38 輪），backlog 僅剩 5 項未過，已相當接近全過——下一輪或下下輪很可能可以嘗試宣告 converged（需先跑 full tier + backlog checker + fresh-context 獨立重驗）。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria。
+
+## iter-39 (2026-08-25T04:44:50+08:00)
+
+**Hypothesis：** iter-38 交接筆記指出剩餘 backlog 只剩 5 個 audited M-item：M080（kim-inst-v1-e-plus）、M081（kim-inst-v2）、M082（kim-instvoc-duality-v1）、M083（kim-instvoc-duality-v2，M082/M083 host 為不常見的 github.com/releases/download，需先確認非死連結）、M089（vocals-by-becruily，host 為熟悉的 Politrees）。若先做 host 預檢確認皆非死連結，即可一次批次驗證全部 5 個模型（首度一輪處理 5 個而非慣例 2-4 個，因總下載量約 6.84GB、量到速度約 10 MB/s，預期時間預算內可行），backlog 應可達成 117/117 全過，屆時應立即補跑 full tier + backlog checker + scope check + fresh-context 獨立重驗，檢驗是否可宣告 converged。
+
+**Files touched：** `.loop/backlog.json`（M080、M081、M082、M083、M089 翻為 passes:true）、`.loop/iterations/0039.json`、`.loop/journal.md`、`.loop/LESSONS.md`、`.loop/state.json`、`verify/roformer-cache/roformer-model-melband-roformer-kim-inst-v1-e-plus-by-unwa/`、`verify/roformer-cache/roformer-model-melband-roformer-kim-inst-v2-by-unwa/`、`verify/roformer-cache/roformer-model-melband-roformer-kim-instvoc-duality-v1-by-unwa/`、`verify/roformer-cache/roformer-model-melband-roformer-kim-instvoc-duality-v2-by-unwa/`、`verify/roformer-cache/roformer-model-melband-roformer-vocals-by-becruily/`（皆為 cache 目錄，repo 外允許路徑）、`verify/roformer-cache/melband-roformer-kim-vocals/`（本輪途中被 LRU 擠出後重新觸碰恢復）。
+
+**Host 預檢：** M080 config（raw.githubusercontent.com）`http_code=200 size=920`；M081 checkpoint（huggingface.co/pcunwa）HEAD → `302 Found`（正常轉址）；M082/M083 checkpoint 與 config（github.com/releases/download，本專案首次遇到此 host）HEAD → 皆為 `302 Found` 轉址至簽章過的 `release-assets.githubusercontent.com` URL（非死連結，可安全排入批次）。Politrees 30MB range 測速：`speed=10120351 size=30000001 time=2.964324 http_code=206`（約 10.1 MB/s，與過去輪次一致）。
+
+**批次驗證（一次 5 個模型，全程同步等待未離開 turn；exit 0）：**
+```json
+[
+  {"model": "roformer-model-melband-roformer-kim-inst-v1-e-plus-by-unwa", "category": "instrumental", "cache_verified_sha256": "6a4ddba739f0352407fb6e18b29206b82318ec427fe37fcedb0f83241e4e15fb", "checkpoint_size": 913090472, "outcome": "pass"},
+  {"model": "roformer-model-melband-roformer-kim-inst-v2-by-unwa", "category": "instrumental", "cache_verified_sha256": "bd19766620f7d6f58fdf7aaada7e89907fe41bc64490ce3faa9a6dab15d6e1f2", "checkpoint_size": 1574477088, "outcome": "pass"},
+  {"model": "roformer-model-melband-roformer-kim-instvoc-duality-v1-by-unwa", "category": "instvoc", "cache_verified_sha256": "4640a59d454bf9f69d67460592ab71e7cdce3afa0c0a6f0cf4500bb4ac0b8381", "checkpoint_size": 1719116358, "outcome": "pass"},
+  {"model": "roformer-model-melband-roformer-kim-instvoc-duality-v2-by-unwa", "category": "instvoc", "cache_verified_sha256": "b4a69558708f2857e36ac86a0e03ed95c4e3d8b9c5b8113963987d0d7df7e20f", "checkpoint_size": 1719116358, "outcome": "pass"},
+  {"model": "roformer-model-melband-roformer-vocals-by-becruily", "category": "vocals", "cache_verified_sha256": "a05961310cc55fbb901290c2e8be02682942f73522b6ac76bf2ec11e347ed95a", "checkpoint_size": 913107578, "outcome": "pass"}
+]
+```
+所有 `separation` 欄位皆為 `sample_rate=48000, frames=96000, channels=2, subtype=FLOAT, finite=true, num_outputs=2`；五個模型的 `cache_verified_sha256` 全數與 `assets/models/roformer-manifest.json` 記錄值完全相符。批次途中 `melband-roformer-kim-vocals` 再度被 LRU（max_cached=3）擠出快取，已用 `worker/roformer_cache.py --model melband-roformer-kim-vocals --cache-dir ... --max-cached 3` 重新觸碰，證據：`cache_dir_entries=["melband-roformer-kim-vocals","roformer-model-melband-roformer-kim-instvoc-duality-v2-by-unwa","roformer-model-melband-roformer-vocals-by-becruily"]`，確認重新成為最近使用。
+
+**backlog.json 更新後複查：** `total items: 117, passing: 117, failing: 0`——全部 backlog 項目 passes=true。
+
+**Full tier（C1，本輪必跑——因即將宣告 converged）：** `cmd //c '.loop\checksull.cmd'` → exit 0：
+```text
+=== ui_configuration_smoke ===
+... roformer_browser=99 categories=10 search=true experimental=true ... PASS
+=== media_io_smoke ===
+audio_import=true quick_vocals=true quick_accompany=true raw_stem_unchanged=true mix_controls=true video_import=true mp4_replace_audio=true mp4_bytes=31942 PASS
+=== record_mode_smoke (auto/GPU) ===
+backend=auto recorded_seconds=1.00426 preview_seconds=1.00426 progress=1 inference_ms=183.808 ... PASS=true
+=== roformer_smoke ===
+roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/instrumental roformer_export_naming=true roformer_sample_rate=44100 roformer_channels=2 roformer_bit_depth=32float roformer_finite=true PASS
+```
+
+**Backlog checker（C2）：** `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` → exit 0（117/117 passing）。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 73 changed path(s) within policy`。
+
+**獨立 fresh-context 重驗（Task subagent，依協定宣告 converged 前必須執行）：** 過程中意外發現本機同時有另一個 `.loop/run_loop.sh` 外部驅動器 session 也在跑（`.loop/driver.log` 顯示其獨立啟動了「iteration 39 launching 2026-08-25T03:58:35+0800」，process id 34372 等，與本次互動式 session 幾乎同時開始、各自不知道對方存在——詳見下方新增 SIGN）。子代理第一次嘗試 `full.cmd` 因與該並行 process 爭用同一 GPU／build 目錄而卡在 `roformer_smoke` 約 40 分鐘無 exit code；子代理未殺任何 process、如實回報後重跑一次，第二次乾淨完成：
+```
+=== roformer_smoke ===
+roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/instrumental roformer_export_naming=true roformer_sample_rate=44100 roformer_channels=2 roformer_bit_depth=32float roformer_finite=true PASS
+EXITCODE=0
+```
+子代理獨立重跑 backlog checker → `EXIT=0`；獨立重跑 `python .loop/check_scope.py` → `[scope] OK — 73 changed path(s) within policy`，exit 0。三項獨立重驗全數與本輪主結果一致。
+
+**Criteria:** C1 pass（full tier 本輪跑出、印出證據，含 roformer_smoke PASS）／C2 pass（backlog 117/117 全過）／C3 pass（scope 無違規）。AND 規則下三項本輪皆通過，且已完成 fresh-context 獨立重驗確認一致。
+**Metric:** backlog_items_passing = 117（較上輪 112 增加 5：M080、M081、M082、M083、M089）；improved: true。
+**Decision:** converged
+**Lesson（新 SIGN）：** 本輪透過 `Get-Process` 與 `.loop/driver.log` 時間戳記發現，`.loop/run_loop.sh` 外部驅動器（LOOP_PLAN §9 定義的正式 Engine B）在本次互動式 session 開始前就已在背景持續運行（`nohup`/前次 session 留下），且幾乎與本次 session 同時各自獨立啟動了「iteration 39」——這是本專案第一次真的遇到「同一個 loop 被兩個獨立 process 同時推進」的情境，過去 38 輪從未發生過（過去每輪都是 driver 依序 launch，前一輪 agent process 完全退出才 launch 下一輪）。本輪選擇不殺對方 process、不覆蓋其工作，而是盡快把已完成且有完整證據的變更（backlog 117/117、full tier PASS、獨立重驗 PASS）寫入並 commit，降低競態視窗；已知殘留風險：對方 process 之後若也嘗試寫入 `.loop/iterations/0039.json` 或把 `state.json.iteration` 從 38 bump 一次，可能覆蓋本次寫入的檔案或造成 iteration 計數帳本輕微不一致（`journal.md` 為 append-only 不受影響）。**規則：** 任何後續 iteration（或使用者／下一個 session）開始動作前，除了讀 `state.json.status` 之外，也應該用 `Get-Process` 檢查是否已有其他 `claude`/`codex` headless process 綁定同一 repo 路徑在跑；若發現，應優先確認彼此的 `status` 決策（例如本輪已宣告 `converged`），而不是各自獨立推進、假設自己是唯一的 driver instance。
+**Note：** 本輪 criteria 全數 pass 且已通過獨立重驗，依協定宣告 `converged` / `criterion_met`。57 個稽核模型 backlog 全數 passes=true，42 個未稽核模型收錄＋標註 experimental 的架構項目也全數完成（既有 backlog 涵蓋）。**重要殘留提醒：** 發現有另一個 `.loop/run_loop.sh` 驅動器 session 仍在背景運行、且截至本輪 commit 前仍在進行它自己版本的「iteration 39」（可能已因與本輪爭用 GPU/build 而受影響或變慢）——使用者應檢查該背景 session（`.loop/driver.log`、`Get-Process` 找 `claude`/`node` process，本輪觀察到的 PID 包含 34372 及一批 03:58 前後啟動的 node 子行程）並視需要手動停止它（例如 `touch .loop/STOP` 或直接終止該 process），因為本 loop 已 converged、不應再繼續消耗資源或產生額外提交。

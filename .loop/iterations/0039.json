@@ -1,0 +1,83 @@
+{
+  "iteration": 39,
+  "timestamp": "2026-08-25T04:44:50+08:00",
+  "hypothesis": "iter-38 交接筆記指出剩餘 backlog 只剩 5 個 audited M-item：M080（kim-inst-v1-e-plus）、M081（kim-inst-v2）、M082（kim-instvoc-duality-v1）、M083（kim-instvoc-duality-v2，M082/M083 host 為不常見的 github.com/releases/download，需先確認非死連結）、M089（vocals-by-becruily，host 為熟悉的 Politrees）。若對 github.com releases/download host 先做 HEAD 探測確認非死連結、對 Politrees 做 30MB range 測速，即可一次批次驗證全部 5 個模型（不同於過去慣例的 2-4 個，但總下載量約 6.84GB，以量到的約 10 MB/s 速度預期可在時間預算內同步完成），backlog 應可達成 117/117 全過，屆時應立即補跑 full tier + backlog checker + scope check + fresh-context 獨立重驗，檢驗是否可宣告 converged。",
+  "files_touched": [
+    ".loop/backlog.json",
+    ".loop/iterations/0039.json",
+    ".loop/journal.md",
+    ".loop/LESSONS.md",
+    ".loop/state.json",
+    "verify/roformer-cache/roformer-model-melband-roformer-kim-inst-v1-e-plus-by-unwa/ (cache dir, repo-external allow path)",
+    "verify/roformer-cache/roformer-model-melband-roformer-kim-inst-v2-by-unwa/ (cache dir, repo-external allow path)",
+    "verify/roformer-cache/roformer-model-melband-roformer-kim-instvoc-duality-v1-by-unwa/ (cache dir, repo-external allow path)",
+    "verify/roformer-cache/roformer-model-melband-roformer-kim-instvoc-duality-v2-by-unwa/ (cache dir, repo-external allow path)",
+    "verify/roformer-cache/roformer-model-melband-roformer-vocals-by-becruily/ (cache dir, repo-external allow path)",
+    "verify/roformer-cache/melband-roformer-kim-vocals/ (cache dir, re-touched after LRU eviction, repo-external allow path)"
+  ],
+  "commands": [
+    {
+      "cmd": "curl HEAD/GET prechecks: raw.githubusercontent.com config (M080), huggingface.co/pcunwa checkpoint HEAD (M081), github.com/releases/download checkpoint+config HEAD (M082/M083)",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "curl -sL --max-time 40 -r 0-30000000 -o /dev/null -w '...' https://huggingface.co/Politrees/UVR_resources/resolve/main/models/Roformer/MelBand/mel_band_roformer_vocals_becruily.ckpt",
+      "exit_code": 0,
+      "timed_out": false,
+      "result": "speed=10120351 size=30000001 time=2.964324 http_code=206"
+    },
+    {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-inst-v1-e-plus-by-unwa roformer-model-melband-roformer-kim-inst-v2-by-unwa roformer-model-melband-roformer-kim-instvoc-duality-v1-by-unwa roformer-model-melband-roformer-kim-instvoc-duality-v2-by-unwa roformer-model-melband-roformer-vocals-by-becruily --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --max-cached 3",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe worker/roformer_cache.py --model melband-roformer-kim-vocals --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --max-cached 3",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "python (inline): flip M080/M081/M082/M083/M089 to passes:true in .loop/backlog.json with printed evidence (cache_verified_sha256 matches manifest)",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "cmd //c '.loop\\checks\full.cmd'",
+      "exit_code": 0,
+      "timed_out": false,
+      "note": "C1 — this run, direct execution"
+    },
+    {
+      "cmd": "python -c \"import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))\"",
+      "exit_code": 0,
+      "timed_out": false,
+      "note": "C2 backlog checker — 117/117 passing"
+    },
+    {
+      "cmd": "python .loop/check_scope.py",
+      "exit_code": 0,
+      "timed_out": false,
+      "note": "C3 — 73 changed paths within policy"
+    },
+    {
+      "cmd": "Task subagent (general-purpose): independent fresh-context re-run of cmd //c '.loop\\checks\full.cmd' + backlog checker + check_scope.py",
+      "exit_code": 0,
+      "timed_out": false,
+      "note": "first attempt collided with concurrently-running external .loop/run_loop.sh driver process (also mid-iteration-39, discovered during this step) and stalled at roformer_smoke with no exit code after ~40 min; subagent retried cleanly from scratch once contention cleared, all three commands exit 0, all 4 smoke tests PASS"
+    }
+  ],
+  "criteria": {
+    "C1": "pass",
+    "C2": "pass",
+    "C3": "pass"
+  },
+  "metrics": {
+    "name": "backlog_items_passing",
+    "value": 117,
+    "improved": true
+  },
+  "decision": "converged",
+  "status": "converged",
+  "stop_reason": "criterion_met"
+}
