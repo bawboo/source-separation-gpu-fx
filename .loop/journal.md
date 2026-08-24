@@ -1788,3 +1788,58 @@ roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/
 **Decision:** continue
 **Lesson：** 無新 SIGN——本輪操作性觀察：iter-33/34 量到的 HuggingFace `Politrees/UVR_resources` 慢速吞吐量（~0.4–0.6 MB/s）並非該主機的穩定基線，本輪同一主機量到 ~8.96 MB/s（快約 15–20 倍），兩個 913MB 級模型的下載＋分離合計僅約 1 分鐘完成——這進一步印證 iter-34 既有結論（測速結果易受當下 CDN 節點/壅塞狀況影響、不可視為固定值），每輪動手前仍應重新測速，但不必因過去幾輪偏慢就預設保守到只做一個模型；吞吐量恢復正常時，「測速→啟動下載→視實際完成時間臨場加碼」的策略讓本輪同時完成兩個模型下載又仍有餘裕跑完強制 full tier。
 **Note（交接給 iteration 36）：** M035、M036 已完成並有印出證據；本輪同時已完成強制 full tier（C1 pass，含 roformer_smoke）。剩餘 backlog：17 個 audited M-item（下一個優先序：M042 `roformer-model-melband-roformer-de-reverb-less-aggressive-by-anvuew` priority 53、M043 `roformer-model-melband-roformer-de-reverb-mono-by-anvuew` priority 54、M050 `roformer-model-melband-roformer-instrumental-by-becruily` priority 61、M053 `roformer-model-melband-roformer-instrumental-by-gabox` priority 64...）。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存，mtime 03:16）；下一次 5 的倍數在 iteration 40，之前無需強制 full tier（但 cheap tier 每輪仍必跑）。距離 max_iterations=60 還有充裕空間（本輪為第 35 輪），backlog 仍有 17 項未過，遠未達 converged 門檻。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria。
+
+## iter-36 (2026-08-25T03:34:48+08:00)
+
+**Hypothesis：** iter-35 交接筆記指出下一優先序為 M042（`roformer-model-melband-roformer-de-reverb-less-aggressive-by-anvuew`，priority 53）與 M043（`roformer-model-melband-roformer-de-reverb-mono-by-anvuew`，priority 54），checkpoint 分別在 HuggingFace `Politrees/UVR_resources` 與 `anvuew/dereverb_mel_band_roformer` 主機，且兩者共用 config 檔 `dereverb_mel_band_roformer_anvuew.yaml`（與上輪已驗證通過的 M036 相同 config，非 iter-31/32 記錄的「無 config override」故障家族），預期 `tools/roformer_batch_verify.py` 可直接一次過。動手前對 Politrees 主機做 30MB range 測速，量到約 9.4 MB/s（與 iter-35 量到的 ~8.96 MB/s 一致，確認主機目前吞吐量正常）。既有 SIGN（iter-33/34/35）皆指出測速結果每輪浮動、不應套用固定批次慣例——本輪計畫先做 M042+M043，若時間預算允許則沿優先序繼續（M050、M053，同為 Politrees 主機的 instrumental 模型），不因慣例在 2 個時停手。
+
+**Files touched：** `.loop/backlog.json`（M042、M043、M050、M053 翻為 passes:true）、`verify/roformer-cache/roformer-model-melband-roformer-de-reverb-less-aggressive-by-anvuew/`、`verify/roformer-cache/roformer-model-melband-roformer-de-reverb-mono-by-anvuew/`、`verify/roformer-cache/roformer-model-melband-roformer-instrumental-by-becruily/`、`verify/roformer-cache/roformer-model-melband-roformer-instrumental-by-gabox/`（皆為 cache 目錄，repo 外允許路徑）、`verify/roformer-cache/melband-roformer-kim-vocals/`（本輪批次途中被 LRU 擠出後重新觸碰恢復）。
+
+**Verification（M042/M043/M050/M053 依序批次驗證，全程同步等待未離開 turn）：**
+
+30MB range 測速：`speed=9449652 size=30000001 time=3.174720 http_code=206`。
+
+M042 批次驗證 exit 0：
+```json
+{"model": "roformer-model-melband-roformer-de-reverb-less-aggressive-by-anvuew", "category": "dereverb", "audited": true, "cache_verified_sha256": "0db8f1b41c00cead1112e967262a12802fd32e76c0c3a8eb207e772bae25d07b", "checkpoint_size": 913107578, "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2}, "outcome": "pass"}
+```
+
+M043 批次驗證 exit 0：
+```json
+{"model": "roformer-model-melband-roformer-de-reverb-mono-by-anvuew", "category": "dereverb", "audited": true, "cache_verified_sha256": "f099ee717eb57fb0ad5eb0e7c9ad6787c36168140b61ce2b158b90c2c4ecee79", "checkpoint_size": 913097978, "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2}, "outcome": "pass"}
+```
+
+時間預算尚有餘裕（03:27:42 開始至此僅約 3 分鐘），臨場沿優先序加做 M050、M053：
+
+M050 批次驗證 exit 0：
+```json
+{"model": "roformer-model-melband-roformer-instrumental-by-becruily", "category": "instrumental", "audited": true, "cache_verified_sha256": "a8da6632a1c25efb1c9be783ce9ea367d226d4b918cd6c3717c8b1d7a396041d", "checkpoint_size": 913106900, "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2}, "outcome": "pass"}
+```
+
+M053 批次驗證 exit 0：
+```json
+{"model": "roformer-model-melband-roformer-instrumental-by-gabox", "category": "instrumental", "audited": true, "cache_verified_sha256": "7b3ad6bd8bed3aaaa4d9320ea2ca910d140196a2302186db1754f3a8d8e16fb1", "checkpoint_size": 913026650, "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2}, "outcome": "pass"}
+```
+
+四個模型的 `cache_verified_sha256` 皆與 manifest 記錄值完全相符。本輪一次做 4 個模型（max_cached=3）在 M050 下載時把 `melband-roformer-kim-vocals` 擠出快取（SIGN iter-13 已預告的風險，本輪首度在單輪內真的發生）——複驗快取目錄確認 kim-vocals 確實消失，隨即用 `python worker/roformer_cache.py --model melband-roformer-kim-vocals --cache-dir ... --max-cached 3` 重新觸碰下載，證據：`cache_dir_entries=["melband-roformer-kim-vocals","roformer-model-melband-roformer-instrumental-by-becruily","roformer-model-melband-roformer-instrumental-by-gabox"]`，確認其重新成為最近使用、不會被下一輪立即擠出。
+
+**Cheap tier：** `cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.002s / OK
+Ran 2 tests in 0.083s / OK
+Ran 8 tests in 0.106s / OK
+```
+
+**Full tier：** 本輪 iteration number 36、36 % 5 != 0，且非宣告 converged，依協定不強制執行。
+
+**Backlog checker（僅供參考，非本輪 C2 判定依據——full tier 未跑）：** 直接檢視 `.loop/backlog.json`：117 項中仍有 13 項 `passes:false`。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 70 changed path(s) within policy`
+
+**Criteria:** C1 fail（本輪未跑 full tier，依協定不可宣稱 pass）／C2 fail（backlog 仍有 13 項未過）／C3 pass（scope 無違規）。AND 規則下未同時全過，非 converged。
+**Metric:** backlog_items_passing = 104（較上輪 100 增加 4：M042、M043、M050、M053）；improved: true。
+**Decision:** continue
+**Lesson：** 無新 SIGN——本輪操作性觀察印證並補齊 SIGN iter-13 原先只是預告的風險：一輪內連續驗證 4 個新模型（max_cached=3）確實會在第 3 個新模型下載時把 `melband-roformer-kim-vocals` 擠出快取（此前 iter-34/35 每輪只做 2 個模型，皆未觸發）；此為 SIGN iter-13 已記錄的既定流程之一部分（「批次前務必確認…不在則重新觸碰」），本輪只是首次真的在單輪內遇到並照該流程排除，不需新增 SIGN。
+**Note（交接給 iteration 37）：** M042、M043、M050、M053 已完成並有印出證據；`melband-roformer-kim-vocals` 已於本輪內重新觸碰確認存活。剩餘 backlog：13 個 audited M-item（下一個優先序：M069、M070、M072、M073、M075、M076、M078、M079、M080、M081...，皆為 priority 80 以上，尚未逐一核對主機/config 細節，下一輪動手前應先讀 manifest 確認）。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內；若本輪批次擴大到 3–4 個模型，務必在批次途中（而非只在批次前）留意 kim-vocals 是否被擠出，並在跑 cheap/full tier 前重新觸碰。下一次 5 的倍數在 iteration 40，屆時需強制跑 full tier。距離 max_iterations=60 還有充裕空間（本輪為第 36 輪），backlog 仍有 13 項未過，遠未達 converged 門檻。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria。
