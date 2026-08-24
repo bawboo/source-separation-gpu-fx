@@ -1346,10 +1346,10 @@
   {
     "id": "B4",
     "title": "B4: ui_configuration_smoke 擴充鎖住 B1–B3 行為（disabled→enabled 轉換、各模式預設模型正確、模式清單存在），並保持四個 smoke 全綠。",
-    "passes": false,
+    "passes": true,
     "priority": 11.4,
     "source": "user",
-    "evidence": null,
+    "evidence": "iter 21: tests/ui_configuration_smoke.cpp 新增迴圈，走遍全部 10 個 RoFormer 分類模式（先前只挑 Vocals/Guitar 兩項）逐一驗證 B1 enable gate、B2 audited-first 預設模型（比對 processor->getRoformerModels() 分類與 audited 旗標）、B3 兩軌拉桿一致性 gating；新增 PASS 行 token separation_mode_all_categories_verified=true。`cmd //c '.loop\\checks\\full.cmd'` exit 0，四個 smoke（ui_configuration_smoke／media_io_smoke／record_mode_smoke／roformer_smoke）全 PASS；同一支已建置 exe 另外本機重跑 8/8 exit 0 確認無 timer race。",
     "check": "cmd //c '.loop\\checks\full.cmd'（四個 smoke 全 PASS，含擴充後的 ui_configuration_smoke 斷言）"
   },
   {

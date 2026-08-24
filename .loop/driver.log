@@ -180817,3 +180817,9 @@ LOOP STATUS: running â€” iter-19 B2 done (mode â†’ default model wiring for HTDe
 [driver] agent process exited rc=0
 [scope] OK ¡X 54 changed path(s) within policy
 [driver] iteration 20 launching  2026-08-24T23:51:17+0800
+Working tree is clean, checkpoint committed. This iteration is complete.
+
+LOOP STATUS: running â€” iter-20 B3 stem-slider gating done (HTDemucs 4/6-stem vs RoFormer 2-stem visibility/enable) plus a stale-RoFormer-model routing fix and a flaky-timer test-sync fix; full tier green (4/4 smoke tests), 74/116 backlog passing, not converged (C2 fail).
+[driver] agent process exited rc=0
+[scope] OK ¡X 55 changed path(s) within policy
+[driver] iteration 21 launching  2026-08-25T00:42:21+0800

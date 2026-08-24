@@ -476,6 +476,56 @@ int run() {
             "RoFormer download/experimental status mismatch");
     roformerSearch->clear();
 
+    // B4: the checks above only spot-check two of the ten RoFormer category
+    // modes (Vocals, Guitar). Walk every remaining category mode entry so
+    // B1's enable gate, B2's audited-first default selection, and B3's
+    // uniform 2-stem slider gating are verified for all ten categories, not
+    // just the two hand-picked ones.
+    for (int modeIndex = 2; modeIndex < separationMode->getNumItems(); ++modeIndex) {
+        const auto category = separationMode->getItemText(modeIndex);
+        separationMode->setSelectedItemIndex(modeIndex, juce::sendNotificationSync);
+        require(waitUntil(
+                    [&] {
+                        return model->isEnabled() && roformerCategory->isEnabled() &&
+                               roformerSearch->isEnabled() && roformerModel->isEnabled() &&
+                               roformerCategory->getText().equalsIgnoreCase(category) &&
+                               processor->getSelectedRoformerModel().isNotEmpty();
+                    },
+                    std::chrono::seconds(3)),
+                "B4: a RoFormer category mode did not enable controls / lock its "
+                "category filter / select a default model");
+
+        const auto selectedId = processor->getSelectedRoformerModel();
+        bool categoryHasAuditedModel = false;
+        bool selectedIsInCategory = false;
+        bool selectedIsAudited = false;
+        for (const auto& roformerModelEntry : roformerModels) {
+            if (roformerModelEntry.category.equalsIgnoreCase(category)) {
+                if (roformerModelEntry.audited) {
+                    categoryHasAuditedModel = true;
+                }
+                if (roformerModelEntry.id == selectedId) {
+                    selectedIsInCategory = true;
+                    selectedIsAudited = roformerModelEntry.audited;
+                }
+            }
+        }
+        require(selectedIsInCategory,
+                "B4: a RoFormer category default model does not belong to its "
+                "own category");
+        require(!categoryHasAuditedModel || selectedIsAudited,
+                "B4: a RoFormer category default did not prefer an audited "
+                "model when one exists in that category");
+        require(drumsSlider->isVisible() && drumsSlider->isEnabled() &&
+                    bassSlider->isVisible() && bassSlider->isEnabled() &&
+                    !otherSlider->isVisible() && !otherSlider->isEnabled() &&
+                    !vocalsSlider->isVisible() && !vocalsSlider->isEnabled() &&
+                    !guitarSlider->isVisible() && !guitarSlider->isEnabled() &&
+                    !pianoSlider->isVisible() && !pianoSlider->isEnabled(),
+                "B4: a RoFormer category mode did not keep the uniform 2-stem "
+                "slider gating");
+    }
+
     compute->setSelectedItemIndex(2, juce::sendNotificationSync);
     require(waitUntil(
                 [&components] {
@@ -532,6 +582,7 @@ int run() {
                  " experimental=true download_status=true"
                  " separation_mode_gate=true separation_modes=12"
                  " separation_mode_defaults=true separation_mode_stem_gating=true"
+                 " separation_mode_all_categories_verified=true"
                  " roformer_stem_labels=vocals/instrumental"
                  " roformer_stem_label_categories=8 roformer_export_naming=true PASS\n";
     return 0;
