@@ -2,9 +2,9 @@
 
 - status: **blocked**
 - stop_reason: `blocked_permission_required`
-- iterations: 12 / max 60
-- best_metric: 51
-- started_at: 2026-08-23T10:50:55+08:00  ·  updated_at: 2026-08-23T22:32:07+08:00
+- iterations: 13 / max 60
+- best_metric: 61
+- started_at: 2026-08-23T10:50:55+08:00  ·  updated_at: 2026-08-24T20:46:48+08:00
 - git: origin `main`@`24bfb70f2c4de22ba92996cdcee08ac8ecbff9e6` → loop branch `loop/melband-roformer` (switch back / merge is your call)
 
 | iter | decision | status | metric | criteria |
@@ -21,10 +21,12 @@
 | 10 | continue | running | 10 | C1:pass C2:fail C3:pass |
 | 11 | continue | running | 11 | C1:fail C2:fail C3:pass |
 | 12 | continue | running | 51 | C1:fail C2:fail C3:pass |
+| 13 | continue | running | 61 | C1:fail C2:fail C3:pass |
 
 Files touched across the run:
 
 - `.loop/LESSONS.md`
+- `.loop/STEER.md (deleted after journal entry written, one-shot directive consumed)`
 - `.loop/backlog.json`
 - `.loop/checks/cheap_extra.cmd`
 - `.loop/driver.log`
@@ -40,7 +42,9 @@ Files touched across the run:
 - `.loop/iterations/0010.json`
 - `.loop/iterations/0011.json`
 - `.loop/iterations/0012.json`
+- `.loop/iterations/0013.json`
 - `.loop/journal.md`
+- `.loop/lastrun.log`
 - `.loop/state.json`
 - `C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-cpp-integration/`
 - `C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-iter3/`
@@ -61,6 +65,7 @@ Files touched across the run:
 - `tools/generate_roformer_model_backlog_items.py`
 - `tools/roformer_batch_verify.py`
 - `tools/validate_roformer_manifest.py`
+- `verify/ (stray relative-path cache dir under the transfer tree; deleted, cache exception per LESSONS SIGN iter 13)`
 - `worker/roformer_cache.py`
 - `worker/roformer_worker.py`
 

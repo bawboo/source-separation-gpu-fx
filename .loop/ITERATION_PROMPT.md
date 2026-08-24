@@ -124,6 +124,17 @@ status 值與 LOOP STATUS 行保持英文。
 
 ## Hard rules
 
+- **NEVER use background execution of any kind** (Bash run_in_background,
+  Monitor, `&`, detached processes, "waiting for a background job"). You are a
+  print-mode (`-p`) process: the moment you end your message, EVERYTHING you
+  spawned is orphaned and you are never woken again. All work — downloads,
+  verification, builds — must complete SYNCHRONOUSLY before step 9. If a batch
+  is too big to finish synchronously, shrink the batch (2–4 audited models per
+  iteration).
+- **Windows absolute paths passed through the Bash tool must be single-quoted**
+  (e.g. `'C:\CodexProjects\...\verify\roformer-cache'`) or written with forward
+  slashes — unquoted backslashes get eaten by MSYS and create mangled literal
+  directories inside the repo (a scope violation that halts the whole loop).
 - Never weaken, delete, or reinterpret a completion criterion or test to make
   it pass; that is the `"blocked_criterion_doubt"` path.
 - Print `LOOP STATUS: converged` only when ALL criteria genuinely passed with

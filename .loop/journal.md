@@ -552,3 +552,8 @@ SCOPE_EXIT=0
 **Decision:** continue
 **Lesson:** (1) 呼叫 `worker/roformer_worker.py` 相關腳本一律用 `htfx-roformer` env 的 python.exe 絕對路徑（`C:\Users\<user>\anaconda3\envs\htfx-roformer\python.exe`）直接執行，不要包一層 `conda run`——`conda run` 的輸出轉印邏輯本身在 Windows cp950 主控台上會對含 emoji 的子行程輸出拋 `UnicodeEncodeError`，即使子行程自己已呼叫過 `configure_utf8_stream`，因為壞掉的是 `conda run` 自己的 print，不是子行程的 stream。(2) `ui_configuration_smoke` 的 RoFormer C++ 路由測試硬編碼依賴 `melband-roformer-kim-vocals` 必須常駐 `verify/roformer-cache/`（`beginSeparation()` 不會自動下載未安裝模型）；任何在同一個共用滾動快取（`max_cached=3`）內批次跑其他模型的 M-item 驗證，都可能把 kim-vocals 擠出快取而讓 cheap/full tier 的 UI smoke 失敗——批次跑完 M-item 後、執行 cheap/full tier 之前，必須確認（必要時重新觸碰）kim-vocals 仍在快取內。已寫入 LESSONS.md。
 **Note:** 下一輪應繼續處理剩下的 50 個 audited M-item（依 checkpoint size 由小到大，下一批約 913MB 級距的 gabox/instv6 系列共 ~14 個同尺寸模型）；`tools/roformer_batch_verify.py` 與 `tools/generate_roformer_model_backlog_items.py` 皆可直接重用。每輪批次跑完後、進 cheap/full tier 前，務必確認 `melband-roformer-kim-vocals` 仍在 `verify/roformer-cache/` 內（不在則重新觸碰），避免重演本輪的 smoke test 回歸。
+
+## Operator note — 2026-08-24T20:55+08:00（iter-14 事故處理與續跑）
+- iteration 14 重蹈兩個舊病：(1) 背景任務＋Monitor 後結束 turn（headless -p 不會被喚醒）→ 無 record 無 commit；(2) 絕對路徑未引號經 bash 傳遞 → repo 內畸形目錄 `CodexProjectsSourceSeparation_GPU_FXverifyroformer-cache/`（229MB 部分下載）→ scope 鎖機（防護正確動作）。
+- 處置：畸形目錄整個**搬移**（非刪除）至 `verify\quarantine\iter14-mangled-cache\`；無孤兒程序；兩條規則升級為 ITERATION_PROMPT 硬規則＋LESSONS SIGN。
+- 狀態 blocked→running，driver 重啟續跑（下一輪仍記為 iteration 14）。

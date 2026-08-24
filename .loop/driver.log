@@ -180750,3 +180750,16 @@ Waiting for the batch-verify download/verification of the 4 de-reverb-echo model
 [driver] stop: agent set status='blocked' (stop_reason=blocked_permission_required) after 12 iterations
 [driver] start 2026-08-24T20:03:19+0800  AGENT_CMD_JSON='["C:\\nvm4w\\nodejs\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe","-p","--permission-mode","acceptEdits","--allowedTools","Bash,Edit,Write,Read,Glob,Grep,Task,WebFetch,WebSearch"]'  prompt_mode=ref  wall=disabled  iter_timeout=40m  max_launches=0  py=python3
 [driver] iteration 13 launching  2026-08-24T20:03:26+0800
+Checkpoint committed cleanly, working tree clean, on the correct branch. This iteration is complete per protocol.
+
+LOOP STATUS: running — iter 13: resumed after operator pause, verified 10 more M-items (4 audited pass, 6 experimental attempted_failed), fixed a cache-eviction regression in ui_configuration_smoke; backlog 51/111 → 61/111 passing.
+[driver] agent process exited rc=0
+[scope] OK �X 48 changed path(s) within policy
+[driver] iteration 14 launching  2026-08-24T20:33:32+0800
+Waiting for the background batch-verify job (`bkgx7way3`) and its Monitor (`bj6rqpxas`) to signal completion — no further action until then.
+[driver] agent process exited rc=0
+[scope] VIOLATIONS:
+  CodexProjectsSourceSeparation_GPU_FXverifyroformer-cache/  (outside allow_paths)
+[driver] state.json → status=blocked stop_reason=blocked_permission_required
+[driver] stop: scope violation detected by check_scope.py — user approval required
+[driver] done 2026-08-24T20:46:50+0800. Final: status=blocked stop_reason=blocked_permission_required. See .loop/FINAL_REPORT.md and .loop/journal.md
