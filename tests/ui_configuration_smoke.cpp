@@ -367,6 +367,8 @@ int run() {
                 std::chrono::seconds(3)),
             "model/RoFormer/slider controls did not enable after choosing a "
             "separation mode");
+    require(model->isVisible(),
+            "D2: the Demucs model combo should be visible in an HTDemucs mode");
     require(model->getSelectedItemIndex() == 0,
             "B2: choosing 4-stem separation did not default the model box to "
             "htdemucs");
@@ -416,6 +418,11 @@ int run() {
                 !pianoSlider->isVisible() && !pianoSlider->isEnabled(),
             "B3: RoFormer 2-stem mode did not hide the remaining HTDemucs stem "
             "sliders");
+    require(waitUntil(
+                [&] { return !model->isEnabled() && !model->isVisible(); },
+                std::chrono::seconds(3)),
+            "D2: RoFormer Vocals mode did not disable/hide the inert Demucs "
+            "model combo");
 
     int guitarModeIndex = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
@@ -440,6 +447,9 @@ int run() {
                 !otherSlider->isVisible() && !vocalsSlider->isVisible() &&
                 !guitarSlider->isVisible() && !pianoSlider->isVisible(),
             "B3: RoFormer Guitar mode did not keep the 2-stem slider gating");
+    require(!model->isEnabled() && !model->isVisible(),
+            "D2: RoFormer Guitar mode did not keep the Demucs model combo "
+            "disabled/hidden");
 
     separationMode->setSelectedItemIndex(0, juce::sendNotificationSync);
     require(waitUntil([&] { return processor->getSelectedRoformerModel().isEmpty(); },
@@ -453,6 +463,11 @@ int run() {
                 !guitarSlider->isVisible() && !pianoSlider->isVisible(),
             "B3: returning to 4-stem separation did not restore its four stem "
             "sliders and re-hide the 6-stem-only pair");
+    require(waitUntil(
+                [&] { return model->isEnabled() && model->isVisible(); },
+                std::chrono::seconds(3)),
+            "D2: returning to 4-stem separation did not re-enable/show the "
+            "Demucs model combo");
 
     separationMode->setSelectedItemIndex(guitarModeIndex, juce::sendNotificationSync);
     require(waitUntil([&] { return roformerCategory->getText() == "guitar"; },
@@ -486,14 +501,16 @@ int run() {
         separationMode->setSelectedItemIndex(modeIndex, juce::sendNotificationSync);
         require(waitUntil(
                     [&] {
-                        return model->isEnabled() && roformerCategory->isEnabled() &&
+                        return !model->isEnabled() && !model->isVisible() &&
+                               roformerCategory->isEnabled() &&
                                roformerSearch->isEnabled() && roformerModel->isEnabled() &&
                                roformerCategory->getText().equalsIgnoreCase(category) &&
                                processor->getSelectedRoformerModel().isNotEmpty();
                     },
                     std::chrono::seconds(3)),
-                "B4: a RoFormer category mode did not enable controls / lock its "
-                "category filter / select a default model");
+                "B4/D2: a RoFormer category mode did not enable its own controls / "
+                "disable-hide the inert Demucs model combo / lock its category "
+                "filter / select a default model");
 
         const auto selectedId = processor->getSelectedRoformerModel();
         bool categoryHasAuditedModel = false;

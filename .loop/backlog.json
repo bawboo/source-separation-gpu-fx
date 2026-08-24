@@ -1355,8 +1355,16 @@
   {
     "id": "D2",
     "title": "D2 (discovered while implementing B3): modelBox_ (\"Demucs model\" combo) stays enabled whenever a separation mode is chosen, even while a RoFormer category mode is active, but changing it has no effect on the actual separation route -- currentRuntimeConfiguration() always prefers selectedRoformerModel_ over modelBox_'s choice whenever a RoFormer model is selected (plugin/PluginProcessor.cpp currentRuntimeConfiguration(), ~line 697-702). Should gate/hide modelBox_ (and its download button) per active mode kind (HTDemucs vs RoFormer), mirroring the stem-slider gating B3 just added, so the control isn't misleadingly interactive when it's inert.",
-    "passes": false,
+    "passes": true,
     "priority": 11.5,
+    "source": "discovered",
+    "evidence": "iter 22: cmd //c \".loop\\checks\\cheap.cmd\" -> exit 0, ui_configuration_smoke PASS with new D2 assertions (model->isEnabled()/isVisible() gated by RoFormer mode: disabled+hidden during Vocals/Guitar/all-10-category RoFormer modes, re-enabled+shown on return to 4-stem HTDemucs); same built exe re-run 8/8 exit 0 (no waitUntil/timer-race flakiness per iter-20 SIGN)."
+  },
+  {
+    "id": "D3",
+    "title": "D3 (discovered while implementing D2): the mirror-image gap of D2 -- roformerCategoryBox_/roformerSearch_/roformerModelBox_ are only gated by `modeChosen` (plugin/PluginProcessor.cpp timerCallback(), ~roformerCategoryBox_.setEnabled block), not by whether the active separation mode is actually a RoFormer category. While an HTDemucs mode (4-stem/6-stem) is chosen, these three RoFormer browser controls stay enabled and visible, and interacting with roformerModelBox_ calls processor_.selectRoformerModel(), which sets selectedRoformerModel_ and immediately hijacks currentRuntimeConfiguration() over to the RoFormer route (currentRuntimeConfiguration(), ~line 697-702) even though separationModeBox_ still shows an HTDemucs mode selected -- worse than D2 (inert-but-clickable) because it is clickable-and-silently-changes-the-active-route. Should gate/hide the RoFormer browser trio (and roformerStatus_/its label) per active mode kind, mirroring D2 in the opposite direction.",
+    "passes": false,
+    "priority": 11.6,
     "source": "discovered"
   }
 ]

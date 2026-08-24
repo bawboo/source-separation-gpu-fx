@@ -180823,3 +180823,9 @@ LOOP STATUS: running â€” iter-20 B3 stem-slider gating done (HTDemucs 4/6-stem v
 [driver] agent process exited rc=0
 [scope] OK ¡X 55 changed path(s) within policy
 [driver] iteration 21 launching  2026-08-25T00:42:21+0800
+Commit succeeded. Iteration 21 complete: B4 flipped to `passes:true` with full-tier evidence, 75/116 backlog items now passing, all four smoke tests green, scope check clean.
+
+LOOP STATUS: running â€” iter-21 flipped B4 (ui_configuration_smoke now covers all 10 RoFormer category modes, not just 2), 75/116 backlog passing, committed 49bb42f
+[driver] agent process exited rc=0
+[scope] OK ¡X 56 changed path(s) within policy
+[driver] iteration 22 launching  2026-08-25T00:51:49+0800

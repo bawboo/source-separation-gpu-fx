@@ -965,3 +965,46 @@ roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/
 **Decision:** continue
 **Lesson：** 無新 SIGN——本輪假設如預期成立，過程中未發現先前記錄之外的驚訝之處（`waitUntil` 輪詢式 helper 對新增的 10 分類迴圈同樣穩定，8/8 未見 timer race）。
 **Note（交接給 iteration 22）：** B1–B4 已全數完成並有印出證據（`ui_configuration_smoke` 現已涵蓋全部 10 個 RoFormer 分類模式，非僅 2 個）。剩餘 backlog：D2（discovered，`modelBox_` 在 RoFormer 模式下仍可互動但無實際效果，應比照 B3 的拉桿 gating 邏輯做顯示/啟用門控）與 40 個 audited M-item（下載＋SHA-256 驗證→分離→輸出格式驗證）。下一輪建議優先處理 D2（範圍小、與剛完成的 B3/B4 gating 邏輯高度相關，可直接沿用 `roformerModeSelected()` 判斷式），或依 backlog priority 繼續 M-item 批次（每輪 2–4 個 audited 模型，批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內——本輪未觸碰快取，無需重新 touch）。下一次 5 的倍數在 iteration 25，記得跑 full tier（雖然本輪已提前跑過一次，仍需在 iteration 25 依協定再次執行）。
+
+## iter-22 (2026-08-25T04:10:00+08:00)
+
+**Hypothesis：** iter-21 交接筆記建議優先處理 D2（priority 11.5，目前 failing 項目中優先序最高）——`modelBox_`（"Demucs model" 下拉選單）在任何分離模式選定後都保持 enabled，即使目前是 RoFormer 分類模式；但 `currentRuntimeConfiguration()` 一旦 `selectedRoformerModel_` 非空就永遠優先於 `modelBox_` 的選擇，代表使用者在 RoFormer 模式下仍可互動的這顆下拉選單其實完全無效。假設：比照 B3 剛加上的拉桿 gating 模式——在 `timerCallback()`（處理忙碌狀態相依的 enabled 旗標）與 `updateSixSourceControls()`（處理模式相依的 visible 旗標，會在切換分離模式時同步呼叫、也會在每個 timer tick 呼叫）都加上 `!roformerModeSelected()` 條件，讓 `modelBox_`／`modelLabel_`／`modelDownloadButton_` 在 RoFormer 模式下停用並隱藏，可以讓 D2 翻為 `passes:true`（有 cheap tier 證據），且不會使既有四個 smoke test 退步，因為改動只是在既有 enabled/visible 判斷式上新增一個 `!roformerModeActive` 條件，未更動底層分離路由邏輯本身。
+
+**變更：**
+- `plugin/PluginProcessor.cpp`：
+  - `timerCallback()`：新增 `const bool roformerModeActive = roformerModeSelected();`；`modelBox_.setEnabled(...)` 與新增的 `modelLabel_.setEnabled(...)` 都加上 `&& !roformerModeActive`；`modelDownloadButton_.setEnabled(...)` 同樣加上 `&& !roformerModeActive`。
+  - `updateSixSourceControls()`（已有 `roformerMode` 區域變數）：新增 `modelControlsVisible = advancedPanel_ && advancedVisible_ && !roformerMode`，套用到 `modelLabel_`／`modelBox_`／`modelDownloadButton_` 的 `setVisible()`。此函式本就在切換分離模式時同步呼叫、也在每個 timer tick 被呼叫，與 B3 拉桿 gating 使用同一個掛載點。
+  - `advancedButton_.onClick` 的展開/收合處理常式：在既有 `updateAdvancedVisibility()`（會無條件把 `modelBox_` 等 16 個元件設回可見）之後，補呼叫一次 `updateSixSourceControls()`，避免使用者在 RoFormer 模式下展開「Advanced options」時，`modelBox_` 先被無條件顯示、要等下一個 timer tick 才被本次修正的邏輯改回隱藏（單一畫格閃爍）。
+- `tests/ui_configuration_smoke.cpp`：
+  - 4-stem 模式啟用後新增 `model->isVisible()` 斷言（HTDemucs 模式應顯示）。
+  - Vocals／Guitar RoFormer 模式各新增一個 `waitUntil`／`require`，斷言 `!model->isEnabled() && !model->isVisible()`。
+  - 切回 4-stem 後新增 `waitUntil` 斷言 `model->isEnabled() && model->isVisible()`（確認離開 RoFormer 模式會還原）。
+  - B4 迴圈（走遍全部 10 個 RoFormer 分類）原本的 `waitUntil` 條件式裡包含 `model->isEnabled()`（在 D2 之前，RoFormer 模式下 `modelBox_` 本來就該保持 enabled，所以舊測試斷言它是 true）——本輪必須把這個條件改成 `!model->isEnabled() && !model->isVisible()`，否則會與剛加上的 production code 改動直接衝突（10 個分類全部會斷言失敗）。這不是為了通過測試而弱化斷言，而是舊斷言本身就是 D2 想修正的錯誤行為（RoFormer 模式下 model 理應被停用，不該是原本斷言的「應該啟用」）。
+
+**Verification commands + output（實際印出）：**
+
+`cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.002s / OK
+Ran 2 tests in 0.077s / OK
+Ran 8 tests in 0.068s / OK
+```
+
+同一支已建置 exe 另外本機重跑 8 次確認穩定性：8/8 exit 0（無 1 次失敗，本輪改動未觸發 iter-20 記錄過的 `waitUntil`/timer race）。
+
+**Full tier：** 本輪 iteration number 22、22 % 5 != 0，且非宣告 converged，依協定不強制執行；D2 backlog 項目本身沒有 `check` 欄位要求 full tier 證據（不同於 iter-21 的 B4），故本輪僅以 cheap tier 證據翻牌，符合協定第 9 步「proof was printed this run」的最低要求。
+
+**Backlog checker（僅供參考，非本輪 C2 判定依據——full tier 未跑）：** `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` → exit 1（117 項中仍有 41 項 `passes:false`：新增的 D3、40 個 audited M-item）。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 56 changed path(s) within policy`
+
+**Criteria:** C1 fail（本輪未跑 full tier，依協定不可宣稱 pass）／C2 fail（backlog 仍有 41 項未過）／C3 pass（scope 無違規）。AND 規則下未同時全過，非 converged。
+**Metric:** backlog_items_passing = 76（較上輪 75 增加 1：D2）；improved: true。
+**Decision:** continue
+**Lesson（新增 SIGN 見下）：** 元件可見度的權責分散在兩個函式時（`updateAdvancedVisibility()` 無條件顯示 vs. `updateSixSourceControls()` 模式相依的細化），只把新的模式相依邏輯加進後者是不夠的——任何會呼叫前者但不會接著呼叫後者的路徑（本例是 `advancedButton_.onClick`）都會產生單一畫格的過期可見度，直到下一個 timer tick 才校正。本輪已補上該呼叫點；已寫入 LESSONS.md。
+
+**Discovered（D3，已 append 進 backlog，不吸收進本次 change-set）：** 實作 D2 時發現鏡像缺口——`roformerCategoryBox_`／`roformerSearch_`／`roformerModelBox_` 目前只受 `modeChosen` 門控，不管目前是不是 RoFormer 分類模式。使用者在 HTDemucs 模式下這三顆控制項仍是 enabled/visible，若去操作 `roformerModelBox_` 會呼叫 `processor_.selectRoformerModel()`，直接設定 `selectedRoformerModel_`，讓 `currentRuntimeConfiguration()` 立刻改用 RoFormer 路由——即使 `separationModeBox_` 畫面上還顯示著 HTDemucs 模式，比 D2 的「可互動但無效」更嚴重（是「可互動且會悄悄改變實際路由」）。已記錄為 D3、priority 11.6，留給下一輪視 priority 排序處理。
+
+**Note（交接給 iteration 23）：** D2 已完成並有印出證據。剩餘 backlog：D3（discovered，本輪新增，RoFormer 瀏覽器三元件在 HTDemucs 模式下的鏡像 gating 缺口）與 40 個 audited M-item（下載＋SHA-256 驗證→分離→輸出格式驗證）。下一輪可選：(a) D3——範圍小、與 D2/B3 的 gating pattern 高度相似，可直接沿用同一個 `roformerModeSelected()` 判斷式（方向相反：HTDemucs 模式時隱藏/停用 RoFormer 瀏覽器三元件＋`roformerStatus_`），或 (b) 依 priority 繼續 M-item 批次（每輪 2–4 個 audited 模型，批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內——本輪未觸碰快取，無需重新 touch）。下一次 5 的倍數在 iteration 25，記得依協定跑 full tier（C1／C2 才有本輪未取得的 full tier 證據）。

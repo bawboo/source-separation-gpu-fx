@@ -1,0 +1,48 @@
+{
+  "iteration": 22,
+  "timestamp": "2026-08-25T04:10:00+08:00",
+  "hypothesis": "iter-21's handoff note flagged D2 (priority 11.5, the highest-priority failing backlog item) as small-scope and directly related to the just-finished B3/B4 gating logic: the Demucs model combo (modelBox_) stays enabled/visible whenever any separation mode is chosen, even during a RoFormer category mode, but currentRuntimeConfiguration() always prefers selectedRoformerModel_ once one is selected, so the control is misleadingly interactive while inert. Hypothesis: mirroring B3's stem-slider gating pattern -- disabling+hiding modelBox_/modelLabel_/modelDownloadButton_ whenever roformerModeSelected() is true (in timerCallback() for the busy-state-aware enabled flag, and in updateSixSourceControls() for the mode-driven visibility flag, called both synchronously on separation-mode change and every timer tick) -- will close this gap and let D2 flip to passes:true with printed cheap-tier evidence, without regressing any of the four existing smoke tests, because the change only adds a `!roformerModeActive` conjunct to existing enabled/visible computations rather than altering the underlying separation routing logic.",
+  "files_touched": [
+    "plugin/PluginProcessor.cpp",
+    "tests/ui_configuration_smoke.cpp",
+    ".loop/backlog.json",
+    ".loop/iterations/0022.json",
+    ".loop/journal.md",
+    ".loop/state.json"
+  ],
+  "commands": [
+    {
+      "cmd": "cmd //c '.loop\\checks\\cheap.cmd'",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "build/windows-installed/Release/htdemucs_ui_configuration_smoke.exe (re-run 8x on the same built binary to check for the iter-20-documented waitUntil/timer race)",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "python .loop/check_scope.py",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "python -c \"import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))\" (informational only; full tier not due this iteration, 22 % 5 != 0)",
+      "exit_code": 1,
+      "timed_out": false
+    }
+  ],
+  "criteria": {
+    "C1": "fail",
+    "C2": "fail",
+    "C3": "pass"
+  },
+  "metrics": {
+    "name": "backlog_items_passing",
+    "value": 76,
+    "improved": true
+  },
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}

@@ -3270,6 +3270,10 @@ public:
             advancedButton_.setButtonText(
                 advancedVisible_ ? "Advanced options v" : "Advanced options >");
             updateAdvancedVisibility();
+            // Re-apply the RoFormer-mode-aware refinement (D2) so the model
+            // combo doesn't flash visible for one frame when the disclosure
+            // is expanded while a RoFormer mode is already active.
+            updateSixSourceControls();
             updateSize();
         };
         addAndMakeVisible(advancedButton_);
@@ -3946,6 +3950,16 @@ private:
         }
         outputSlider_.setEnabled(modeChosen);
         outputLabel_.setEnabled(modeChosen);
+
+        // D2: hide the Demucs model combo/label/download button while a
+        // RoFormer mode is active, mirroring the stem-slider gating above --
+        // the control has no effect on the active route once a RoFormer
+        // model is selected (see currentRuntimeConfiguration()).
+        const bool modelControlsVisible =
+            advancedPanel_ && advancedVisible_ && !roformerMode;
+        modelLabel_.setVisible(modelControlsVisible);
+        modelBox_.setVisible(modelControlsVisible);
+        modelDownloadButton_.setVisible(modelControlsVisible);
     }
 
     void updateVisibility() {
@@ -4013,10 +4027,17 @@ private:
         cancelButton_.setVisible((recordMode && (separationBusy || mediaBusy)) || modelBusy);
         const bool configurationEnabled = !recording && !busy;
         const bool modeChosen = separationModeBox_.getSelectedItemIndex() >= 0;
+        const bool roformerModeActive = roformerModeSelected();
         separationModeBox_.setEnabled(configurationEnabled);
         modeBox_.setEnabled(configurationEnabled);
         segmentBox_.setEnabled(configurationEnabled);
-        modelBox_.setEnabled(configurationEnabled && modeChosen);
+        // D2: the Demucs model combo only affects the active separation route
+        // while an HTDemucs mode is chosen -- currentRuntimeConfiguration()
+        // always prefers the RoFormer selection once one is active -- so
+        // disable it (and its download button) during RoFormer modes instead
+        // of leaving it interactive but inert.
+        modelBox_.setEnabled(configurationEnabled && modeChosen && !roformerModeActive);
+        modelLabel_.setEnabled(configurationEnabled && modeChosen && !roformerModeActive);
         const bool selectedModelInstalled =
             processor_.isModelInstalled(modelBox_.getText());
         modelDownloadButton_.setButtonText(
@@ -4024,7 +4045,8 @@ private:
                 ? "Installed"
                 : (modelBusy ? "Downloading..." : "Download selected model"));
         modelDownloadButton_.setEnabled(
-            advancedVisible_ && configurationEnabled && modeChosen && !selectedModelInstalled);
+            advancedVisible_ && configurationEnabled && modeChosen &&
+            !roformerModeActive && !selectedModelInstalled);
         roformerCategoryBox_.setEnabled(modeChosen);
         roformerSearch_.setEnabled(modeChosen);
         roformerModelBox_.setEnabled(modeChosen);
