@@ -180787,3 +180787,9 @@ LOOP STATUS: running â€” iter-14 verified M031+M032 (zero-download, already cach
 [driver] agent process exited rc=0
 [scope] OK ¡X 49 changed path(s) within policy
 [driver] iteration 15 launching  2026-08-24T22:16:58+0800
+Commit succeeded, working tree clean.
+
+LOOP STATUS: running â€” iter-15: verified M037+M004 (65/111 backlog passing), full tier PASS, C2 still fails (46 M-items remain)
+[driver] agent process exited rc=0
+[scope] OK ¡X 50 changed path(s) within policy
+[driver] iteration 16 launching  2026-08-24T22:55:04+0800

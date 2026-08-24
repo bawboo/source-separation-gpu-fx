@@ -167,34 +167,73 @@
   {
     "id": "M006",
     "title": "M006: melband-roformer-inst-gabox-bv2（audited, category=instrumental）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 17,
     "source": "plan",
     "model_id": "melband-roformer-inst-gabox-bv2",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "check": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-inst-gabox-bv2 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3",
+      "sha256": "6109687febb8f18cd5a45207fee35f18ba8b9467b18a4b2e982a3b7dc04a9d72",
+      "checkpoint_size": 913026650,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models melband-roformer-inst-gabox-bv2 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M007",
     "title": "M007: melband-roformer-inst-gabox-fv3（audited, category=instrumental）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 18,
     "source": "plan",
     "model_id": "melband-roformer-inst-gabox-fv3",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "check": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-inst-gabox-fv3 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3",
+      "sha256": "fbb229209a8942d34664e19d2f4862e357ea3108a4e8c04b69aa0aba523a4481",
+      "checkpoint_size": 913026650,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models melband-roformer-inst-gabox-fv3 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M008",
     "title": "M008: melband-roformer-inst-gabox3（audited, category=instrumental）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 19,
     "source": "plan",
     "model_id": "melband-roformer-inst-gabox3",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "check": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-inst-gabox3 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3",
+      "sha256": "f9ec9f299cf617bf6afe1c382f4b0761cd9bee78323da94889951812328e10fb",
+      "checkpoint_size": 913026650,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models melband-roformer-inst-gabox3 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {

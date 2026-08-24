@@ -1,0 +1,57 @@
+{
+  "iteration": 16,
+  "timestamp": "2026-08-24T23:07:13+08:00",
+  "hypothesis": "本輪無 STOP/STEER，依常態推進剩餘 46 個 audited M-item；先以 60 秒 curl 對 GaboxR67/MelBandRoformers（HF）量測吞吐量（實測 7.33MB/s，優於 iter-15 的 2.67MB/s），依此判斷本輪可同步驗證 3 個 913MB 級距的 gabox instrumental 系列模型（M006 inst-gabox-bv2、M007 inst-gabox-fv3、M008 inst-gabox3），預期三者皆能在單次 batch verify 呼叫內完成下載＋SHA-256＋分離＋輸出契約驗證並翻為 pass，且不重蹈逾時。",
+  "files_touched": [
+    ".loop/backlog.json",
+    ".loop/iterations/0016.json",
+    ".loop/journal.md",
+    ".loop/state.json",
+    ".loop/driver.log"
+  ],
+  "commands": [
+    {
+      "cmd": "curl -sS -L -o /dev/null --max-time 60 -w '...' https://huggingface.co/GaboxR67/MelBandRoformers/resolve/main/melbandroformers/instrumental/inst_gaboxBv2.ckpt",
+      "exit_code": 28,
+      "timed_out": false
+    },
+    {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-inst-gabox-bv2 melband-roformer-inst-gabox-fv3 melband-roformer-inst-gabox3 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe worker/roformer_cache.py --model melband-roformer-kim-vocals --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "cmd //c '.loop\\checks\\cheap.cmd'",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "python .loop/check_scope.py",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "python -c \"import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))\" (informational only; full tier not due this iteration, 16 % 5 != 0)",
+      "exit_code": 1,
+      "timed_out": false
+    }
+  ],
+  "criteria": {
+    "C1": "fail",
+    "C2": "fail",
+    "C3": "pass"
+  },
+  "metrics": {
+    "name": "backlog_items_passing",
+    "value": 68,
+    "improved": true
+  },
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}
