@@ -561,3 +561,60 @@ SCOPE_EXIT=0
 ## Operator note — 2026-08-24T22:15+08:00（兩振超時處置）
 - iteration 14 第 2、3 次嘗試均 40 分鐘超時（claude -p 無中途輸出，推測慢速行動網路下同步下載大模型未完）。driver 依設計兩振鎖 blocked/stalled_no_state_update。
 - 修訂 §6 iteration_timeout 40→60 min（Amendments 已記）；STEER（單模型批次＋15 分下載止損）未被消費、下輪生效。狀態解鎖 running，driver 重啟。
+
+## iter 14 — 2026-08-24T22:15:23+08:00
+
+**STEER.md（21:35 投放，一次性指令，本輪引用後刪除）：**
+> （一次性操作指令，2026-08-24 21:35 投放）
+> 前兩次 iteration-14 嘗試分別因背景執行與 40 分鐘超時失敗。本輪硬性要求：
+> 1. 批次縮到最小：本輪只同步驗證 **1 個** audited 模型（若其權重已在快取可加做第 2 個）。挑 manifest 中檔案較小的優先。
+> 2. 時間預算管理：下載＋分離＋驗證＋record＋commit 必須在 40 分鐘內全部完成。若單一模型下載超過 15 分鐘仍未完，中止該模型、記為本輪觀察（journal），改驗快取內既有模型或改做小項目，確保本輪有 record 有 commit。
+> 3. 其餘照 ITERATION_PROMPT 硬規則（禁背景、路徑單引號、絕對路徑快取）。
+
+**Hypothesis:** 檢查 `verify/roformer-cache/` 發現前兩次失敗的 iteration-14 嘗試已把 M031（aspiration-by-sucial）與 M032（aspiration-less-aggressive-by-sucial）的 checkpoint 完整下載（位元組數與 manifest `size` 完全吻合：835983746／835982664），只有 M037（de-reverb-echo）是部分 `.ckpt.part`（825,229,312 / 835,997,896 bytes，未完整）。對已完整快取的 M031＋M032 執行 batch verify 完全不需要下載，應能在極短時間內完成並翻為 pass，不重蹈前兩輪的下載逾時；M037 因無斷點續傳（`ensure_cached` 一律整檔重下）會觸發全新完整下載，違背本輪風險最小化的 STEER 精神，本輪不嘗試。
+
+**Files touched:** `.loop/backlog.json`（M031/M032 翻 pass＋evidence）；`.loop/iterations/0014.json`、`.loop/journal.md`、`.loop/state.json`、`.loop/STEER.md`（刪除，一次性指令已消費）、`.loop/driver.log`、`.loop/lastrun.log`（外部 driver 自行 append，隨 commit 一併納入）。未修改任何 `plugin/`／`cpp/`／`worker/`／`tests/` 原始碼。
+
+**執行（零下載，快取已完整）：** `C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-melband-roformer-aspiration-by-sucial roformer-model-melband-roformer-aspiration-less-aggressive-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3`（exit 0，總耗時數秒——checkpoint 已在本機、`ensure_cached` 直接比對 SHA-256 通過，未觸發任何網路下載）：
+```text
+{
+  "model": "roformer-model-melband-roformer-aspiration-by-sucial",
+  "cache_verified_sha256": "9e791258c866c6c8da66052693d8cc3b64f1f42c01e052dbdc570cd278380cc5",
+  "checkpoint_size": 835983746,
+  "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+  "outcome": "pass"
+}
+{
+  "model": "roformer-model-melband-roformer-aspiration-less-aggressive-by-sucial",
+  "cache_verified_sha256": "83bfe991cec4fbadde9f30d1f79cd5293ad0b1f936256be327bba5cbb4883374",
+  "checkpoint_size": 835982664,
+  "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+  "outcome": "pass"
+}
+```
+
+**Backlog 更新：** 以一次性腳本（tmp+rename 原子寫入，用畢即刪）把 M031／M032 的 `passes` 翻為 `true` 並寫入含指令、sha256、size、separation 規格的 `evidence`；61 → 63 個 backlog item passing。
+
+**已知的滾動快取副作用（沿用 iter-13 修法，非新踩坑）：** batch verify 把 M031/M032 標記為最近使用、`max_cached=3` 觸發 eviction，如預期把 `melband-roformer-kim-vocals` 擠出快取（`verify/roformer-cache/` 驗證只剩 3 個 sucial/aspiration 目錄）。依 LESSONS SIGN (iter 13) 執行 `worker/roformer_cache.py --model melband-roformer-kim-vocals --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache` 重新觸碰（exit 0，`cache_dir_entries` 確認回到快取內，順帶把仍不完整的 `de-reverb-echo-by-sucial`（M037 部分下載殘留）擠出——該項未過，留給下一輪重新完整下載）。
+
+**Verification:** `cmd //c '.loop\checks\cheap.cmd'`（exit 0）
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s
+OK
+Ran 2 tests in 0.056s
+OK
+Ran 8 tests in 0.169s
+OK
+```
+**Scope:** `python .loop/check_scope.py`（exit 0）
+```text
+[scope] OK — 49 changed path(s) within policy
+```
+**Backlog checker（本輪非 5 的倍數，non-full-tier，僅供參考）：** exit 1 —— passing 63/111。
+**Criteria:** C1: fail（本輪未跑 full tier，不宣稱 pass）· C2: fail（仍有 48 個 M-item 未過）· C3: pass
+**Metric:** 63 個 backlog item passing（best so far: 63；improved: true，較上輪 61 增加 2）
+**Decision:** continue
+**Lesson:** 無新規則——本輪嚴格遵循既有 LESSONS（絕對路徑單引號、禁背景、直接呼叫 htfx-roformer python.exe、批次跑完後確認 kim-vocals 仍在快取）以及 STEER 的風險最小化指令（優先驗證已完整快取、零下載的模型），未觸發新的踩坑。唯一值得記錄的操作性觀察：`ensure_cached` 沒有斷點續傳，任何 `.ckpt.part` 殘留在下次呼叫時會被整檔覆蓋重下，不能省下已下載的部分位元組——這解釋了為何本輪優先選字節數與 manifest size 完全吻合的 M031/M032（真正「零下載」）而非位元組數僅差 ~1% 的 M037（仍會觸發全新完整下載）。
+**Note:** 下一輪可考慮先處理 M037（de-reverb-echo-by-sucial，需要完整重新下載 ~836MB，非資源續傳，抓 15 分鐘下載止損）；其後依 checkpoint size 由小到大處理 ~913MB 級距的 gabox/instv6/voc-fv 系列（M004/M006–M014/M022/M023 等 12 個同尺寸模型）。`tools/roformer_batch_verify.py` 與快取續住 `melband-roformer-kim-vocals` 的固定流程持續適用；仍剩 48 個 audited M-item 待驗證，estimé需要多輪、每輪同步完成 1–4 個以符合 60 分鐘 iteration_timeout。

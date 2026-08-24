@@ -429,23 +429,49 @@
   {
     "id": "M031",
     "title": "M031: roformer-model-melband-roformer-aspiration-by-sucial（audited, category=aspiration）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 42,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-aspiration-by-sucial",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-melband-roformer-aspiration-by-sucial roformer-model-melband-roformer-aspiration-less-aggressive-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3",
+      "cache_verified_sha256": "9e791258c866c6c8da66052693d8cc3b64f1f42c01e052dbdc570cd278380cc5",
+      "checkpoint_size": 835983746,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-aspiration-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M032",
     "title": "M032: roformer-model-melband-roformer-aspiration-less-aggressive-by-sucial（audited, category=aspiration）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 43,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-aspiration-less-aggressive-by-sucial",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-melband-roformer-aspiration-by-sucial roformer-model-melband-roformer-aspiration-less-aggressive-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3",
+      "cache_verified_sha256": "83bfe991cec4fbadde9f30d1f79cd5293ad0b1f936256be327bba5cbb4883374",
+      "checkpoint_size": 835982664,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass"
+    },
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-aspiration-less-aggressive-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {

@@ -1,0 +1,26 @@
+{
+  "iteration": 14,
+  "timestamp": "2026-08-24T22:15:23+08:00",
+  "hypothesis": "STEER.md（21:35 投放的一次性指令，回應前兩次 iteration-14 嘗試分別因背景執行與 40 分鐘下載超時失敗）要求本輪把批次縮到最小：只同步驗證 1 個 audited 模型，若其權重已在快取可加做第 2 個，且全程須在時間預算內完成。檢查 verify/roformer-cache/ 發現前兩次失敗嘗試已把 M031（aspiration-by-sucial）與 M032（aspiration-less-aggressive-by-sucial）的 checkpoint 完整下載且位元組數與 manifest size 完全吻合（M037 de-reverb-echo 則只有部分 .ckpt.part，未完整）。若對 M031＋M032 執行 batch verify，因權重已在本機、無需下載，應能在數秒內完成 SHA-256 驗證＋分離＋輸出契約驗證並翻為 pass，且不重蹈前兩輪的下載逾時；未嘗試 M037（會觸發全新完整下載，違背本輪風險最小化的 STEER 精神），留給下一輪。",
+  "files_touched": [
+    ".loop/backlog.json",
+    ".loop/iterations/0014.json",
+    ".loop/journal.md",
+    ".loop/state.json",
+    ".loop/STEER.md (deleted after journal entry written, one-shot directive consumed)",
+    ".loop/driver.log",
+    ".loop/lastrun.log"
+  ],
+  "commands": [
+    {"cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models roformer-model-melband-roformer-aspiration-by-sucial roformer-model-melband-roformer-aspiration-less-aggressive-by-sucial --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --device auto --max-cached 3", "exit_code": 0, "timed_out": false},
+    {"cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe worker/roformer_cache.py --model melband-roformer-kim-vocals --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache (re-touch after rolling cache evicted it during the batch verify above; required so ui_configuration_smoke's hardcoded RoFormer route keeps working, per LESSONS SIGN iter 13)", "exit_code": 0, "timed_out": false},
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd'", "exit_code": 0, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false},
+    {"cmd": "python -c \"import json,sys; ...\" (informational only; full tier not due this iteration, 14 % 5 != 0)", "exit_code": 1, "timed_out": false}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 63, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}
