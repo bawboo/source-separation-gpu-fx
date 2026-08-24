@@ -1176,3 +1176,61 @@ roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/
 **Decision:** continue
 **Lesson：** 無新 SIGN——本輪假設 (a)(b)(c) 皆如預期成立。額外確認：LESSONS iter-13 記載的「批次前用目錄 mtime 排序預判 evict_oldest() 的犧牲對象」方法本輪再次準確預測（fullness／inst-gaboxbv3 被擠掉、kim-vocals 倖存），可視為此專案 rolling cache 批次規劃的穩定作法，非一次性巧合。
 **Note（交接給 iteration 26）：** M010、M011 已完成並有印出證據；本輪也已補齊 full tier 證據（C1 pass）。剩餘 backlog：36 個 audited M-item（下一個優先序：M012 `melband-roformer-instv6` priority 23、M013 `melband-roformer-instv6n` priority 24、M014 `melband-roformer-instv7n` priority 25、M017 `melband-roformer-karaoke-gabox` priority 28...）。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存）；下一次 5 的倍數在 iteration 30，記得依協定跑 full tier。附註：本輪讀 backlog.json 時發現所有項目（包含早已 pass 的舊項目，例如 A1／M005／M009）的中文 `title` 欄位在 UTF-8 重新解碼後仍顯示為亂碼字元，判斷是早期 wiring 階段以非 UTF-8 console 寫入時就已產生的既存資料品質問題，不是本輪或本次改動造成；依「backlog 項目 append-only，不可 reword」規則本輪未觸碰，僅新增 `passes`／`evidence`。留給後續視需要另案處理（不阻塞任何 completion criteria，criteria 不檢查 title 內容）。
+
+## iter-26 (2026-08-25T02:30:00+08:00)
+
+**Hypothesis：** iter-25 交接筆記指出下一個優先序最高的兩個 failing audited 項目是 M012（`melband-roformer-instv6`，priority 23）與 M013（`melband-roformer-instv6n`，priority 24），且 `melband-roformer-kim-vocals` 在 iter-25 批次後倖存於快取（mtime 01:46:17，被 iter-25 mandatory full tier 的 `roformer_smoke` 觸碰更新，是快取內最新項目）。假設：(a) 對 M012＋M013 用 `tools/roformer_batch_verify.py` 單次同步批次呼叫可下載＋SHA-256 驗證＋分離＋輸出格式驗證，讓兩項翻為 `passes:true`——批次前對實際 checkpoint URL（INSTV6.ckpt）做 20MB range-request 吞吐量探測，量到約 4.0 MB/s（913MB 約 228 秒／個），遠低於 60 分鐘 iteration timeout；(b) 這批次不會把 `melband-roformer-kim-vocals` 擠出快取（`max_cached=3`）——批次前快取內只有 3 個項目且 kim-vocals 是最新的一個，新增 2 個模型後快取滿 5 項，`evict_oldest()` 只會丟掉沒有受保護必要的既存項目（本輪批次前快取內除 kim-vocals 外沒有其他既存項目需要擔心被擠掉）；(c) 本輪 iteration 26 不是 5 的倍數也非宣告 converged，依協定（iter-22/23/24 先例）只有 cheap tier 為強制項，C1 本輪維持 fail，留待 iteration 30 的強制 full tier。
+
+**變更：**
+- 無原始碼變更（本輪為 M-item 資料驗證批次，不改動任何 `plugin/`／`cpp/`／`worker/`／`tests/` 程式碼）。
+- `.loop/backlog.json`：M012、M013 `passes` 翻為 `true`，`evidence` 記錄本輪指令、exit code、SHA-256、checkpoint 大小、輸出規格（sample_rate/channels/subtype/finite/num_outputs）。
+
+**Verification commands + output（實際印出）：**
+
+`curl --max-time 45 -L -r 0-20000000 -o /dev/null -w 'speed=%{speed_download} bytes/s size=%{size_download} time=%{time_total} http_code=%{http_code}'` → `speed=4009470 bytes/s size=20000001 time=4.988190 http_code=206`（約 4.0 MB/s）。
+
+`C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-instv6 melband-roformer-instv6n --cache-dir 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache' --fixture 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav' --output-root 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch' --max-cached 3` → exit 0：
+```json
+[
+  {
+    "model": "melband-roformer-instv6",
+    "category": "instrumental",
+    "audited": true,
+    "cache_verified_sha256": "677951b8556a27abe32e39705640638826e78101fa901a51ad73d20522be6d25",
+    "checkpoint_size": 913026650,
+    "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+    "outcome": "pass"
+  },
+  {
+    "model": "melband-roformer-instv6n",
+    "category": "instrumental",
+    "audited": true,
+    "cache_verified_sha256": "802f3e5d183d7c4b50dea147c320e61634f5be6ff55fa899fdebeaf0f3cf7f42",
+    "checkpoint_size": 913026650,
+    "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+    "outcome": "pass"
+  }
+]
+```
+下載後複驗 `verify/roformer-cache/` 目錄：`melband-roformer-instv6/INSTV6.ckpt`（913026650 bytes）、`melband-roformer-instv6n/INSTV6N.ckpt`（913026650 bytes）與各自 `inst_gabox.yaml` 皆存在；`melband-roformer-kim-vocals`（mtime 01:46:17）安然倖存於快取內，本輪不需重新 touch。
+
+`cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s / OK
+Ran 2 tests in 0.075s / OK
+Ran 8 tests in 0.110s / OK
+```
+
+**Full tier：** 本輪 iteration number 26、26 % 5 != 0，且非宣告 converged，依協定不強制執行；M012／M013 backlog 項目的 `check` 欄位本身是 `roformer_batch_verify.py` 指令（非 full tier），故本輪僅以該指令 exit 0 的證據翻牌，符合協定第 9 步「proof was printed this run」的最低要求。
+
+**Backlog checker（僅供參考，非本輪 C2 判定依據——full tier 未跑）：** `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` → exit 1（117 項中仍有 34 項 `passes:false`：34 個剩餘 audited M-item）。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 60 changed path(s) within policy`
+
+**Criteria:** C1 fail（本輪未跑 full tier，依協定不可宣稱 pass）／C2 fail（backlog 仍有 34 項未過）／C3 pass（scope 無違規）。AND 規則下未同時全過，非 converged。
+**Metric:** backlog_items_passing = 83（較上輪 81 增加 2：M012、M013）；improved: true。
+**Decision:** continue
+**Lesson：** 無新 SIGN——本輪假設如預期成立，過程中未發現先前記錄之外的驚訝之處。
+**Note（交接給 iteration 27）：** M012、M013 已完成並有印出證據。剩餘 backlog：34 個 audited M-item（下一個優先序：M014 `melband-roformer-instv7n` priority 25、M017 `melband-roformer-karaoke-gabox` priority 28、M019 `melband-roformer-kimmel-ft` priority 30、M020 `melband-roformer-kimmel-ft2` priority 31...）。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存）；下一次 5 的倍數在 iteration 30，記得依協定跑 full tier。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria，留待後續視需要另案處理。

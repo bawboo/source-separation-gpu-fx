@@ -180847,3 +180847,9 @@ LOOP STATUS: running â€” iter-24 verified M005+M009 (audited RoFormer models), 7
 [driver] agent process exited rc=0
 [scope] OK ¡X 59 changed path(s) within policy
 [driver] iteration 25 launching  2026-08-25T01:35:48+0800
+Commit succeeded and the working tree is clean. Iteration 25 complete: M010 (`melband-roformer-inst-gaboxfvx`) and M011 (`melband-roformer-inst-gaboxv7`) both downloaded, SHA-256 verified, separated, and output-validated; the mandatory full tier (build + all 4 smoke tests) also passed this round since iteration 25 is a multiple of 5. Backlog is now 81/117 passing (36 audited M-items remain). C2 (backlog checker) still fails so this is not convergence.
+
+LOOP STATUS: running â€” iter-25 M010+M011 verified + full tier PASS, 81/117 backlog passing, continuing
+[driver] agent process exited rc=0
+[scope] OK ¡X 60 changed path(s) within policy
+[driver] iteration 26 launching  2026-08-25T01:48:22+0800

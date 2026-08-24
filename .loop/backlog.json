@@ -342,23 +342,53 @@
   {
     "id": "M012",
     "title": "M012: melband-roformer-instv6（audited, category=instrumental）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 23,
     "source": "plan",
     "model_id": "melband-roformer-instv6",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-instv6 melband-roformer-instv6n --cache-dir 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache' --fixture 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav' --output-root 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch' --max-cached 3",
+      "exit_code": 0,
+      "sha256": "677951b8556a27abe32e39705640638826e78101fa901a51ad73d20522be6d25",
+      "checkpoint_size": 913026650,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass",
+      "iteration": 26
+    },
     "check": "python tools/roformer_batch_verify.py --models melband-roformer-instv6 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M013",
     "title": "M013: melband-roformer-instv6n（audited, category=instrumental）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 24,
     "source": "plan",
     "model_id": "melband-roformer-instv6n",
     "audited": true,
-    "evidence": null,
+    "evidence": {
+      "cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-instv6 melband-roformer-instv6n --cache-dir 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache' --fixture 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav' --output-root 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch' --max-cached 3",
+      "exit_code": 0,
+      "sha256": "802f3e5d183d7c4b50dea147c320e61634f5be6ff55fa899fdebeaf0f3cf7f42",
+      "checkpoint_size": 913026650,
+      "separation": {
+        "sample_rate": 48000,
+        "frames": 96000,
+        "channels": 2,
+        "subtype": "FLOAT",
+        "finite": true,
+        "num_outputs": 2
+      },
+      "outcome": "pass",
+      "iteration": 26
+    },
     "check": "python tools/roformer_batch_verify.py --models melband-roformer-instv6n --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
