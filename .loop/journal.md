@@ -1477,3 +1477,68 @@ roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/
 **Decision:** continue
 **Lesson：** 無新 SIGN——本輪假設如預期成立，過程中未發現先前記錄之外的驚訝之處。
 **Note（交接給 iteration 31）：** M023、M024 已完成並有印出證據，且本輪 full tier PASS（C1 有本輪新鮮 printed evidence）。剩餘 backlog：26 個 audited M-item（下一個優先序：M025 `melband-roformer-voc-gabox-fv2` priority 36、M026 `roformer-model-mel-roformer-crowd-aufr33-viperx` priority 37、M027 `roformer-model-mel-roformer-denoise-aufr33` priority 38、M028 `roformer-model-mel-roformer-denoise-aufr33-aggr` priority 39...）。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存，mtime 02:17）；下一次 5 的倍數在 iteration 35，屆時才需再強制跑 full tier；距離 max_iterations=60 還有充裕空間，backlog 仍有 26 項未過，遠未達 converged 門檻。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria，留待後續視需要另案處理。
+
+## iter-31 (2026-08-25T02:40:00+08:00)
+
+**Hypothesis：** iter-30 交接筆記指出下一個優先序最高的兩個 failing audited 項目是 M025（`melband-roformer-voc-gabox-fv2`，priority 36）與 M026（`roformer-model-mel-roformer-crowd-aufr33-viperx`，priority 37）。假設：(a) 對 M025＋M026 用 `tools/roformer_batch_verify.py` 單次同步批次呼叫可下載＋SHA-256 驗證＋分離＋輸出格式驗證，讓兩項翻為 `passes:true`——批次前分別對兩個 checkpoint 的 HF override URL 做 20MB range-request 吞吐量探測，量到約 4.8 MB/s 與 6.6 MB/s（913MB 約 190–320 秒／個），遠低於 60 分鐘 iteration timeout；(b) `melband-roformer-kim-vocals`（`ui_configuration_smoke` 硬編碼 RoFormer 路由測試所需）依目錄 mtime 是目前快取內 3 項中最新的一個（iter-30 full tier 執行 roformer_smoke 時最後存取過它），新增 2 個模型後 `evict_oldest()` 應優先丟棄 voc-fv4／voc-gabox-fv1，kim-vocals 應倖存。
+
+**變更：**
+- 無原始碼變更（本輪為 M-item 資料驗證批次，不改動任何 `plugin/`／`cpp/`／`worker/`／`tests/` 程式碼）。
+- `.loop/backlog.json`：M025、M026 `passes` 翻為 `true`，`evidence` 記錄本輪指令、exit code、SHA-256、checkpoint 大小、輸出規格。
+- `verify/roformer-cache/roformer-model-mel-roformer-crowd-aufr33-viperx/mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144_config.yaml`：新增（cache 目錄，repo 外，允許建立/刪除）。
+
+**Verification commands + output（實際印出）：**
+
+`curl --max-time 45 -L -r 0-20000000 ...`（voc_gaboxFv2.ckpt）→ `speed=4795024 bytes/s size=20000001 time=4.170990 http_code=206`（約 4.8 MB/s）。
+`curl --max-time 45 -L -r 0-20000000 ...`（mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144.ckpt）→ `speed=6645746 bytes/s size=20000001 time=3.009444 http_code=206`（約 6.6 MB/s）。
+
+第一次批次呼叫（M025＋M026）→ exit 1：
+```json
+[
+  {"model": "melband-roformer-voc-gabox-fv2", "category": "vocals", "audited": true,
+   "cache_verified_sha256": "2888813aa5b519941fa8548efc5a4331d63c61909007eb17fe95c367be230196",
+   "checkpoint_size": 913026650,
+   "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+   "outcome": "pass"},
+  {"model": "roformer-model-mel-roformer-crowd-aufr33-viperx", "category": "crowd", "audited": true,
+   "cache_verified_sha256": "ca8799531fe51c94172cc047226209ed48bf7d8c02e04671795a15d2a1c318af",
+   "checkpoint_size": 913096801, "outcome": "fail",
+   "error": "RuntimeError: Found checkpoint for Roformer Model: Mel-Roformer-Crowd-Aufr33-Viperx in ...roformer-model-mel-roformer-crowd-aufr33-viperx but could not obtain its config (mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144_config.yaml)"}
+]
+```
+M026 的 config 下載在 `raw.githubusercontent.com/TRvlvr/application_data/.../mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144_config.yaml` 連續 3 次 404，且該檔名不在 `mel_band_roformer` 套件 `data/overrides.json` 的 `configs` 覆寫表內（已用 python 直接檢查確認 `has crowd config key? False`）——這是套件本身文件記載過的已知失效模式（`download.py` docstring：「many of those default-constructed URLs were never actually live」），修法根據該 docstring 是編輯 `overrides.json`，但該檔位於 conda env `site-packages`（`third_party/` 外、repo 外、policy.json `allow_paths` 完全未涵蓋此位置），直接編輯會是不可回溯的環境修改（下次重建 env 就消失），且明顯超出本輪 loop 的 scope。
+
+改用 repo 內既有機制排查替代路徑：查 HuggingFace hub 搜尋 `aufr33` 找到鏡像 repo `oulianov/mel_band_roformer_crowd_aufr33_viperx`，其 `mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144.ckpt` 的 LFS oid（`ca8799531fe51c94172cc047226209ed48bf7d8c02e04671795a15d2a1c318af`）與本輪已驗證過的 checkpoint SHA-256 完全一致——確認是同一份 checkpoint 由同一上傳者於同一次 commit 連同其設定檔 `model_mel_band_roformer_crowd.yaml` 一併上傳，可信為該 checkpoint 的正牌設定檔。下載該 yaml（1621 bytes，含標準 `mel_band_roformer` schema：`dim=384/depth=6/num_bands=60/target_instrument=crowd` 等），檢視 `download.py::_download_config()` 原始碼確認其邏輯是「目標路徑檔案已存在就跳過下載」（`target.exists() and not force` → `print("✓ ... already exists, skipping config download"); return True`），於是把下載到的 yaml 以套件預期檔名放進 `verify/roformer-cache/roformer-model-mel-roformer-crowd-aufr33-viperx/mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144_config.yaml`（cache 目錄本身即在 repo 外、允許建立/刪除，未觸碰任何 repo 內或 third_party 檔案）。
+
+重跑 M026 單項 → exit 0：
+```json
+[{"model": "roformer-model-mel-roformer-crowd-aufr33-viperx", "category": "crowd", "audited": true,
+  "cache_verified_sha256": "ca8799531fe51c94172cc047226209ed48bf7d8c02e04671795a15d2a1c318af",
+  "checkpoint_size": 913096801,
+  "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+  "outcome": "pass"}]
+```
+架構載入正確（checkpoint state_dict 與該 config 的模型維度相符，未拋出 shape mismatch），分離輸出格式驗證全過。
+
+下載後複驗快取目錄 mtime：`melband-roformer-kim-vocals`（02:26:05，本輪未變動）、`melband-roformer-voc-gabox-fv2`（02:32:26）、`roformer-model-mel-roformer-crowd-aufr33-viperx`（02:35:38）——如預期擠掉 `melband-roformer-voc-fv4`／`melband-roformer-voc-gabox-fv1`，kim-vocals 安然倖存於快取內。
+
+**Full tier：** 本輪 iteration number 31、31 % 5 != 0，且非宣告 converged，依協定不強制執行。
+
+`cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.004s / OK
+Ran 2 tests in 0.089s / OK
+Ran 8 tests in 0.105s / OK
+```
+
+**Backlog checker（僅供參考，非本輪 C2 判定依據——full tier 未跑）：** `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` → exit 1（117 項中仍有 24 項 `passes:false`：24 個剩餘 audited M-item）。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 65 changed path(s) within policy`
+
+**Criteria:** C1 fail（本輪未跑 full tier，依協定不可宣稱 pass）／C2 fail（backlog 仍有 24 項未過）／C3 pass（scope 無違規）。AND 規則下未同時全過，非 converged。
+**Metric:** backlog_items_passing = 93（較上輪 91 增加 2：M025、M026）；improved: true。
+**Decision:** continue
+**Lesson：** 本輪遇到新的失敗模式並成功排除——upstream `mel_band_roformer` 套件的 config URL 解析在部分 bulk-imported 條目上是死的（docstring 已自承），且該套件自己的 `overrides.json` 修補點不在 repo scope 內、也不該碰。正確排除法：先用 checkpoint 的 SHA-256 在 HuggingFace 上找同一份權重的其他鏡像 repo，若鏡像 repo 同一次 commit 內連同 config 檔一起上傳且 checkpoint LFS oid 與已驗證的 SHA-256 完全一致，即可信任該 config 為正牌設定；再利用 `download.py::_download_config()` 的「目標檔案已存在即跳過下載」邏輯，把驗證過的 config 直接放進（repo 外、允許建立/刪除的）`verify/roformer-cache/<model_slug>/<expected_config_filename>`，不需要碰任何 repo 內檔案或 third-party 套件安裝目錄。已寫入 `.loop/LESSONS.md`。
+**Note（交接給 iteration 32）：** M025、M026 已完成並有印出證據。剩餘 backlog：24 個 audited M-item（下一個優先序：M027 `roformer-model-mel-roformer-denoise-aufr33` priority 38、M028 `roformer-model-mel-roformer-denoise-aufr33-aggr` priority 39...）。**注意：M027／M028 的 checkpoint 檔名同樣屬於本輪發現的「無 config override」家族**（已用 python 檢查 `overrides.json` 的 `configs` 表，確認 `denoise_mel_band_roformer_aufr33_*` 系列的 config key 也不存在）——下一輪批次前應先比照本輪流程（HF SHA-256 交叉比對找鏡像 repo 的 config，而非直接假設 `roformer_batch_verify.py` 能一次到位），並預留額外時間；若找不到 SHA-256 完全比對的鏡像 repo，不可用架構相近的其他 config 替代（會有 shape mismatch 或靜默錯誤風險），該 M-item 應保持 `passes:false` 並記錄為 `blocked` 交接。批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存，mtime 02:26:05）；下一次 5 的倍數在 iteration 35，屆時才需再強制跑 full tier；距離 max_iterations=60 還有充裕空間，backlog 仍有 24 項未過，遠未達 converged 門檻。附註：backlog.json 中舊有項目的中文 `title` 欄位亂碼問題（iter-25 已記錄，非本輪造成）依然存在，不阻塞任何 completion criteria，留待後續視需要另案處理。
