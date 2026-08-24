@@ -180835,3 +180835,9 @@ Commit succeeded, clean working tree. Iteration 22 is complete per protocol.
 [driver] agent process exited rc=0
 [scope] OK ¡X 57 changed path(s) within policy
 [driver] iteration 23 launching  2026-08-25T01:10:58+0800
+Checkpoint succeeded, working tree clean. This iteration is complete.
+
+LOOP STATUS: running â€” D3 RoFormer browser trio gated to hide/disable during HTDemucs modes (mirrors D2), 77/117 backlog passing, C1/C2 fail (full tier not due), C3 pass
+[driver] agent process exited rc=0
+[scope] OK ¡X 58 changed path(s) within policy
+[driver] iteration 24 launching  2026-08-25T01:27:52+0800

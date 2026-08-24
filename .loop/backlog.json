@@ -196,12 +196,12 @@
   {
     "id": "M005",
     "title": "M005: melband-roformer-fullness（audited, category=vocals）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 16,
     "source": "plan",
     "model_id": "melband-roformer-fullness",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter-24: tools/roformer_batch_verify.py --models melband-roformer-fullness --cache-dir verify/roformer-cache --fixture verify/fixtures/test_48k_2s.wav --output-root verify/output/roformer-batch --max-cached 3 -> exit 0, outcome=pass, sha256 verified, sample_rate=48000 (matches source fixture), channels=2, subtype=FLOAT, finite=true, num_outputs=2 (vocals/instrumental). checkpoint_sha256=a64a27a672b457de23d9decd1fc7b58b0664a9f4f24bb43af154708e2ef07d2f checkpoint_size=913090472.",
     "check": "python tools/roformer_batch_verify.py --models melband-roformer-fullness --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
@@ -279,12 +279,12 @@
   {
     "id": "M009",
     "title": "M009: melband-roformer-inst-gaboxbv3（audited, category=instrumental）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 20,
     "source": "plan",
     "model_id": "melband-roformer-inst-gaboxbv3",
     "audited": true,
-    "evidence": null,
+    "evidence": "iter-24: tools/roformer_batch_verify.py --models melband-roformer-inst-gaboxbv3 --cache-dir verify/roformer-cache --fixture verify/fixtures/test_48k_2s.wav --output-root verify/output/roformer-batch --max-cached 3 -> exit 0, outcome=pass, sha256 verified, sample_rate=48000 (matches source fixture), channels=2, subtype=FLOAT, finite=true, num_outputs=2 (vocals/instrumental). checkpoint_sha256=5578545e094e584835b3184310ed1b12072f15d4b6ed8f4359ecc17358a66676 checkpoint_size=913026650.",
     "check": "python tools/roformer_batch_verify.py --models melband-roformer-inst-gaboxbv3 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {

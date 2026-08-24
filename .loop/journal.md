@@ -1051,3 +1051,59 @@ Ran 8 tests in 0.072s / OK
 **Decision:** continue
 **Lesson：** 無新 SIGN——本輪假設如預期成立，D2 建立的兩個掛載點（`timerCallback()` 的 enabled 邏輯、`updateSixSourceControls()` 的 visible 邏輯，且 `advancedButton_.onClick` 已在 iter-22 補過對 `updateSixSourceControls()` 的呼叫）對 D3 的鏡像 gating 同樣直接適用，過程中未發現先前記錄之外的驚訝之處。
 **Note（交接給 iteration 24）：** D1–D3 皆已完成並有印出證據（modelBox_ 與 RoFormer 瀏覽器三元件現在互為鏡像 gating，任一時刻只有其中一組會 visible/enabled）。剩餘 backlog 只剩 40 個 audited M-item（下載＋SHA-256 驗證→分離→輸出格式驗證，優先序由 M005 開始 priority 16 起跳）。下一輪建議開始批次處理 M-item（每輪 2–4 個 audited 模型，批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內——本輪未觸碰快取，無需重新 touch；批次前建議先用 60 秒 `curl --max-time 60` 量測目前下載吞吐量以決定本輪批次大小，見 LESSONS iter-15 SIGN）。下一次 5 的倍數在 iteration 25，記得依協定跑 full tier。
+
+## iter-24 (2026-08-25T01:45:00+08:00)
+
+**Hypothesis：** iter-23 交接筆記指出 D1–D3 皆已完成並有印出證據，剩餘 backlog 只剩 40 個 audited M-item（下載＋SHA-256 驗證→分離→輸出格式驗證），優先序由 M005（priority 16）起跳。假設：對目前優先序最高的兩個 failing audited 項目（M005 `melband-roformer-fullness`、M009 `melband-roformer-inst-gaboxbv3`）用 `tools/roformer_batch_verify.py` 單次同步批次呼叫，可以下載＋SHA-256 驗證＋分離測試音檔＋驗證輸出格式，讓兩項都翻為 `passes:true`（有印出證據），backlog_items_passing 增加 2，因為驗證管線本身已被先前多輪 M-item 證明正確，且本輪實測對 HuggingFace resolve URL 的 range request 吞吐量約 4.28 MB/s（`curl -r 0-20000000` 20MB 樣本、4.67 秒），兩個約 913MB 的 checkpoint 預估各約 210 秒下載，遠低於 60 分鐘 iteration timeout；批次大小選 2（而非上限 4）是為了避免觸發 LESSONS iter-13/21 記錄過的滾動快取（`max_cached=3`）擠掉 `melband-roformer-kim-vocals`（`ui_configuration_smoke`／`roformer_smoke` 依賴的固定快取模型）——下載前快取內容為 `melband-roformer-big-beta5e`（mtime 23:21）、`melband-roformer-big-beta7`（mtime 23:18）、`melband-roformer-kim-vocals`（mtime 01:24，最新），新增 2 個模型只會擠掉最舊的兩個（big-beta7、big-beta5e），kim-vocals 應可倖存不需重新 touch。
+
+**變更：**
+- 無原始碼變更（本輪為 M-item 資料驗證批次，不改動任何 `plugin/`／`cpp/`／`worker/`／`tests/` 程式碼）。
+- `.loop/backlog.json`：M005、M009 `passes` 翻為 `true`，`evidence` 記錄本輪指令、exit code、SHA-256、checkpoint 大小、輸出規格（sample_rate/channels/subtype/finite/num_outputs）。
+
+**Verification commands + output（實際印出）：**
+
+`C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-fullness melband-roformer-inst-gaboxbv3 --cache-dir 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache' --fixture 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav' --output-root 'C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch' --max-cached 3` → exit 0：
+```json
+[
+  {
+    "model": "melband-roformer-fullness",
+    "category": "vocals",
+    "audited": true,
+    "cache_verified_sha256": "a64a27a672b457de23d9decd1fc7b58b0664a9f4f24bb43af154708e2ef07d2f",
+    "checkpoint_size": 913090472,
+    "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+    "outcome": "pass"
+  },
+  {
+    "model": "melband-roformer-inst-gaboxbv3",
+    "category": "instrumental",
+    "audited": true,
+    "cache_verified_sha256": "5578545e094e584835b3184310ed1b12072f15d4b6ed8f4359ecc17358a66676",
+    "checkpoint_size": 913026650,
+    "separation": {"sample_rate": 48000, "frames": 96000, "channels": 2, "subtype": "FLOAT", "finite": true, "num_outputs": 2},
+    "outcome": "pass"
+  }
+]
+```
+下載後複驗 `verify/roformer-cache/` 目錄：`melband-roformer-fullness/FullnessVocalModel.ckpt`（913090472 bytes）、`melband-roformer-inst-gaboxbv3/inst_gaboxBv3.ckpt`（913026650 bytes）與 config.yaml 皆存在；滾動快取如預期擠掉 `big-beta5e`／`big-beta7`，`melband-roformer-kim-vocals`（mtime 01:24）安然倖存於快取內，本輪不需重新 touch。
+
+`cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s / OK
+Ran 2 tests in 0.068s / OK
+Ran 8 tests in 0.175s / OK
+```
+
+**Full tier：** 本輪 iteration number 24、24 % 5 != 0，且非宣告 converged，依協定不強制執行；M005／M009 backlog 項目的 `check` 欄位本身是 `roformer_batch_verify.py` 指令（非 full tier），故本輪僅以該指令 exit 0 的證據翻牌，符合協定第 9 步「proof was printed this run」的最低要求。
+
+**Backlog checker（僅供參考，非本輪 C2 判定依據——full tier 未跑）：** `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` → exit 1（117 項中仍有 38 項 `passes:false`：38 個剩餘 audited M-item）。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 58 changed path(s) within policy`
+
+**Criteria:** C1 fail（本輪未跑 full tier，依協定不可宣稱 pass）／C2 fail（backlog 仍有 38 項未過）／C3 pass（scope 無違規）。AND 規則下未同時全過，非 converged。
+**Metric:** backlog_items_passing = 79（較上輪 77 增加 2：M005、M009）；improved: true。
+**Decision:** continue
+**Lesson：** 無新 SIGN——本輪假設如預期成立。額外確認：對 HuggingFace resolve CDN 的 range-request 吞吐量測法（`curl --max-time 45 -L -r 0-20000000 -o /dev/null -w '...'`）比 LESSONS iter-15 原本量測 huggingface.co 首頁的方法更能反映真實 checkpoint 下載速度（本輪量到 4.28 MB/s，換算 913MB 約 210 秒，與實測批次總耗時量級相符）；批次大小 2（保守於上限 4）成功避開了 kim-vocals 被擠出快取的風險，往後若吞吐量穩定在 4+ MB/s、且本輪目標模型不含 kim-vocals，批次大小可視情況上調到 3（仍需確認新增數量不超過快取剩餘的「非 kim-vocals」名額，或批次後主動 touch kim-vocals）。
+**Note（交接給 iteration 25）：** M005、M009 已完成並有印出證據。剩餘 backlog：38 個 audited M-item（下一個優先序：M010 `melband-roformer-inst-gaboxfvx` priority 21、M011 `melband-roformer-inst-gaboxv7` priority 22、M012 `melband-roformer-instv6` priority 23、M013 `melband-roformer-instv6n` priority 24...）。**iteration 25 是下一次 5 的倍數，依協定必須跑 full tier（`cmd //c '.loop\checks\full.cmd'`）＋ backlog checker，且本輪未取得 full tier 證據，C1 仍會是 fail 直到那時。** 批次前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪已確認倖存，下一輪若批次模型不含 kim-vocals 且批次大小 ≤2，理論上仍會倖存，但每輪仍建議開頭快速 `ls` 快取目錄複核）。
