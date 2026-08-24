@@ -1,0 +1,9 @@
+本輪（iteration 39）完成並已 commit（`4dc472e`）。摘要：
+
+**達成 converged**：本輪驗證了 backlog 剩餘的最後 5 個稽核模型（M080 kim-inst-v1e-plus、M081 kim-inst-v2、M082 kim-instvoc-duality-v1、M083 kim-instvoc-duality-v2、M089 vocals-becruily），SHA-256 全數與 manifest 相符，分離輸出格式驗證全過。backlog 達成 **117/117 全數 passes=true**。隨後跑了強制的 full tier（build + 4 個 smoke test 全 PASS，含 `htdemucs_roformer_smoke`）、backlog checker（exit 0）、scope check（exit 0），並依協定用一個獨立 fresh-context subagent 從零重跑同一組驗證——三項獨立重驗結果一致。三個 completion criteria（C1/C2/C3）本輪同時通過，故宣告 `converged` / `criterion_met`。
+
+**⚠️ 重要發現，需要你處理**：本輪過程中意外發現，正式的外部驅動器 `.loop/run_loop.sh`（LOOP_PLAN 定義的 Engine B）其實**一直在背景另一個 session 中持續運行**，幾乎與這次互動式呼叫同時各自獨立啟動了「iteration 39」（`.loop/driver.log` 顯示 `[driver] iteration 39 launching 2026-08-25T03:58:35`，對應 process id 34372 及其 MSBuild/node 子行程，直到我這輪 commit 完成時都還存活）。這兩個 process 互不知情地同時在同一份工作樹上動作，我這輪選擇不去殺對方 process、盡快把已完成且有完整證據的成果 commit 以縮小競態視窗，但殘留風險是：那個背景 session 稍後完成時，可能會覆蓋我剛寫入的 `.loop/iterations/0039.json`、或把 `state.json.status` 從 `converged` 改回 `running`。
+
+**建議你現在做**：既然 loop 已經 converged，該背景 session 不應該再繼續消耗資源或產生額外提交。請檢查並視需要手動停止它（例如 `touch .loop/STOP`，或直接在工作管理員找 PID 附近的 `claude`/`node`/`MSBuild` process 結束）。
+
+LOOP STATUS: converged — 117/117 backlog passing, full tier + backlog checker + scope check + fresh-context independent re-verify all pass this run; all completion criteria met (criterion_met)

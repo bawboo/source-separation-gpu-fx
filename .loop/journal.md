@@ -2003,3 +2003,10 @@ EXITCODE=0
 **Decision:** converged
 **Lesson（新 SIGN）：** 本輪透過 `Get-Process` 與 `.loop/driver.log` 時間戳記發現，`.loop/run_loop.sh` 外部驅動器（LOOP_PLAN §9 定義的正式 Engine B）在本次互動式 session 開始前就已在背景持續運行（`nohup`/前次 session 留下），且幾乎與本次 session 同時各自獨立啟動了「iteration 39」——這是本專案第一次真的遇到「同一個 loop 被兩個獨立 process 同時推進」的情境，過去 38 輪從未發生過（過去每輪都是 driver 依序 launch，前一輪 agent process 完全退出才 launch 下一輪）。本輪選擇不殺對方 process、不覆蓋其工作，而是盡快把已完成且有完整證據的變更（backlog 117/117、full tier PASS、獨立重驗 PASS）寫入並 commit，降低競態視窗；已知殘留風險：對方 process 之後若也嘗試寫入 `.loop/iterations/0039.json` 或把 `state.json.iteration` 從 38 bump 一次，可能覆蓋本次寫入的檔案或造成 iteration 計數帳本輕微不一致（`journal.md` 為 append-only 不受影響）。**規則：** 任何後續 iteration（或使用者／下一個 session）開始動作前，除了讀 `state.json.status` 之外，也應該用 `Get-Process` 檢查是否已有其他 `claude`/`codex` headless process 綁定同一 repo 路徑在跑；若發現，應優先確認彼此的 `status` 決策（例如本輪已宣告 `converged`），而不是各自獨立推進、假設自己是唯一的 driver instance。
 **Note：** 本輪 criteria 全數 pass 且已通過獨立重驗，依協定宣告 `converged` / `criterion_met`。57 個稽核模型 backlog 全數 passes=true，42 個未稽核模型收錄＋標註 experimental 的架構項目也全數完成（既有 backlog 涵蓋）。**重要殘留提醒：** 發現有另一個 `.loop/run_loop.sh` 驅動器 session 仍在背景運行、且截至本輪 commit 前仍在進行它自己版本的「iteration 39」（可能已因與本輪爭用 GPU/build 而受影響或變慢）——使用者應檢查該背景 session（`.loop/driver.log`、`Get-Process` 找 `claude`/`node` process，本輪觀察到的 PID 包含 34372 及一批 03:58 前後啟動的 node 子行程）並視需要手動停止它（例如 `touch .loop/STOP` 或直接終止該 process），因為本 loop 已 converged、不應再繼續消耗資源或產生額外提交。
+
+## Operator acceptance — 2026-08-25T05:05+08:00（Phase 4 終驗收）
+- 收斂宣告後 operator 獨立重跑 full tier，首次 FAIL：`ui_configuration_smoke fatal: RoFormer C++ route produced no preview`。
+- 根因：iter-39 journal 記載的「並行幽靈 driver」殘留 agent 在收斂後被強殺，當時正在動 `htfx-roformer` env → site-packages 成片損壞（_cffi_backend、decorator、pyyaml、requests、tqdm、pycparser、platformdirs 遺失）。與收斂 commit 的程式碼無關；工作樹與 4dc472e 完全一致。
+- 修復：pip 補齊全部缺失套件，`pip check` 乾淨、`mel_band_roformer` import OK。
+- 重跑終驗收：**FULL_EXIT=0**——ui（12 modes＋gating 全簽章）／media_io／record_mode（GPU 180.7ms）／roformer_smoke（44.1kHz/stereo/32float/finite）全 PASS。收斂證據確認有效。
+- Final: status=converged / criterion_met · 39 iterations · backlog 117/117 · loop branch `loop/melband-roformer`（merge 回 main 由使用者決定）。
