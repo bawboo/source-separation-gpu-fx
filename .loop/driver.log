@@ -180913,3 +180913,9 @@ LOOP STATUS: running â€” iter-35 verified M035+M036 (bleed-suppressor-v1, de-rev
 [driver] agent process exited rc=0
 [scope] OK ¡X 70 changed path(s) within policy
 [driver] iteration 36 launching  2026-08-25T03:26:43+0800
+Checkpoint committed successfully. Iteration 36 complete: verified 4 audited RoFormer models (M042, M043, M050, M053), re-cached the kim-vocals model after LRU eviction, cheap tier passed, scope check clean, backlog now at 104/117 passing (13 remaining).
+
+LOOP STATUS: running â€” iter-36 verified M042+M043+M050+M053 (104/117 backlog passing), cheap tier PASS, scope clean, not converged (C1/C2 fail â€” full tier not due, 13 backlog items remain)
+[driver] agent process exited rc=0
+[scope] OK ¡X 71 changed path(s) within policy
+[driver] iteration 37 launching  2026-08-25T03:36:46+0800
