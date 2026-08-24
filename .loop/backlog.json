@@ -1390,23 +1390,23 @@
   {
     "id": "M075",
     "title": "M075: roformer-model-melband-roformer-kim-ft-2-bleedless-by-unwa（audited, category=denoise）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 86,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-ft-2-bleedless-by-unwa",
     "audited": true,
-    "evidence": null,
+    "evidence": "{\"model\": \"roformer-model-melband-roformer-kim-ft-2-bleedless-by-unwa\", \"category\": \"denoise\", \"audited\": true, \"cache_verified_sha256\": \"3c450bd66a98b49dd03231fc5ebb84121eef8418236b179423c2b171d62b04d9\", \"checkpoint_size\": 913101368, \"separation\": {\"sample_rate\": 48000, \"frames\": 96000, \"channels\": 2, \"subtype\": \"FLOAT\", \"finite\": true, \"num_outputs\": 2}, \"outcome\": \"pass\"}",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-ft-2-bleedless-by-unwa --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M076",
     "title": "M076: roformer-model-melband-roformer-kim-ft-2-by-unwa（audited, category=general）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 87,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-ft-2-by-unwa",
     "audited": true,
-    "evidence": null,
+    "evidence": "{\"model\": \"roformer-model-melband-roformer-kim-ft-2-by-unwa\", \"category\": \"general\", \"audited\": true, \"cache_verified_sha256\": \"5ed7b9e4c2eebbec7a7e5e8113058f7b68ba5e6048db8eaccfbbeb884c7884c0\", \"checkpoint_size\": 913100690, \"separation\": {\"sample_rate\": 48000, \"frames\": 96000, \"channels\": 2, \"subtype\": \"FLOAT\", \"finite\": true, \"num_outputs\": 2}, \"outcome\": \"pass\"}",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-ft-2-by-unwa --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
@@ -1423,23 +1423,23 @@
   {
     "id": "M078",
     "title": "M078: roformer-model-melband-roformer-kim-ft-by-unwa（audited, category=general）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 89,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-ft-by-unwa",
     "audited": true,
-    "evidence": null,
+    "evidence": "{\"model\": \"roformer-model-melband-roformer-kim-ft-by-unwa\", \"category\": \"general\", \"audited\": true, \"cache_verified_sha256\": \"e6bd8d333880191254a6ef6be3cb0ffa4dda9d3282e36b0cce2e88a660e00d39\", \"checkpoint_size\": 913100690, \"separation\": {\"sample_rate\": 48000, \"frames\": 96000, \"channels\": 2, \"subtype\": \"FLOAT\", \"finite\": true, \"num_outputs\": 2}, \"outcome\": \"pass\"}",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-ft-by-unwa --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
     "id": "M079",
     "title": "M079: roformer-model-melband-roformer-kim-inst-v1-e-by-unwa（audited, category=instrumental）—— 下載+SHA-256 驗證 → 對測試音檔分離 → 輸出規格驗證（時長不變/stereo/32-bit float/有限值）必過",
-    "passes": false,
+    "passes": true,
     "priority": 90,
     "source": "plan",
     "model_id": "roformer-model-melband-roformer-kim-inst-v1-e-by-unwa",
     "audited": true,
-    "evidence": null,
+    "evidence": "{\"model\": \"roformer-model-melband-roformer-kim-inst-v1-e-by-unwa\", \"category\": \"instrumental\", \"audited\": true, \"cache_verified_sha256\": \"df2bcdb8838b88264f5381dbb0ccd84a9926c9775cf548c34d8846f5cd20fe96\", \"checkpoint_size\": 913102724, \"separation\": {\"sample_rate\": 48000, \"frames\": 96000, \"channels\": 2, \"subtype\": \"FLOAT\", \"finite\": true, \"num_outputs\": 2}, \"outcome\": \"pass\"}",
     "check": "python tools/roformer_batch_verify.py --models roformer-model-melband-roformer-kim-inst-v1-e-by-unwa --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch"
   },
   {
