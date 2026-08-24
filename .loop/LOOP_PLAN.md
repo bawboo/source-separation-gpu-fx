@@ -80,3 +80,4 @@ Broken verification harness (command errors twice in a row): always pause-and-as
 - iter 0, 2026-08-23T11:20+08:00: §9 AGENT_CMD_JSON: claude.exe headless → codex.exe `exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox`（原因：claude CLI 在本機未登入（"Not logged in"），headless 無法認證；codex exec 實測已認證可用。引擎仍為 B、其餘不變。使用者已於 2026-08-23 授權自行運行維護）
 - iter 0, 2026-08-23T11:20+08:00: §4 追加使用者規則：絕不允許刪除 `C:\CodexProjects\SourceSeparation_GPU_FX\` 專案根目錄以外的任何檔案（已寫入 LESSONS.md SIGN）
 - iter 14, 2026-08-24T22:15+08:00: §6 iteration_timeout: 40 → 60 min（連續兩次同步模型下載超時；配合 STEER 單模型批次＋15 分下載止損。操作性 ceiling 調整，未放寬任何完成標準）
+- iter 16+, 2026-08-24: §1 UX 精緻化（使用者試用回饋，user-directed）：面板改為「模式優先」——先選分離模式（各模式有預設模型、可換同類替代），選定後拉桿才 enable。以 backlog B1–B4（source:user）實作，優先於剩餘 M 項。目標與完成標準未放寬；C2 涵蓋新 B 項。
