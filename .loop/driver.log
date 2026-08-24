@@ -180841,3 +180841,9 @@ LOOP STATUS: running â€” D3 RoFormer browser trio gated to hide/disable during H
 [driver] agent process exited rc=0
 [scope] OK ¡X 58 changed path(s) within policy
 [driver] iteration 24 launching  2026-08-25T01:27:52+0800
+Checkpoint committed successfully. Iteration 24 complete: verified two audited RoFormer models (M005 `melband-roformer-fullness`, M009 `melband-roformer-inst-gaboxbv3`) via download+SHA-256+separate+validate, flipped both backlog items to passing, ran cheap-tier and scope verification (both exit 0), and confirmed the `melband-roformer-kim-vocals` cache entry survived the rolling-cache eviction. 38 audited M-items remain; iteration 25 is the next full-tier checkpoint.
+
+LOOP STATUS: running â€” iter-24 verified M005+M009 (audited RoFormer models), 79/117 backlog passing, C1/C2 fail (full tier due at iter-25)/C3 pass
+[driver] agent process exited rc=0
+[scope] OK ¡X 59 changed path(s) within policy
+[driver] iteration 25 launching  2026-08-25T01:35:48+0800
