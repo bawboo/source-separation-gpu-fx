@@ -78,14 +78,23 @@ void require(bool condition, const char* message) {
     }
 }
 
+// juce::Timer::callPendingTimersSynchronously() only fires callbacks whose
+// countdown has already been decremented by JUCE's real background
+// TimerThread, so a single sleep()+callPendingTimersSynchronously() call is
+// inherently racy (the countdown may not have ticked down yet regardless of
+// how long we slept). Pumping it on every poll iteration here makes waits on
+// timer-driven UI state (e.g. Component::isEnabled() flags only refreshed in
+// timerCallback()) deterministic instead of occasionally missing the window.
 bool waitUntil(const std::function<bool()>& predicate, std::chrono::seconds timeout) {
     const auto deadline = std::chrono::steady_clock::now() + timeout;
     while (std::chrono::steady_clock::now() < deadline) {
+        juce::Timer::callPendingTimersSynchronously();
         if (predicate()) {
             return true;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
+    juce::Timer::callPendingTimersSynchronously();
     return predicate();
 }
 
@@ -332,8 +341,15 @@ int run() {
             "RoFormer browser did not expose all 99 models");
 
     auto* drumsSlider = findNamedComponent<juce::Slider>(components, "drumsGain");
+    auto* bassSlider = findNamedComponent<juce::Slider>(components, "bassGain");
+    auto* otherSlider = findNamedComponent<juce::Slider>(components, "otherGain");
+    auto* vocalsSlider = findNamedComponent<juce::Slider>(components, "vocalsGain");
+    auto* guitarSlider = findNamedComponent<juce::Slider>(components, "guitarGain");
+    auto* pianoSlider = findNamedComponent<juce::Slider>(components, "pianoGain");
     auto* outputTrimSlider = findNamedComponent<juce::Slider>(components, "outputTrim");
-    require(drumsSlider != nullptr && outputTrimSlider != nullptr,
+    require(drumsSlider != nullptr && bassSlider != nullptr && otherSlider != nullptr &&
+                vocalsSlider != nullptr && guitarSlider != nullptr &&
+                pianoSlider != nullptr && outputTrimSlider != nullptr,
             "stem/output gain sliders were not found");
     require(!model->isEnabled() && !roformerCategory->isEnabled() &&
                 !roformerSearch->isEnabled() && !roformerModel->isEnabled() &&
@@ -342,23 +358,36 @@ int run() {
             "mode was chosen");
 
     separationMode->setSelectedItemIndex(0, juce::sendNotificationSync);
-    juce::Thread::sleep(120);
-    juce::Timer::callPendingTimersSynchronously();
-    require(model->isEnabled() && roformerCategory->isEnabled() &&
-                roformerSearch->isEnabled() && roformerModel->isEnabled() &&
-                drumsSlider->isEnabled() && outputTrimSlider->isEnabled(),
+    require(waitUntil(
+                [&] {
+                    return model->isEnabled() && roformerCategory->isEnabled() &&
+                           roformerSearch->isEnabled() && roformerModel->isEnabled() &&
+                           drumsSlider->isEnabled() && outputTrimSlider->isEnabled();
+                },
+                std::chrono::seconds(3)),
             "model/RoFormer/slider controls did not enable after choosing a "
             "separation mode");
     require(model->getSelectedItemIndex() == 0,
             "B2: choosing 4-stem separation did not default the model box to "
             "htdemucs");
+    require(drumsSlider->isVisible() && bassSlider->isVisible() &&
+                otherSlider->isVisible() && vocalsSlider->isVisible() &&
+                drumsSlider->isEnabled() && bassSlider->isEnabled() &&
+                otherSlider->isEnabled() && vocalsSlider->isEnabled(),
+            "B3: 4-stem separation did not show/enable its four stem sliders");
+    require(!guitarSlider->isVisible() && !pianoSlider->isVisible(),
+            "B3: 4-stem separation did not hide the 6-stem-only sliders");
 
     separationMode->setSelectedItemIndex(1, juce::sendNotificationSync);
-    juce::Thread::sleep(60);
-    juce::Timer::callPendingTimersSynchronously();
-    require(model->getSelectedItemIndex() == 2,
+    require(waitUntil([&] { return model->getSelectedItemIndex() == 2; },
+                       std::chrono::seconds(3)),
             "B2: choosing 6-stem separation did not default the model box to "
             "htdemucs_6s");
+    require(drumsSlider->isVisible() && bassSlider->isVisible() &&
+                otherSlider->isVisible() && vocalsSlider->isVisible() &&
+                guitarSlider->isVisible() && pianoSlider->isVisible() &&
+                guitarSlider->isEnabled() && pianoSlider->isEnabled(),
+            "B3: 6-stem separation did not show/enable all six stem sliders");
 
     int vocalsModeIndex = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
@@ -369,9 +398,8 @@ int run() {
     }
     require(vocalsModeIndex >= 0, "Vocals separation mode entry is missing");
     separationMode->setSelectedItemIndex(vocalsModeIndex, juce::sendNotificationSync);
-    juce::Thread::sleep(60);
-    juce::Timer::callPendingTimersSynchronously();
-    require(roformerCategory->getText() == "vocals",
+    require(waitUntil([&] { return roformerCategory->getText() == "vocals"; },
+                       std::chrono::seconds(3)),
             "B2: choosing the Vocals separation mode did not lock the RoFormer "
             "category filter");
     require(processor->getSelectedRoformerModel() == "melband-roformer-big-beta5e",
@@ -379,6 +407,15 @@ int run() {
             "audited-first vocals model");
     require(roformerStatus->getText().contains("Audited"),
             "B2: Vocals separation mode default model should be marked Audited");
+    require(drumsSlider->isVisible() && drumsSlider->isEnabled() &&
+                bassSlider->isVisible() && bassSlider->isEnabled(),
+            "B3: RoFormer 2-stem mode did not show/enable its two stem sliders");
+    require(!otherSlider->isVisible() && !otherSlider->isEnabled() &&
+                !vocalsSlider->isVisible() && !vocalsSlider->isEnabled() &&
+                !guitarSlider->isVisible() && !guitarSlider->isEnabled() &&
+                !pianoSlider->isVisible() && !pianoSlider->isEnabled(),
+            "B3: RoFormer 2-stem mode did not hide the remaining HTDemucs stem "
+            "sliders");
 
     int guitarModeIndex = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
@@ -389,14 +426,38 @@ int run() {
     }
     require(guitarModeIndex >= 0, "Guitar separation mode entry is missing");
     separationMode->setSelectedItemIndex(guitarModeIndex, juce::sendNotificationSync);
-    juce::Thread::sleep(60);
-    juce::Timer::callPendingTimersSynchronously();
-    require(roformerCategory->getText() == "guitar" &&
-                processor->getSelectedRoformerModel() ==
-                    "roformer-model-melband-roformer-guitar-by-becruily",
+    require(waitUntil(
+                [&] {
+                    return roformerCategory->getText() == "guitar" &&
+                           processor->getSelectedRoformerModel() ==
+                               "roformer-model-melband-roformer-guitar-by-becruily";
+                },
+                std::chrono::seconds(3)),
             "B2: choosing the Guitar separation mode did not default to its "
             "audited model");
+    require(drumsSlider->isVisible() && drumsSlider->isEnabled() &&
+                bassSlider->isVisible() && bassSlider->isEnabled() &&
+                !otherSlider->isVisible() && !vocalsSlider->isVisible() &&
+                !guitarSlider->isVisible() && !pianoSlider->isVisible(),
+            "B3: RoFormer Guitar mode did not keep the 2-stem slider gating");
 
+    separationMode->setSelectedItemIndex(0, juce::sendNotificationSync);
+    require(waitUntil([&] { return processor->getSelectedRoformerModel().isEmpty(); },
+                       std::chrono::seconds(3)),
+            "B3: switching back to 4-stem separation did not clear the stale "
+            "RoFormer model selection");
+    require(drumsSlider->isVisible() && drumsSlider->isEnabled() &&
+                bassSlider->isVisible() && bassSlider->isEnabled() &&
+                otherSlider->isVisible() && otherSlider->isEnabled() &&
+                vocalsSlider->isVisible() && vocalsSlider->isEnabled() &&
+                !guitarSlider->isVisible() && !pianoSlider->isVisible(),
+            "B3: returning to 4-stem separation did not restore its four stem "
+            "sliders and re-hide the 6-stem-only pair");
+
+    separationMode->setSelectedItemIndex(guitarModeIndex, juce::sendNotificationSync);
+    require(waitUntil([&] { return roformerCategory->getText() == "guitar"; },
+                       std::chrono::seconds(3)),
+            "re-selecting the Guitar separation mode did not restore its category");
     roformerCategory->setText("vocals", juce::sendNotificationSync);
     require(roformerModel->getNumItems() == 24,
             "RoFormer category filter did not show the 24 vocal models");
@@ -416,9 +477,11 @@ int run() {
     roformerSearch->clear();
 
     compute->setSelectedItemIndex(2, juce::sendNotificationSync);
-    juce::Thread::sleep(120);
-    juce::Timer::callPendingTimersSynchronously();
-    require(hasLabelText(components, "CPU mode: separation is supported"),
+    require(waitUntil(
+                [&components] {
+                    return hasLabelText(components, "CPU mode: separation is supported");
+                },
+                std::chrono::seconds(3)),
             "CPU slow-mode warning was not displayed");
 
     advanced->onClick();
@@ -468,7 +531,7 @@ int run() {
                  " roformer_browser=99 categories=10 search=true"
                  " experimental=true download_status=true"
                  " separation_mode_gate=true separation_modes=12"
-                 " separation_mode_defaults=true"
+                 " separation_mode_defaults=true separation_mode_stem_gating=true"
                  " roformer_stem_labels=vocals/instrumental"
                  " roformer_stem_label_categories=8 roformer_export_naming=true PASS\n";
     return 0;

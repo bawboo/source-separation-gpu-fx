@@ -168,6 +168,7 @@ public:
     }
     [[nodiscard]] std::vector<RoformerModel> getRoformerModels() const;
     bool selectRoformerModel(const juce::String& modelId);
+    void clearRoformerModel();
     [[nodiscard]] juce::String getSelectedRoformerModel() const;
     [[nodiscard]] static juce::String sourceName(int sourceIndex);
     [[nodiscard]] juce::String getStemLabel(int sourceIndex) const;

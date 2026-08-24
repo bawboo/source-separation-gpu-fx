@@ -872,3 +872,52 @@ backlog checker（informational only，本輪非 5 的倍數 19%5!=0，非強制
 **Metric:** backlog_items_passing = 73（較上輪 72 增加 1：B2）；improved: true。
 **Decision:** continue
 **Note（交接給 iteration 20）：** B1／B2 已完成並有印出證據；iteration 20 是 5 的倍數，依協定必須跑 full tier（`cmd //c .loop\checks\full.cmd` ＋ backlog checker）。下一輪依 backlog priority 應接續 B3（拉桿依 stem 數量/模式做精細 gating——目前 B1 的 `updateSixSourceControls()` 已依 `modelBox_` 的 6-stem 判斷各 stem 拉桿 enable/disable，B3 需要把這個判斷也同步進 RoFormer 2-stem 模式的呈現，例如 RoFormer 模式下只顯示/啟用對應的兩軌控制而非全部 6 條）；B4（smoke 全面鎖定＋full tier）在 B3 之後。剩餘 40 個 audited M-item 待 B1–B4 全綠後恢復行軍。批次跑 M-item 前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪未觸碰快取，無需重新 touch）。
+
+
+## Iteration 20 — 2026-08-25T02:20:00+08:00
+
+**Hypothesis：** iter-19 完成 B2（模式連動預設模型）並交接下一輪做 B3：拉桿依 stem 數量/模式 gating——HTDemucs 4/6-stem 模式應顯示/啟用對應數量的 stem 拉桿，RoFormer 類別模式（恆為 2-stem 目標/殘餘分離）應只顯示/啟用兩條拉桿而非全部 6 條。本輪 hypothesis：把 `updateSixSourceControls()` 改為從 `separationModeBox_` 自身的選取結果判斷目前模式種類（新增 `roformerModeSelected()`：index >= 2 即為 RoFormer 類別），取代舊版「只靠 `modelBox_` index==2 推斷 6-stem」的邏輯，並用這個判斷同時控制 `stemSliders_[0..5]` 的 enable **與** visible（RoFormer 模式只有 slot 0-1 相關；4-stem 為 slot 0-3；6-stem 為全部 6 條），預期能滿足 B3 驗收且不回歸既有四個 smoke test，因為新邏輯只是在 B1 既有的 `modeChosen` 閘控之上疊加一個「relevant」條件，並非取代它。實作途中發現一個真實的路由正確性 bug：`selectedRoformerModel_` 一旦被設定就沒有清除機制，導致選了 RoFormer 模型之後再切回 HTDemucs 模式，`currentRuntimeConfiguration()` 仍會悄悄沿用舊的 RoFormer 模型——已新增 `clearRoformerModel()` 並在 `selectHtdemucsModel()` 呼叫，一併修正並用新測試斷言證明。
+
+**Files touched：**
+- `plugin/PluginProcessor.h`：新增 `void clearRoformerModel();` 宣告。
+- `plugin/PluginProcessor.cpp`：新增 `HTDemucsGpuFXAudioProcessor::clearRoformerModel()`（鎖 `roformerMutex_` 後清空 `selectedRoformerModel_`）；`selectHtdemucsModel()` 呼叫它；新增 `roformerModeSelected()` helper；重寫 `updateSixSourceControls()`（以 `roformerMode`/`sixSources` 決定每條拉桿的 `relevant`，同時驅動 `setEnabled()` 與 `setVisible()`）；`updatePanelVisibility()` 尾端加呼叫 `updateSixSourceControls()`，讓面板切換/展開收合時 gating 立刻同步結算，不必等下一次 timer tick。
+- `tests/ui_configuration_smoke.cpp`：新增 drums/bass/other/vocals/guitar/piano 六條拉桿指標與 B3 斷言（4-stem 顯示 0-3、隱藏 4-5；6-stem 全顯示；Vocals/Guitar RoFormer 模式只顯示 0-1、隱藏 2-5；切回 4-stem 後 `processor->getSelectedRoformerModel().isEmpty()` 且四條拉桿復原、6-stem 專屬兩條再隱藏）。另外把共用 `waitUntil()` helper 改為每次輪詢都呼叫 `juce::Timer::callPendingTimersSynchronously()`（修正下述 race），並把檔案內所有一次性 `sleep(N)+callPendingTimersSynchronously()` 呼叫點換成 `require(waitUntil(predicate, 3s), message)`。PASS 行新增 `separation_mode_stem_gating=true`。
+- `.loop/backlog.json`：B3 `passes` 翻為 `true`（evidence 含指令與斷言摘要）；新增 discovered 項目 D2（`modelBox_` 在 RoFormer 模式下仍可互動但無實際效果，記錄供未來處理，`passes:false`）。
+- `.loop/LESSONS.md`：新增本輪 SIGN，記錄 `sleep+callPendingTimersSynchronously` race 的根因與修法（見下）。
+
+**除錯過程（造成本輪耗時但屬必要，非額外 scope creep）：** 初次跑 `cheap.cmd` 時，既有（iter-18 就存在、非本輪新增）的「選 4-stem 分離模式後 `model`/`roformerCategory`/`roformerSearch`/`roformerModel` 應變 enabled」斷言確定性失敗。加入除錯輸出後查明：`juce::Timer::callPendingTimersSynchronously()` 只會呼叫「countdown 已被 JUCE 真正的背景 `TimerThread` 扣到 ≤0」的 timer，那個扣減由另一條背景執行緒依自己的排程週期（至多每 100ms 醒一次）進行，與呼叫端 `Thread::sleep()` 睡了多久無關；本地重跑同一支 exe 量到 2/5、3/8 的失敗率，且每次失敗必是同一組只靠 `timerCallback()` 更新的控制項（`drumsSlider`/`outputTrimSlider` 因為有 `onSeparationModeChanged()` 同步路徑而不受影響，永遠正確）。判定為既有測試手法的真實 race，不是本輪新邏輯造成——修法見上（`waitUntil` 輪詢式改寫），修正後本機重跑同一支 exe 8/8 全過。
+
+**Verification commands + output（實際印出）：**
+
+`cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.002s / OK
+Ran 2 tests in 0.057s / OK
+Ran 8 tests in 0.085s / OK
+```
+另外對同一支已建置 exe 重跑 8 次確認穩定性：8/8 exit 0（無 1 次失敗）。
+
+**Full tier（本輪為 iteration 20，20 % 5 == 0，依協定強制執行）：** `cmd //c '.loop\checksull.cmd'` → exit 0：
+```text
+=== ui_configuration_smoke ===
+default_panel=general ... separation_mode_stem_gating=true ... PASS
+=== media_io_smoke ===
+audio_import=true quick_vocals=true quick_accompany=true raw_stem_unchanged=true mix_controls=true video_import=true mp4_replace_audio=true mp4_bytes=31942 PASS
+=== record_mode_smoke (auto/GPU) ===
+backend=auto recorded_seconds=1.00426 preview_seconds=1.00426 progress=1 inference_ms=248.191 full_mix_energy=360.007 muted_stem_energy=2.3891 bypass_original_energy=356.806 mix_controls=true status=Ready to preview · htdemucs · GPU PASS=true
+=== roformer_smoke ===
+roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/instrumental roformer_export_naming=true roformer_sample_rate=44100 roformer_channels=2 roformer_bit_depth=32float roformer_finite=true PASS
+```
+四個 smoke test 全 PASS，無回歸。
+
+**Backlog checker（C2，本輪強制執行）：** `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` → exit 1（116 項中仍有 42 項 passes=false：B4、D2、40 個 audited M-item）。
+
+**Scope（C3）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 54 changed path(s) within policy`
+
+**Criteria:** C1 pass（full tier 本輪印出 exit 0，含 roformer_smoke PASS，四個 smoke 全綠）／C2 fail（backlog 尚有未過項目）／C3 pass（scope 無違規）。AND 規則下未同時全過，非 converged。
+**Metric:** backlog_items_passing = 74（較上輪 73 增加 1：B3；總項目數因新增 D2 從 115 → 116）；improved: true。
+**Decision:** continue
+**Lesson：** 已寫入 `.loop/LESSONS.md`（見上方 SIGN iter 20）——任何在 smoke test 裡等待 JUCE `Timer` 驅動的 UI 狀態變化，一律用輪詢式 `waitUntil(predicate, timeout)`（每次輪詢都呼叫 `callPendingTimersSynchronously()`），不要用單次 `sleep()+callPendingTimersSynchronously()`，後者有真實 race、之前的「PASS」證據可能只是運氣好未踩到窗口。
+**Note（交接給 iteration 21）：** B1–B3 已完成並有印出證據；下一輪依 backlog priority 應接續 B4（`ui_configuration_smoke` 全面鎖定 B1–B3 行為＋跑 full tier——B4 的核心斷言其實已隨 B1/B2/B3 各輪逐步補齊在同一支測試檔裡，下一輪可著重確認「four smoke tests 全綠」這個 B4 驗收敘述本身有沒有额外未覆蓋的角落，例如 B1/B2/B3 斷言是否涵蓋了「未選模式→選模式→換模式→切回」的完整往返路徑）。剩餘 40 個 audited M-item 與新增的 D2（discovered，modelBox_ 在 RoFormer 模式下仍可互動但無效）待 B1–B4 全綠後恢復處理。下一次 5 的倍數在 iteration 25，記得跑 full tier；批次跑 M-item 前務必確認 `melband-roformer-kim-vocals` 仍在快取內（本輪未觸碰快取，無需重新 touch）。

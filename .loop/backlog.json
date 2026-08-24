@@ -1337,11 +1337,11 @@
   {
     "id": "B3",
     "title": "B3: 拉桿 gating — 模式＋模型選定後才 enable 對應參數（4/6-stem 才顯示/啟用各 stem 音量拉桿；2-stem 模式只呈現對應兩軌控制）。",
-    "passes": false,
+    "passes": true,
     "priority": 11.3,
     "source": "user",
-    "evidence": null,
-    "check": "TODO: 由執行本項的 iteration 依 LOOP_PLAN 定義具體驗證指令（ui_configuration_smoke 擴充，見 B4）。"
+    "evidence": "iter 20: plugin/PluginProcessor.h/.cpp -- added HTDemucsGpuFXAudioProcessor::clearRoformerModel() and called it from the editor's selectHtdemucsModel(), so choosing an HTDemucs separation mode (4-stem/6-stem) after a RoFormer model was selected no longer leaves currentRuntimeConfiguration() silently routed to the stale RoFormer model (a real routing-correctness bug found while implementing this item: selectedRoformerModel_ previously had no way to clear once set). Rewrote updateSixSourceControls() to compute the active mode kind from separationModeBox_'s own selection (new roformerModeSelected() helper: index >= 2 = a RoFormer category) instead of only inferring 6-stem from modelBox_'s index: RoFormer modes now show/enable only stemSliders_[0..1] (2-stem split) and hide/disable stemSliders_[2..5]; 4-stem HTDemucs mode shows/enables sliders [0..3] and hides [4..5]; 6-stem HTDemucs mode shows all 6. Also call updateSixSourceControls() at the end of updatePanelVisibility() so the gating resolves synchronously on panel switch/advanced-disclosure toggle, not only on the next timer tick. tests/ui_configuration_smoke.cpp extended with B3 assertions: 4-stem shows drums/bass/other/vocals sliders (hides guitar/piano); 6-stem shows all six; Vocals and Guitar RoFormer modes show only drums/bass slider slots (reused as the 2-stem gain controls) and hide the other four; switching back to 4-stem after a RoFormer selection both clears processor->getSelectedRoformerModel() (routing-correctness proof) and restores the four-slider display. While adding these waits, found the existing juce::Thread::sleep(N)+juce::Timer::callPendingTimersSynchronously() pattern (already used since iter 18) is genuinely racy: callPendingTimersSynchronously() only fires callbacks whose countdown was already decremented by JUCE's real background TimerThread, independent of how long the test slept, so it intermittently missed the window (measured 2/5 and 3/8 failures locally on the pre-existing 4-stem enablement check before the fix). Fixed by making the shared waitUntil() helper call callPendingTimersSynchronously() on every poll iteration and replacing every one-shot sleep+pump call site with waitUntil(...) on the actual expected condition; reran the built exe 8/8 clean after the fix (0 failures), vs. deterministic failures before. cmd //c .loop\\checks\\cheap.cmd exit 0 and cmd //c .loop\\checks\\full.cmd exit 0 (all four smoke tests PASS: ui_configuration_smoke, media_io_smoke, record_mode_smoke auto/GPU, roformer_smoke -- no regressions).",
+    "check": "cmd //c '.loop\\checks\\cheap.cmd' (ui_configuration_smoke asserts: 4-stem separation mode shows/enables drumsGain/bassGain/otherGain/vocalsGain sliders and hides guitarGain/pianoGain; 6-stem separation mode shows/enables all six stem sliders; RoFormer 2-stem modes (Vocals, Guitar) show/enable only the first two stem slider slots and hide the remaining four; returning to 4-stem separation after a RoFormer selection clears processor->getSelectedRoformerModel() and restores the four-slider display) plus separation_mode_stem_gating=true in the PASS line"
   },
   {
     "id": "B4",
@@ -1351,5 +1351,12 @@
     "source": "user",
     "evidence": null,
     "check": "cmd //c '.loop\\checks\full.cmd'（四個 smoke 全 PASS，含擴充後的 ui_configuration_smoke 斷言）"
+  },
+  {
+    "id": "D2",
+    "title": "D2 (discovered while implementing B3): modelBox_ (\"Demucs model\" combo) stays enabled whenever a separation mode is chosen, even while a RoFormer category mode is active, but changing it has no effect on the actual separation route -- currentRuntimeConfiguration() always prefers selectedRoformerModel_ over modelBox_'s choice whenever a RoFormer model is selected (plugin/PluginProcessor.cpp currentRuntimeConfiguration(), ~line 697-702). Should gate/hide modelBox_ (and its download button) per active mode kind (HTDemucs vs RoFormer), mirroring the stem-slider gating B3 just added, so the control isn't misleadingly interactive when it's inert.",
+    "passes": false,
+    "priority": 11.5,
+    "source": "discovered"
   }
 ]

@@ -774,6 +774,11 @@ juce::String HTDemucsGpuFXAudioProcessor::getSelectedRoformerModel() const {
     return selectedRoformerModel_;
 }
 
+void HTDemucsGpuFXAudioProcessor::clearRoformerModel() {
+    const std::scoped_lock lock(roformerMutex_);
+    selectedRoformerModel_.clear();
+}
+
 double HTDemucsGpuFXAudioProcessor::getRecordedSeconds() const noexcept {
     return static_cast<double>(recordedSamples_.load(std::memory_order_acquire)) /
            static_cast<double>(kSampleRate);
@@ -3824,9 +3829,17 @@ private:
     void selectHtdemucsModel(int comboIndex) {
         modelBox_.setSelectedItemIndex(comboIndex, juce::dontSendNotification);
         setChoice("model", comboIndex);
+        processor_.clearRoformerModel();
         if (processor_.isModelInstalled(modelBox_.getText())) {
             processor_.applyUserConfiguration();
         }
+    }
+
+    // A RoFormer separation mode is any entry after the two fixed HTDemucs
+    // entries (index 0 = 4-stem, index 1 = 6-stem); the remaining entries are
+    // the RoFormer manifest categories appended in the constructor.
+    bool roformerModeSelected() const {
+        return separationModeBox_.getSelectedItemIndex() >= 2;
     }
 
     void selectRoformerCategoryDefault(const juce::String& category) {
@@ -3900,6 +3913,9 @@ private:
             stemSliders_[index].setVisible(advancedPanel_);
         }
         updateAdvancedVisibility();
+        // Refine the coarse advancedPanel_ visibility above down to only the
+        // stem sliders relevant to the currently chosen separation mode.
+        updateSixSourceControls();
     }
 
     void updateCpuWarning() {
@@ -3914,11 +3930,19 @@ private:
 
     void updateSixSourceControls() {
         const bool modeChosen = separationModeBox_.getSelectedItemIndex() >= 0;
-        const bool sixSources = modelBox_.getSelectedItemIndex() == 2;
+        const bool roformerMode = roformerModeSelected();
+        const bool sixSources = !roformerMode && modelBox_.getSelectedItemIndex() == 2;
         for (std::size_t index = 0; index < stemSliders_.size(); ++index) {
-            const bool enabled = modeChosen && (index < 4 || sixSources);
+            // RoFormer modes are always a 2-stem split (target + residual), so
+            // only the first two sliders are relevant; HTDemucs modes show the
+            // 4 or 6 sliders matching the chosen model's stem count.
+            const bool relevant =
+                roformerMode ? index < 2 : (index < 4 || sixSources);
+            const bool enabled = modeChosen && relevant;
             stemSliders_[index].setEnabled(enabled);
             stemLabels_[index].setEnabled(enabled);
+            stemSliders_[index].setVisible(advancedPanel_ && relevant);
+            stemLabels_[index].setVisible(advancedPanel_ && relevant);
         }
         outputSlider_.setEnabled(modeChosen);
         outputLabel_.setEnabled(modeChosen);

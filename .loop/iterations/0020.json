@@ -1,0 +1,50 @@
+{
+  "iteration": 20,
+  "timestamp": "2026-08-25T02:20:00+08:00",
+  "hypothesis": "iter-19 finished B2 (mode-linked default model selection) and its handoff note said the next step is B3: gate the stem gain sliders per the currently chosen separation mode -- HTDemucs 4/6-stem modes should show/enable the matching number of stem sliders, and RoFormer category modes (always a 2-stem target/residual split) should show/enable only two sliders instead of all six. Hypothesis: rewriting updateSixSourceControls() to derive the active mode kind from separationModeBox_'s own selection (new roformerModeSelected() helper: index >= 2 = a RoFormer category) instead of only inferring 6-stem-ness from modelBox_'s index, and using that to both enable AND show/hide stemSliders_[0..5] (RoFormer modes: only slots 0-1 relevant; 4-stem: slots 0-3; 6-stem: all 6), will satisfy B3's criterion without regressing the four existing smoke tests, because the change only adds an additional 'relevant' gate on top of B1's existing modeChosen gate rather than replacing it. Also fixing a routing-correctness bug found in passing: selectedRoformerModel_ had no way to clear once set, so choosing an HTDemucs mode after a RoFormer selection would leave currentRuntimeConfiguration() silently still routed to the stale RoFormer model -- added clearRoformerModel() and call it from selectHtdemucsModel().",
+  "files_touched": [
+    "plugin/PluginProcessor.h",
+    "plugin/PluginProcessor.cpp",
+    "tests/ui_configuration_smoke.cpp",
+    ".loop/backlog.json",
+    ".loop/LESSONS.md",
+    ".loop/iterations/0020.json",
+    ".loop/journal.md",
+    ".loop/state.json"
+  ],
+  "commands": [
+    {
+      "cmd": "cmd //c '.loop\\checks\\cheap.cmd'",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "cmd //c '.loop\\checks\\full.cmd' (mandatory this iteration: 20 % 5 == 0)",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "python -c \"import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))\"",
+      "exit_code": 1,
+      "timed_out": false
+    },
+    {
+      "cmd": "python .loop/check_scope.py",
+      "exit_code": 0,
+      "timed_out": false
+    }
+  ],
+  "criteria": {
+    "C1": "pass",
+    "C2": "fail",
+    "C3": "pass"
+  },
+  "metrics": {
+    "name": "backlog_items_passing",
+    "value": 74,
+    "improved": true
+  },
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}
