@@ -1,0 +1,19 @@
+{
+  "iteration": 30,
+  "timestamp": "2026-08-25T02:26:30+08:00",
+  "hypothesis": "iter-29 handoff notes point to M023 (melband-roformer-voc-fv4, priority 34) and M024 (melband-roformer-voc-gabox-fv1, priority 35) as the next-highest-priority failing audited backlog items, and flag that iteration 30 is the next multiple of 5 so full tier + backlog checker are mandatory this run regardless of convergence. Hypothesis: (a) a synchronous roformer_batch_verify.py run for M023+M024 (pre-batch 20MB range-request throughput probe against voc_fv4.ckpt measured ~3.4 MB/s, 913MB checkpoint ~265s each, well within the 60-min iteration timeout) will download+SHA-256-verify+separate+validate both and flip them to passes:true; (b) melband-roformer-kim-vocals (needed by the hardcoded ui_configuration_smoke RoFormer route test) will survive the rolling cache eviction (max_cached=3) since the cache held only kimmel-ft2-bleedless/voc-fv3/kim-vocals pre-batch and evict_oldest() drops the two oldest, not kim-vocals; (c) since this iteration also owes the mandatory full tier (30 % 5 == 0), running cmd //c '.loop\\checks\\full.cmd' after the M-item batch will give C1 printed evidence this run, though C2 will still fail because 26 audited M-items remain, so this is not a convergence attempt.",
+  "files_touched": [".loop/backlog.json"],
+  "commands": [
+    {"cmd": "curl --max-time 45 -L -r 0-20000000 -o /dev/null -w speed/size/time/http_code (voc_fv4.ckpt)", "exit_code": 0, "timed_out": false},
+    {"cmd": "C:/Users/<user>/anaconda3/envs/htfx-roformer/python.exe tools/roformer_batch_verify.py --models melband-roformer-voc-fv4 melband-roformer-voc-gabox-fv1 --cache-dir C:/CodexProjects/SourceSeparation_GPU_FX/verify/roformer-cache --fixture C:/CodexProjects/SourceSeparation_GPU_FX/verify/fixtures/test_48k_2s.wav --output-root C:/CodexProjects/SourceSeparation_GPU_FX/verify/output/roformer-batch --max-cached 3", "exit_code": 0, "timed_out": false},
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd'", "exit_code": 0, "timed_out": false},
+    {"cmd": "cmd //c '.loop\\checks\\full.cmd'", "exit_code": 0, "timed_out": false},
+    {"cmd": "python -c \"import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))\"", "exit_code": 1, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false}
+  ],
+  "criteria": {"C1": "pass", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 91, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}
