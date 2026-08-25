@@ -8,3 +8,12 @@
 [driver] state.json → status=blocked stop_reason=blocked_permission_required
 [driver] stop: scope violation detected by check_scope.py — user approval required
 [driver] done 2026-08-25T13:17:58+0800. Final: status=blocked stop_reason=blocked_permission_required. See .loop/FINAL_REPORT.md and .loop/journal.md
+[driver] start 2026-08-25T13:19:59+0800  AGENT_CMD_JSON='["C:\\nvm4w\\nodejs\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe","-p","--permission-mode","acceptEdits","--allowedTools","Bash,Edit,Write,Read,Glob,Grep,Task,WebFetch,WebSearch"]'  prompt_mode=ref  wall=disabled  iter_timeout=60m  max_launches=1  py=python3
+[driver] iteration 1 launching  2026-08-25T13:20:16+0800
+[driver] hang guard: agent exceeded the iteration timeout and was killed
+[driver] agent process exited rc=124
+[driver] WARNING: agent exceeded ITERATION_TIMEOUT_MINUTES=60 and was killed (hang guard)
+[scope] OK �X 54 changed path(s) within policy
+[driver] WARNING: iteration counter did not advance (failed launch #1, rc=124)
+[driver] pilot stop: MAX_LAUNCHES=1 reached — state untouched (status=running); rerun to continue, nohup/tmux for walk-away
+[driver] pilot done 2026-08-25T15:02:04+0800 — FINAL_REPORT skipped (run not terminated; status=running). Check .loop/iterations/, .loop/journal.md and the checkpoint commit, then relaunch.

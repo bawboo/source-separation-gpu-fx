@@ -29,3 +29,4 @@ Engine B，同上一輪 AGENT_CMD_JSON（claude.exe headless）與 driver 客製
 
 ## Amendments
 none
+- iter 0, 2026-08-25T15:20+08:00: §6 iteration_timeout: 60 → 90 min（L1 觸及 CMakeLists → 每個建置循環全量重建 15–20 分鐘，60 分鐘兩度被 hang guard 終止；小批次 STEER 仍然有效。操作性 ceiling 調整）

@@ -1,6 +1,6 @@
 {
-  "status": "blocked",
-  "stop_reason": "blocked_permission_required",
+  "status": "running",
+  "stop_reason": null,
   "iteration": 0,
   "max_iterations": 30,
   "stall_threshold": 5,
@@ -12,5 +12,5 @@
     "loop_branch": "loop/ui-language"
   },
   "started_at": "2026-08-25T11:42:41+08:00",
-  "updated_at": "2026-08-25T13:17:42+08:00"
+  "updated_at": "2026-08-25T20:26:39+08:00"
 }
