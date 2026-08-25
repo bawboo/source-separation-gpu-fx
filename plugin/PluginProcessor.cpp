@@ -2249,13 +2249,15 @@ void HTDemucsGpuFXAudioProcessor::stemExportLoop(
                 std::memory_order_release);
         }
         setMediaMessage(
-            "Exported " + juce::String(sourceIndices.size()) +
-            " original-volume stem WAV file(s) to " +
+            htfx::tr("status.stemExportSuccessPrefix") +
+            juce::String(sourceIndices.size()) +
+            htfx::tr("status.stemExportSuccessMiddle") +
             outputDirectory.getFullPathName());
         mediaBusy_.store(false, std::memory_order_release);
     } catch (const std::exception& exception) {
         setMediaMessage(
-            "Stem export failed: " + juce::String::fromUTF8(exception.what()));
+            htfx::tr("status.stemExportFailedPrefix") +
+            juce::String::fromUTF8(exception.what()));
         mediaBusy_.store(false, std::memory_order_release);
     }
 }
@@ -2372,13 +2374,14 @@ void HTDemucsGpuFXAudioProcessor::quickExportLoop(
         }
         mediaProgress_.store(1.0, std::memory_order_release);
         setMediaMessage(
-            (kind == QuickExportKind::vocals ? "Exported vocals: "
-                                             : "Exported accompaniment: ") +
+            (kind == QuickExportKind::vocals
+                 ? htfx::tr("status.quickExportedVocalsPrefix")
+                 : htfx::tr("status.quickExportedAccompanyPrefix")) +
             outputFile.getFullPathName());
         mediaBusy_.store(false, std::memory_order_release);
     } catch (const std::exception& exception) {
         setMediaMessage(
-            "Quick export failed: " +
+            htfx::tr("status.quickExportFailedPrefix") +
             juce::String::fromUTF8(exception.what()));
         mediaBusy_.store(false, std::memory_order_release);
     }
@@ -2497,7 +2500,8 @@ void HTDemucsGpuFXAudioProcessor::mixExportLoop(
             }
             mediaProgress_.store(1.0, std::memory_order_release);
             setMediaMessage(
-                "Exported interface mix: " + outputFile.getFullPathName());
+                htfx::tr("status.mixExportedPrefix") +
+                outputFile.getFullPathName());
             mediaBusy_.store(false, std::memory_order_release);
             return;
         }
@@ -2533,8 +2537,7 @@ void HTDemucsGpuFXAudioProcessor::mixExportLoop(
         if (!muxed) {
             temporaryVideo.deleteFile();
             setMediaMessage(
-                error +
-                " (The source video codec may not be compatible with MP4 stream copy.)");
+                error + htfx::tr("status.mp4StreamCopyIncompatibleSuffix"));
             mediaBusy_.store(false, std::memory_order_release);
             return;
         }
@@ -2542,19 +2545,20 @@ void HTDemucsGpuFXAudioProcessor::mixExportLoop(
             !temporaryVideo.moveFileTo(outputFile)) {
             temporaryVideo.deleteFile();
             setMediaMessage(
-                "Could not replace the selected MP4 output file: " +
+                htfx::tr("status.couldNotReplaceMp4OutputPrefix") +
                 outputFile.getFullPathName());
             mediaBusy_.store(false, std::memory_order_release);
             return;
         }
         mediaProgress_.store(1.0, std::memory_order_release);
         setMediaMessage(
-            "Exported MP4 with the interface mix: " +
+            htfx::tr("status.mixExportedMp4Prefix") +
             outputFile.getFullPathName());
         mediaBusy_.store(false, std::memory_order_release);
     } catch (const std::exception& exception) {
         setMediaMessage(
-            "Mix export failed: " + juce::String::fromUTF8(exception.what()));
+            htfx::tr("status.mixExportFailedPrefix") +
+            juce::String::fromUTF8(exception.what()));
         mediaBusy_.store(false, std::memory_order_release);
     }
 }

@@ -198,3 +198,31 @@ PASS 行沒有新增獨立欄位（這批訊息在 `ui_configuration_smoke.cpp`�
 **Decision：** continue（status 保持 running，stop_reason null）。
 
 **Lesson：** L2a 已驗證過的「三元運算式二選一分支、無動態值內嵌」模式（例如按鈕文字依開合狀態切換）可以直接套用到 `setMediaMessage()` 這類狀態訊息——只要兩個分支都是完整靜態字串（本輪的 `kind == QuickExportKind::vocals ? ... : ...`／`replaceVideoAudio ? ... : ...`），做法與單一字面值呼叫點完全一致（各自對應一個獨立 key），不需要 iter 4/5 那套 prefix/suffix 拆分機制；prefix/suffix（或 prefix/middle/suffix）機制只在句子中間真的需要嵌入執行期字串/數值時才需要。掃描同一類 setter 的全部呼叫點時，若同時看到「純字面值／二選一分支」與「含動態值串接」兩種複雜度截然不同的呼叫點混在一起（本輪：15 處純字面值 vs. 9 處含動態值），繼續維持 iter 5 已確立的作法——只做前者，後者記錄成新的 discovered backlog 項目（本輪為 L2f），不要因為函式相鄰、程式碼手法相近就一起做掉。
+
+## iter 7 — 2026-08-25T21:37:10+08:00
+
+**Hypothesis：** 承接 iter 6（L2e：匯出流程 15 個純字面值 `setMediaMessage()` 呼叫點），本輪處理當時刻意排除、記錄為 discovered 項目 L2f 的剩餘 9 個含動態值串接呼叫點——`stemExportLoop()` 匯出完成訊息（數量＋路徑兩個動態值）與例外訊息、`quickExportLoop()` 匯出完成訊息（Vocals/Accompany 二選一分支＋路徑）與例外訊息、`mixExportLoop()` 的 WAV 匯出完成訊息、MP4 混流失敗訊息（`error` 變數＋靜態 suffix）、無法取代既有 MP4 輸出檔訊息、MP4 匯出完成訊息、例外訊息。沿用 iter 4/5 確立的 prefix/middle/suffix 拆分模式（動態值在句尾用 prefix 鍵；動態值在句首、後接靜態文字用 suffix 鍵；句中同時有兩個動態值用 prefix/middle 兩段式）；二選一分支（Vocals/Accompany）沿用 iter 6 已驗證過的「兩個分支各自獨立 key」模式。`tests/ui_configuration_smoke.cpp`／`media_io_smoke.cpp` 皆未對這些訊息的確切文字內容做斷言，預期零既有斷言需要同步修改。本輪迭代編號（7）非 5 的倍數，依協定僅需 cheap tier。
+
+**Files touched：** `plugin/Localization.cpp`（新增 11 個 `status.*` 字串鍵：`status.stemExportSuccessPrefix`／`status.stemExportSuccessMiddle`（兩段式，供匯出數量＋輸出資料夾路徑兩個動態值嵌入）、`status.stemExportFailedPrefix`、`status.quickExportedVocalsPrefix`／`status.quickExportedAccompanyPrefix`（二選一分支各自獨立鍵）、`status.quickExportFailedPrefix`、`status.mixExportedPrefix`、`status.mp4StreamCopyIncompatibleSuffix`（單一 suffix 鍵，直接接在既有 `error` 變數之後，無對應 prefix 鍵——因為原始字面值本身就是「變數在前、靜態文字在後」）、`status.couldNotReplaceMp4OutputPrefix`、`status.mixExportedMp4Prefix`、`status.mixExportFailedPrefix`）、`plugin/PluginProcessor.cpp`（`stemExportLoop()`/`quickExportLoop()`/`mixExportLoop()` 內全部 9 個含動態值串接的 `setMediaMessage()` 呼叫點改接 `htfx::tr(...)` 前後綴，`error`／`exception.what()`／`getFullPathName()`／`sourceIndices.size()` 等執行期值維持原樣拼接、不變）、`.loop/backlog.json`（L2f 由 `passes:false` 翻為 `true`＋補上 evidence）。
+
+**Verification — cheap tier（協定 step 6，每輪必跑）：** `cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true stem_slider_relabels=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true language_default=zh-TW language_toggle=true language_persist_reopen=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.004s OK / Ran 2 tests in 0.057s OK / Ran 8 tests in 0.116s OK
+```
+PASS 行沒有新增獨立欄位（這批訊息在 `ui_configuration_smoke.cpp`／`media_io_smoke.cpp` 中皆無既有斷言路徑覆蓋），全部既有斷言在建置成功後維持全綠，代表本批次翻譯字串接線正確、未破壞任何邏輯；本批次「雙語化本身」正確性靠原始碼審查佐證——`grep -n 'setMediaMessage("' plugin/PluginProcessor.cpp` 於本輪變更後回傳零筆（exit 1，無匹配），確認 `setMediaMessage()` 全部呼叫點（含 L2e 已清空的純字面值呼叫點）已無任何內嵌英文字面值，僅剩 `htfx::tr(...)` 呼叫與變數傳遞。
+
+**Scope self-check（協定 step 7）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 54 changed path(s) within policy`。
+
+**Full tier / backlog checker：** 本輪未跑（iteration 7 非第 5 輪倍數，亦未宣告 converged）——criteria C1/C2 本輪標記 fail，C3 pass。
+
+**Criteria：** C1 fail（full tier 未跑）／C2 fail（backlog checker 未跑）／C3 pass（scope 無違規）。AND 規則下未全數通過，非 converged。
+
+**Backlog：** L2f 由 `passes:false` 翻為 `true`（見上）。L2 本身仍為 false——`setMediaMessage()` 呼叫點雖已全數清空英文字面值，但 L2 涵蓋範圍更廣（控件標籤/選單/狀態列/錯誤訊息/按鈕全體），尚待下一輪盤點 `setSeparationMessage()`/`setMediaMessage()` 以外是否還有遺漏的英文字面值（例如 JUCE 內建對話框、tooltip、或其他尚未掃描過的 UI 元件）才能轉綠。L1、L2a、L2b、L2c、L2d、L2e 維持 true。L3–L7 維持 false。
+
+**Metric：** backlog_items_passing = 7（較上一輪 6 增加 1：L2f 新增為 true）；improved: true。
+
+**Decision：** continue（status 保持 running，stop_reason null）。
+
+**Lesson：** 「動態值在句首、句尾接靜態文字」（例如本輪 `error + " (The source video codec may not be compatible...)"`）只需要一個 suffix 鍵、不需要對應的 prefix 鍵——因為變數本身已經在句首，呼叫端寫法就是 `error + htfx::tr(suffix)`，與 iter 4/5「靜態文字在句首、動態值在句尾」時只需要 prefix 鍵（`htfx::tr(prefix) + value`）是對稱的鏡像情況。掃描含動態值串接的呼叫點時，應先判斷「動態值在句子的哪個位置」（純句尾／純句首／句中兩側都有靜態文字／句中有兩個動態值），再決定要拆 prefix-only、suffix-only、還是 prefix/middle（/suffix）——不要預設每個含動態值的呼叫點都需要完整的三段式拆分。

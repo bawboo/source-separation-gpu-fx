@@ -52,3 +52,38 @@ LOOP STATUS: running — iter-5 L2d done (26 setSeparationMessage + 4 setMediaMe
 [driver] agent process exited rc=0
 [scope] OK �X 54 changed path(s) within policy
 [driver] iteration 6 launching  2026-08-25T21:21:17+0800
+Commit succeeded on branch `loop/ui-language`. Iteration 6 complete: L2e (export-flow status message localization) is now `passes: true`, cheap tier green, scope check clean, checkpoint committed.
+
+LOOP STATUS: running — iter-6 L2e export-flow setMediaMessage() localized (18 keys, 15 call sites), cheap tier PASS, backlog 6/13 passing, L2f discovered for remaining dynamic-value messages
+[driver] agent process exited rc=0
+[scope] OK �X 54 changed path(s) within policy
+[driver] iteration 7 launching  2026-08-25T21:29:20+0800
+我在執行協定前先做了背景並行檢查（依 `.loop/LESSONS.md` SIGN (iter 39) 的教訓），發現了一個需要立即處理的情況，而不是照常推進 iteration 7。
+
+## 發現
+
+- `.loop/state.json` 目前 `iteration: 6`（尚未變成 7）。
+- `.loop/driver.log` 尾端最後一行是：`[driver] iteration 7 launching 2026-08-25T21:29:20+0800`，之後**沒有**對應的完成/commit 行。
+- `tasklist` 顯示現在確實有存活中的 `claude.exe` process（其中一個已累積 ~7:32 分鐘 CPU 時間）以及一個正在跑的 `MSBuild.exe` ——這代表外部 driver（`.loop/run_loop.sh`，LOOP_PLAN §9 Engine B）已經在背景獨立啟動並正在執行 iteration 7（目前卡在建置階段）。
+- 這與 `LESSONS.md` 記錄的 iter-39 情境完全相同：同一個 iteration 編號被兩個互不知情的 process 同時推進。
+
+## 我採取的處理方式
+
+依該教訓的指示（不殺對方 process、不覆蓋其工作、不要各自獨立推進）：
+
+- **沒有**對任何原始碼檔案（`plugin/PluginProcessor.cpp`、`plugin/Localization.cpp` 等）做任何修改——背景 process 很可能正在編輯/建置同一批檔案，同時動手會產生檔案競態。
+- **沒有**寫入 `.loop/iterations/0007.json`、`.loop/backlog.json`、`.loop/state.json` 或 `.loop/journal.md`——這些都是背景 process 完成 iteration 7 後也會寫入的同一批檔案，我這邊沒有任何已完成、有證據的變更需要搶先 checkpoint，貿然寫入只會製造第二個競態視窗（尤其 `state.json` 的 atomic tmp+rename 若兩邊同時進行會互相覆蓋）。
+- **沒有**執行 build 或 `.loop\checks\*.cmd`（`MSBuild.exe` 已在跑，同時觸發第二次建置容易互相干擾/鎖檔）。
+- **沒有**用 `git add`/`git commit`——背景 process 完成後會自己 commit iter-7；我這邊沒有變更可提交。
+
+換句話說：本次呼叫沒有產生任何新的 iteration 變更，`state.json` 維持外部 driver 最後寫入的狀態不變。
+
+## 建議
+
+請確認背景 driver（`run_loop.sh`）目前是唯一在推進這個 loop 的 process。若你是想手動觸發這次互動式 session 額外跑一輪，建議先確認背景 driver 是否還在跑（可看 `.loop/driver.log` 是否已經出現 iteration 7 的完成行、或 `Get-Process` 是否還有存活的 build process），避免兩邊同時修改同一批檔案。
+
+LOOP STATUS: running — skipped iteration 7 (background driver already mid-flight per driver.log + live MSBuild.exe; no changes made to avoid file/state race, see LESSONS iter-39)
+[driver] agent process exited rc=0
+[scope] OK �X 54 changed path(s) within policy
+[driver] WARNING: iteration counter did not advance (failed launch #1, rc=0)
+[driver] iteration 7 launching  2026-08-25T21:31:36+0800
