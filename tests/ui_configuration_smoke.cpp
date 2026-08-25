@@ -252,7 +252,7 @@ int run() {
 
     std::vector<juce::Component*> components;
     collectComponents(*editor, components);
-    auto* mode = findCombo(components, "Record mode", 2);
+    auto* mode = findCombo(components, htfx::tr("combo.modeRecord"), 2);
     auto* segment = findCombo(components, "2 seconds", 5);
     auto* model = findCombo(components, "htdemucs", 4);
 #if JUCE_MAC
@@ -260,15 +260,15 @@ int run() {
 #else
     auto* compute = findCombo(components, "Auto (NVIDIA CUDA, otherwise CPU)", 4);
 #endif
-    auto* advanced = findButton(components, "Advanced options >");
-    auto* panelSwitch = findButton(components, "Advanced panel");
-    auto* record = findButton(components, "Record");
-    auto* importMedia = findButton(components, "Import audio/video");
-    auto* exportVocals = findButton(components, "Export Vocals only");
-    auto* exportAccompany = findButton(components, "Export Accompany only");
-    auto* exportMedia = findButton(components, "Export");
-    auto* fullScreen = findButton(components, "Full screen");
-    auto* scaleUi = findButton(components, "Scale UI");
+    auto* advanced = findButton(components, htfx::tr("button.advancedOptionsExpand"));
+    auto* panelSwitch = findButton(components, htfx::tr("button.advancedPanel"));
+    auto* record = findButton(components, htfx::tr("button.record"));
+    auto* importMedia = findButton(components, htfx::tr("button.import"));
+    auto* exportVocals = findButton(components, htfx::tr("button.exportVocalsOnly"));
+    auto* exportAccompany = findButton(components, htfx::tr("button.exportAccompanyOnly"));
+    auto* exportMedia = findButton(components, htfx::tr("button.export"));
+    auto* fullScreen = findButton(components, htfx::tr("button.fullScreen"));
+    auto* scaleUi = findButton(components, htfx::tr("button.scaleUi"));
     require(mode != nullptr && segment != nullptr && model != nullptr &&
                 compute != nullptr && advanced != nullptr && panelSwitch != nullptr &&
                 record != nullptr && importMedia != nullptr &&
@@ -283,7 +283,7 @@ int run() {
             "general panel control visibility mismatch");
 
     require(mode->getSelectedItemIndex() == 0, "Record mode is not selected");
-    require(mode->getItemText(1) == "Realtime mode (Ultra high latency)",
+    require(mode->getItemText(1) == htfx::tr("combo.modeRealtime"),
             "Realtime mode label mismatch");
     require(segment->getSelectedItemIndex() == 4 &&
                 segment->getItemText(4) == "7.8 seconds",
@@ -318,8 +318,8 @@ int run() {
             "Separation mode selector is hidden in the advanced panel");
     require(separationMode->getSelectedItemIndex() == -1,
             "Separation mode should start unselected");
-    require(separationMode->getItemText(0) == "4-stem separation" &&
-                separationMode->getItemText(1) == "6-stem separation" &&
+    require(separationMode->getItemText(0) == htfx::tr("combo.separationMode4Stem") &&
+                separationMode->getItemText(1) == htfx::tr("combo.separationMode6Stem") &&
                 separationMode->getNumItems() == 12,
             "Separation mode list mismatch (2 HTDemucs + 10 RoFormer categories)");
 
@@ -327,7 +327,7 @@ int run() {
     require(editor->getHeight() == 826, "expanded editor size mismatch");
     require(segment->isVisible() && model->isVisible() && compute->isVisible(),
             "Advanced options did not become visible");
-    require(advanced->getButtonText() == "Advanced options v",
+    require(advanced->getButtonText() == htfx::tr("button.advancedOptionsCollapse"),
             "expanded disclosure label mismatch");
 
     auto* roformerCategory = findNamedComponent<juce::ComboBox>(
@@ -345,7 +345,7 @@ int run() {
                 !roformerModel->isVisible() && !roformerStatus->isVisible(),
             "D3: RoFormer model browser controls should stay hidden while "
             "expanded until a RoFormer separation mode is actually chosen");
-    require(roformerCategory->getItemText(0) == "All categories" &&
+    require(roformerCategory->getItemText(0) == htfx::tr("combo.roformerAllCategories") &&
                 roformerCategory->getNumItems() == 11,
             "RoFormer category browser mismatch");
     require(roformerModel->getNumItems() == 99,
@@ -610,7 +610,7 @@ int run() {
             "Advanced options remained visible after recollapse");
 
     panelSwitch->onClick();
-    require(panelSwitch->getButtonText() == "Advanced panel" &&
+    require(panelSwitch->getButtonText() == htfx::tr("button.advancedPanel") &&
                 editor->getWidth() == 560 && editor->getHeight() == 260,
             "general panel did not restore");
 
@@ -634,20 +634,23 @@ int run() {
             "Scale UI did not restore design size");
 
     fullScreen->onClick();
-    require(fullScreen->getButtonText() == "Exit full screen",
+    require(fullScreen->getButtonText() == htfx::tr("button.exitFullScreen"),
             "full-screen fallback did not enter");
     fullScreen->onClick();
-    require(fullScreen->getButtonText() == "Full screen" &&
+    require(fullScreen->getButtonText() == htfx::tr("button.fullScreen") &&
                 editor->getWidth() == 560 && editor->getHeight() == 260,
             "full-screen fallback did not restore the editor");
 
     // L1: language infrastructure — string table default (zh-TW), the
     // in-editor toggle switching a wired label live, and the choice
     // persisting so a freshly (re)opened editor observes it. This is
-    // additive coverage for the new Localization module; it does not touch
-    // any pre-existing English-string assertion above (those stay in
-    // English until L2/L6 wire the remaining UI and update the assertions
-    // together).
+    // additive coverage for the new Localization module. Every lookup above
+    // that targets a now-localized control resolves via htfx::tr(...) (the
+    // same table this block exercises) rather than an English literal, so it
+    // stays correct regardless of the default UI language; controls not yet
+    // wired into Localization (segment/model/compute choices, dynamic status
+    // text, the RoFormer catalog's own category names) remain English
+    // literals until a future L2/L6 iteration covers them.
     require(htfx::Localization::instance().getLanguage() == htfx::Language::zhTW,
             "language did not default to zh-TW");
     auto* languageToggle =

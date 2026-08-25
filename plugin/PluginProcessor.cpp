@@ -3113,7 +3113,7 @@ public:
           progressBar_(progressValue_) {
         htfx::Localization::instance().reload();
 
-        panelSwitchButton_.setButtonText("Advanced panel");
+        updatePanelSwitchButtonText();
         panelSwitchButton_.onClick = [this] { setAdvancedPanel(!advancedPanel_); };
         addAndMakeVisible(panelSwitchButton_);
 
@@ -3131,16 +3131,16 @@ public:
         simpleTitle_.setFont(juce::FontOptions{22.0f, juce::Font::bold});
         simpleTitle_.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(simpleTitle_);
-        simpleFile_.setText("No audio or video selected", juce::dontSendNotification);
+        simpleFile_.setText(htfx::tr("label.noMediaSelected"), juce::dontSendNotification);
         simpleFile_.setJustificationType(juce::Justification::centredLeft);
         simpleFile_.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
         addAndMakeVisible(simpleFile_);
-        vocalsOnlyButton_.setButtonText("Export Vocals only");
+        vocalsOnlyButton_.setButtonText(htfx::tr("button.exportVocalsOnly"));
         vocalsOnlyButton_.onClick = [this] {
             chooseQuickExportFile(
                 HTDemucsGpuFXAudioProcessor::QuickExportKind::vocals);
         };
-        accompanyOnlyButton_.setButtonText("Export Accompany only");
+        accompanyOnlyButton_.setButtonText(htfx::tr("button.exportAccompanyOnly"));
         accompanyOnlyButton_.onClick = [this] {
             chooseQuickExportFile(
                 HTDemucsGpuFXAudioProcessor::QuickExportKind::accompaniment);
@@ -3150,9 +3150,10 @@ public:
 
         addAndMakeVisible(separationModeLabel_);
         separationModeBox_.setName("Separation mode");
-        separationModeBox_.setTextWhenNothingSelected("Choose a separation mode...");
-        separationModeBox_.addItem("4-stem separation", 1);
-        separationModeBox_.addItem("6-stem separation", 2);
+        separationModeBox_.setTextWhenNothingSelected(
+            htfx::tr("combo.separationModePlaceholder"));
+        separationModeBox_.addItem(htfx::tr("combo.separationMode4Stem"), 1);
+        separationModeBox_.addItem(htfx::tr("combo.separationMode6Stem"), 2);
         juce::StringArray separationModeCategories;
         for (const auto& model : processor_.getRoformerModels()) {
             separationModeCategories.addIfNotAlreadyThere(model.category);
@@ -3169,8 +3170,8 @@ public:
 
         addAndMakeVisible(modeLabel_);
         addAndMakeVisible(modeBox_);
-        modeBox_.addItem("Record mode", 1);
-        modeBox_.addItem("Realtime mode (Ultra high latency)", 2);
+        modeBox_.addItem(htfx::tr("combo.modeRecord"), 1);
+        modeBox_.addItem(htfx::tr("combo.modeRealtime"), 2);
         modeBox_.setSelectedItemIndex(choiceIndex("operatingMode"), juce::dontSendNotification);
         modeBox_.onChange = [this] {
             setChoice("operatingMode", modeBox_.getSelectedItemIndex());
@@ -3181,10 +3182,10 @@ public:
             updateVisibility();
         };
 
-        fullScreenButton_.setButtonText("Full screen");
+        updateFullScreenButtonText();
         fullScreenButton_.onClick = [this] { toggleFullScreen(); };
         addAndMakeVisible(fullScreenButton_);
-        scaleButton_.setButtonText("Scale UI");
+        scaleButton_.setButtonText(htfx::tr("button.scaleUi"));
         scaleButton_.onClick = [this] { updateResizeMode(); };
         addAndMakeVisible(scaleButton_);
 
@@ -3233,13 +3234,13 @@ public:
         };
         addAndMakeVisible(recordButton_);
 
-        importButton_.setButtonText("Import audio/video");
+        importButton_.setButtonText(htfx::tr("button.import"));
         importButton_.onClick = [this] { chooseMediaFile(); };
         addAndMakeVisible(importButton_);
 
         separateButton_.onClick = [this] { processor_.beginSeparation(); };
         addAndMakeVisible(separateButton_);
-        exportButton_.setButtonText("Export");
+        exportButton_.setButtonText(htfx::tr("button.export"));
         exportButton_.onClick = [this] { showExportDialog(); };
         addAndMakeVisible(exportButton_);
         cancelButton_.onClick = [this] {
@@ -3255,7 +3256,7 @@ public:
         addAndMakeVisible(progressBar_);
 
         addAndMakeVisible(previewGroup_);
-        previewPlayButton_.setButtonText("Play");
+        previewPlayButton_.setButtonText(htfx::tr("button.play"));
         previewPlayButton_.onClick = [this] { processor_.togglePreviewPlayback(); };
         previewStopButton_.onClick = [this] { processor_.stopPreview(); };
         previewPosition_.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -3270,11 +3271,10 @@ public:
         addAndMakeVisible(previewPosition_);
         addAndMakeVisible(previewTime_);
 
-        advancedButton_.setButtonText("Advanced options >");
+        updateAdvancedButtonText();
         advancedButton_.onClick = [this] {
             advancedVisible_ = !advancedVisible_;
-            advancedButton_.setButtonText(
-                advancedVisible_ ? "Advanced options v" : "Advanced options >");
+            updateAdvancedButtonText();
             updateAdvancedVisibility();
             // Re-apply the RoFormer-mode-aware refinement (D2) so the model
             // combo doesn't flash visible for one frame when the disclosure
@@ -3307,14 +3307,14 @@ public:
             }
             updateSixSourceControls();
         };
-        modelDownloadButton_.setButtonText("Download selected model");
+        modelDownloadButton_.setButtonText(htfx::tr("button.downloadModel"));
         modelDownloadButton_.onClick = [this] {
             processor_.beginModelDownload(modelBox_.getText());
         };
         addAndMakeVisible(modelDownloadButton_);
 
         roformerCategoryBox_.setName("RoFormer category");
-        roformerCategoryBox_.addItem("All categories", 1);
+        roformerCategoryBox_.addItem(htfx::tr("combo.roformerAllCategories"), 1);
         juce::StringArray roformerCategories;
         for (const auto& model : processor_.getRoformerModels()) {
             roformerCategories.addIfNotAlreadyThere(model.category);
@@ -3328,7 +3328,7 @@ public:
 
         roformerSearch_.setName("RoFormer search");
         roformerSearch_.setTextToShowWhenEmpty(
-            "Name or model ID", juce::Colours::grey);
+            htfx::tr("placeholder.roformerSearch"), juce::Colours::grey);
         roformerSearch_.onTextChange = [this] { refreshRoformerBrowser(); };
 
         roformerModelBox_.setName("RoFormer model");
@@ -3581,6 +3581,23 @@ private:
         gpuLabel_.setText(htfx::tr("label.gpuIndex"), juce::dontSendNotification);
         resetWorker_.setButtonText(htfx::tr("button.resetWorker"));
         languageButton_.setButtonText(htfx::tr("button.languageToggle"));
+        vocalsOnlyButton_.setButtonText(htfx::tr("button.exportVocalsOnly"));
+        accompanyOnlyButton_.setButtonText(htfx::tr("button.exportAccompanyOnly"));
+        importButton_.setButtonText(htfx::tr("button.import"));
+        exportButton_.setButtonText(htfx::tr("button.export"));
+        scaleButton_.setButtonText(htfx::tr("button.scaleUi"));
+        separationModeBox_.setTextWhenNothingSelected(
+            htfx::tr("combo.separationModePlaceholder"));
+        separationModeBox_.changeItemText(1, htfx::tr("combo.separationMode4Stem"));
+        separationModeBox_.changeItemText(2, htfx::tr("combo.separationMode6Stem"));
+        modeBox_.changeItemText(1, htfx::tr("combo.modeRecord"));
+        modeBox_.changeItemText(2, htfx::tr("combo.modeRealtime"));
+        roformerCategoryBox_.changeItemText(1, htfx::tr("combo.roformerAllCategories"));
+        roformerSearch_.setTextToShowWhenEmpty(
+            htfx::tr("placeholder.roformerSearch"), juce::Colours::grey);
+        updatePanelSwitchButtonText();
+        updateAdvancedButtonText();
+        updateFullScreenButtonText();
     }
 
     void chooseMediaFile() {
@@ -3703,8 +3720,7 @@ private:
 
     void setAdvancedPanel(bool advanced) {
         advancedPanel_ = advanced;
-        panelSwitchButton_.setButtonText(
-            advancedPanel_ ? "General panel" : "Advanced panel");
+        updatePanelSwitchButtonText();
         updatePanelVisibility();
         updateVisibility();
         updateSize();
@@ -3741,8 +3757,7 @@ private:
             if (auto* window = findParentComponentOfClass<juce::ResizableWindow>()) {
                 const bool enter = !window->isFullScreen();
                 window->setFullScreen(enter);
-                fullScreenButton_.setButtonText(
-                    enter ? "Exit full screen" : "Full screen");
+                updateFullScreenButtonText();
                 return;
             }
         }
@@ -3757,12 +3772,43 @@ private:
                 setSize(available.getWidth(), available.getHeight());
             }
             editorFullScreen_ = true;
-            fullScreenButton_.setButtonText("Exit full screen");
         } else {
             setSize(previousEditorSize_.x, previousEditorSize_.y);
             editorFullScreen_ = false;
-            fullScreenButton_.setButtonText("Full screen");
         }
+        updateFullScreenButtonText();
+    }
+
+    // Mirrors the two independent "are we full screen" representations used
+    // above: a standalone host window queried live, or the in-editor flag
+    // for the plugin/no-parent-window case. Needed so applyLocalizedStrings()
+    // can re-derive the correct label on a language toggle without duplicating
+    // toggleFullScreen()'s branching.
+    bool isEffectivelyFullScreen() {
+        if (processor_.wrapperType == juce::AudioProcessor::wrapperType_Standalone) {
+            if (auto* window = findParentComponentOfClass<juce::ResizableWindow>()) {
+                return window->isFullScreen();
+            }
+        }
+        return editorFullScreen_;
+    }
+
+    void updateFullScreenButtonText() {
+        fullScreenButton_.setButtonText(
+            isEffectivelyFullScreen() ? htfx::tr("button.exitFullScreen")
+                                       : htfx::tr("button.fullScreen"));
+    }
+
+    void updatePanelSwitchButtonText() {
+        panelSwitchButton_.setButtonText(
+            advancedPanel_ ? htfx::tr("button.generalPanel")
+                           : htfx::tr("button.advancedPanel"));
+    }
+
+    void updateAdvancedButtonText() {
+        advancedButton_.setButtonText(
+            advancedVisible_ ? htfx::tr("button.advancedOptionsCollapse")
+                              : htfx::tr("button.advancedOptionsExpand"));
     }
 
     int choiceIndex(const juce::String& parameterId) const {
@@ -4093,7 +4139,8 @@ private:
                              ? processor_.getModelDownloadProgress()
                              : (mediaBusy ? processor_.getMediaProgress()
                                           : processor_.getSeparationProgress());
-        recordButton_.setButtonText(recording ? "Stop recording" : "Record");
+        recordButton_.setButtonText(
+            recording ? htfx::tr("button.stopRecording") : htfx::tr("button.record"));
         recordButton_.setEnabled(!mediaBusy && !separationBusy);
         importButton_.setEnabled(!recording && !busy);
         const bool quickExportReady =
@@ -4126,8 +4173,9 @@ private:
             processor_.isModelInstalled(modelBox_.getText());
         modelDownloadButton_.setButtonText(
             selectedModelInstalled
-                ? "Installed"
-                : (modelBusy ? "Downloading..." : "Download selected model"));
+                ? htfx::tr("button.modelInstalled")
+                : (modelBusy ? htfx::tr("button.modelDownloading")
+                             : htfx::tr("button.downloadModel")));
         modelDownloadButton_.setEnabled(
             advancedVisible_ && configurationEnabled && modeChosen &&
             !roformerModeActive && !selectedModelInstalled);
@@ -4151,7 +4199,8 @@ private:
         }
         previewPlayButton_.setEnabled(processor_.hasPreview());
         previewStopButton_.setEnabled(processor_.hasPreview());
-        previewPlayButton_.setButtonText(processor_.isPreviewPlaying() ? "Pause" : "Play");
+        previewPlayButton_.setButtonText(
+            processor_.isPreviewPlaying() ? htfx::tr("button.pause") : htfx::tr("button.play"));
         previewTime_.setText(
             juce::String(previewPosition, 1) + " / " +
                 juce::String(previewDuration, 1) + " s",
@@ -4161,7 +4210,7 @@ private:
         simpleFile_.setText(
             importedFile.existsAsFile()
                 ? importedFile.getFileName()
-                : "No audio or video selected",
+                : htfx::tr("label.noMediaSelected"),
             juce::dontSendNotification);
 
         if (pendingQuickExport_.has_value()) {

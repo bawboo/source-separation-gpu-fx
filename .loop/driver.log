@@ -19,3 +19,12 @@
 [driver] pilot done 2026-08-25T15:02:04+0800 — FINAL_REPORT skipped (run not terminated; status=running). Check .loop/iterations/, .loop/journal.md and the checkpoint commit, then relaunch.
 [driver] start 2026-08-25T20:26:52+0800  AGENT_CMD_JSON='["C:\\nvm4w\\nodejs\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe","-p","--permission-mode","acceptEdits","--allowedTools","Bash,Edit,Write,Read,Glob,Grep,Task,WebFetch,WebSearch"]'  prompt_mode=ref  wall=disabled  iter_timeout=90m  max_launches=1  py=python3
 [driver] iteration 1 launching  2026-08-25T20:26:53+0800
+Checkpoint committed successfully. This iteration is complete.
+
+LOOP STATUS: running — iter 1 continue: L1 language infrastructure (string table, persistence, toggle) verified compiling and cheap-tier green, committed to loop/ui-language; L2–L7 remain for future iterations.
+[driver] agent process exited rc=0
+[scope] OK �X 54 changed path(s) within policy
+[driver] pilot stop: MAX_LAUNCHES=1 reached — state untouched (status=running); rerun to continue, nohup/tmux for walk-away
+[driver] pilot done 2026-08-25T20:31:31+0800 — FINAL_REPORT skipped (run not terminated; status=running). Check .loop/iterations/, .loop/journal.md and the checkpoint commit, then relaunch.
+[driver] start 2026-08-25T20:31:40+0800  AGENT_CMD_JSON='["C:\\nvm4w\\nodejs\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe","-p","--permission-mode","acceptEdits","--allowedTools","Bash,Edit,Write,Read,Glob,Grep,Task,WebFetch,WebSearch"]'  prompt_mode=ref  wall=disabled  iter_timeout=90m  max_launches=0  py=python3
+[driver] iteration 2 launching  2026-08-25T20:31:41+0800

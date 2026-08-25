@@ -1,0 +1,19 @@
+{
+  "iteration": 2,
+  "timestamp": "2026-08-25T20:48:16+08:00",
+  "hypothesis": "Wiring the next self-contained batch of static/one-time editor strings (advanced/full-screen/panel-switch toggle buttons, import/export/quick-export buttons, mode/separation-mode/RoFormer-category combo items, scale button) through htfx::tr() into applyLocalizedStrings() (for construction-time-only controls) and directly into timerCallback() (for controls already refreshed every tick) will keep cheap tier green after fixing the pre-existing English-literal test lookups those controls broke, advancing L2 by one sub-milestone without regressing L1.",
+  "files_touched": [
+    "plugin/Localization.cpp",
+    "plugin/PluginProcessor.cpp",
+    "tests/ui_configuration_smoke.cpp"
+  ],
+  "commands": [
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd'", "exit_code": 1, "timed_out": false, "note": "first run after wiring strings: build succeeded but htdemucs_ui_configuration_smoke.exe failed with 'required UI controls were not found' because pre-existing test lookups (findButton/findCombo/getItemText) still used hardcoded English literals for the controls just localized, and the app now defaults to zh-TW"},
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd'", "exit_code": 0, "timed_out": false, "note": "after updating the affected test lookups to htfx::tr(...) — same fix pattern L1 already used for resetWorker_"}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 2, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}
