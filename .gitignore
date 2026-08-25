@@ -46,3 +46,6 @@ ffmpeg-path.txt
 /tools/diagnose_model_paths.py
 /tools/golden_compare.py
 /tools/soak_test.py
+
+# operator loop archives (bookkeeping, never source-controlled)
+/.loop-archive-*/
