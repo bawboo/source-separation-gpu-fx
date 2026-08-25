@@ -146,6 +146,11 @@ int run() {
             .getChildFile("htfx-ui-language-" + juce::Uuid().toString() + ".txt");
     _wputenv_s(L"HTFX_UI_LANGUAGE_FILE",
                languageSettingsFile.getFullPathName().toWideCharPointer());
+    const auto startupSettingsFile =
+        juce::File::getSpecialLocation(juce::File::tempDirectory)
+            .getChildFile("htfx-ui-startup-" + juce::Uuid().toString() + ".txt");
+    _wputenv_s(L"HTFX_UI_STARTUP_FILE",
+               startupSettingsFile.getFullPathName().toWideCharPointer());
 
     juce::AudioProcessor::setTypeOfNextNewPlugin(
         juce::AudioProcessor::wrapperType_Standalone);
@@ -316,8 +321,16 @@ int run() {
     require(separationMode != nullptr, "Separation mode selector was not found");
     require(separationMode->isVisible(),
             "Separation mode selector is hidden in the advanced panel");
-    require(separationMode->getSelectedItemIndex() == -1,
-            "Separation mode should start unselected");
+    int expectedVocalsMode = -1;
+    for (int index = 0; index < separationMode->getNumItems(); ++index) {
+        if (separationMode->getItemText(index) == "Vocals") {
+            expectedVocalsMode = index;
+            break;
+        }
+    }
+    require(expectedVocalsMode >= 2, "Vocals mode entry missing for startup default");
+    require(separationMode->getSelectedItemIndex() == expectedVocalsMode,
+            "L4: startup did not preselect the Vocals separation mode");
     require(separationMode->getItemText(0) == htfx::tr("combo.separationMode4Stem") &&
                 separationMode->getItemText(1) == htfx::tr("combo.separationMode6Stem") &&
                 separationMode->getNumItems() == 12,
@@ -325,7 +338,9 @@ int run() {
 
     advanced->onClick();
     require(editor->getHeight() == 826, "expanded editor size mismatch");
-    require(segment->isVisible() && model->isVisible() && compute->isVisible(),
+    // In the startup Vocals (RoFormer) mode the Demucs model combo stays
+    // hidden per D2; its visibility is asserted later in the HTDemucs modes.
+    require(segment->isVisible() && compute->isVisible(),
             "Advanced options did not become visible");
     require(advanced->getButtonText() == htfx::tr("button.advancedOptionsCollapse"),
             "expanded disclosure label mismatch");
@@ -341,15 +356,21 @@ int run() {
     require(roformerCategory != nullptr && roformerSearch != nullptr &&
                 roformerModel != nullptr && roformerStatus != nullptr,
             "RoFormer model browser controls were not found");
-    require(!roformerCategory->isVisible() && !roformerSearch->isVisible() &&
-                !roformerModel->isVisible() && !roformerStatus->isVisible(),
-            "D3: RoFormer model browser controls should stay hidden while "
-            "expanded until a RoFormer separation mode is actually chosen");
+    require(waitUntil(
+                [&] {
+                    return roformerCategory->isVisible() && roformerModel->isVisible();
+                },
+                std::chrono::seconds(3)),
+            "L4: startup Vocals preselect should show the RoFormer browser "
+            "in the expanded advanced panel");
     require(roformerCategory->getItemText(0) == htfx::tr("combo.roformerAllCategories") &&
                 roformerCategory->getNumItems() == 11,
             "RoFormer category browser mismatch");
-    require(roformerModel->getNumItems() == 99,
-            "RoFormer browser did not expose all 99 models");
+    // Startup preselects the Vocals mode, so the browser opens filtered to
+    // that category (a subset); the full 99-model catalog is asserted at the
+    // processor level above.
+    require(roformerModel->getNumItems() >= 1 && roformerModel->getNumItems() < 99,
+            "RoFormer browser should open filtered to the vocals category");
 
     auto* drumsSlider = findNamedComponent<juce::Slider>(components, "drumsGain");
     auto* bassSlider = findNamedComponent<juce::Slider>(components, "bassGain");
@@ -362,11 +383,16 @@ int run() {
                 vocalsSlider != nullptr && guitarSlider != nullptr &&
                 pianoSlider != nullptr && outputTrimSlider != nullptr,
             "stem/output gain sliders were not found");
-    require(!model->isEnabled() && !roformerCategory->isEnabled() &&
-                !roformerSearch->isEnabled() && !roformerModel->isEnabled() &&
-                !drumsSlider->isEnabled() && !outputTrimSlider->isEnabled(),
-            "model/RoFormer/slider controls were not disabled before a separation "
-            "mode was chosen");
+    require(waitUntil(
+                [&] {
+                    return !model->isEnabled() && roformerModel->isEnabled() &&
+                           drumsSlider->isEnabled() && outputTrimSlider->isEnabled();
+                },
+                std::chrono::seconds(3)),
+            "L4: startup Vocals preselect should enable the RoFormer browser "
+            "and 2-stem sliders while keeping the Demucs combo inert");
+    require(processor->getSelectedRoformerModel().isNotEmpty(),
+            "L4: startup Vocals preselect did not select a default model");
 
     separationMode->setSelectedItemIndex(0, juce::sendNotificationSync);
     require(waitUntil(
@@ -435,7 +461,7 @@ int run() {
     require(processor->getSelectedRoformerModel() == "melband-roformer-big-beta5e",
             "B2: choosing the Vocals separation mode did not default to the "
             "audited-first vocals model");
-    require(roformerStatus->getText().contains("Audited"),
+    require(roformerStatus->getText().contains(htfx::tr("roformer.statusAudited")),
             "B2: Vocals separation mode default model should be marked Audited");
     require(drumsSlider->isVisible() && drumsSlider->isEnabled() &&
                 bassSlider->isVisible() && bassSlider->isEnabled(),
@@ -530,14 +556,15 @@ int run() {
     roformerSearch->setText("melband-roformer-instv8b", true);
     roformerSearch->onTextChange();
     require(roformerModel->getNumItems() == 1 &&
-                roformerModel->getItemText(0).contains("[Experimental]"),
+                roformerModel->getItemText(0).contains(
+                    htfx::tr("roformer.tagExperimental")),
             "RoFormer search/experimental marker mismatch");
     roformerModel->setSelectedItemIndex(0, juce::sendNotificationSync);
     require(processor->getSelectedRoformerModel() ==
                 "melband-roformer-instv8b",
             "RoFormer browser selection did not reach the processor");
-    require(roformerStatus->getText().contains("Experimental") &&
-                roformerStatus->getText().contains("Not downloaded"),
+    require(roformerStatus->getText().contains(htfx::tr("roformer.statusExperimental")) &&
+                roformerStatus->getText().contains(htfx::tr("roformer.statusNotDownloaded")),
             "RoFormer download/experimental status mismatch");
     roformerSearch->clear();
 
@@ -695,6 +722,7 @@ int run() {
                  " separation_mode_gate=true separation_modes=12"
                  " separation_mode_defaults=true separation_mode_stem_gating=true"
                  " separation_mode_all_categories_verified=true"
+                 " startup_default_mode=vocals"
                  " stem_slider_relabels=true"
                  " roformer_stem_labels=vocals/instrumental"
                  " roformer_stem_label_categories=8 roformer_export_naming=true"

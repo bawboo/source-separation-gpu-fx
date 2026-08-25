@@ -3358,6 +3358,7 @@ public:
                     visibleRoformerIds_[static_cast<std::size_t>(index)]);
             }
             updateRoformerStatus();
+            persistStartupSelection();
         };
 
         roformerStatus_.setName("RoFormer download status");
@@ -3421,6 +3422,7 @@ public:
         addAndMakeVisible(scaledContent_);
         setResizable(false, false);
         applyLocalizedStrings();
+        restoreStartupSelection();
         updateSixSourceControls();
         updateAdvancedVisibility();
         updatePanelVisibility();
@@ -3893,8 +3895,8 @@ private:
             }
             const auto displayName = model.name +
                                      (model.experimental
-                                          ? " [Experimental]"
-                                          : " [Audited]");
+                                          ? htfx::tr("roformer.tagExperimental")
+                                          : htfx::tr("roformer.tagAudited"));
             roformerModelBox_.addItem(
                 displayName, roformerModelBox_.getNumItems() + 1);
             visibleRoformerIds_.push_back(model.id);
@@ -3913,7 +3915,8 @@ private:
     void updateRoformerStatus() {
         const auto index = roformerModelBox_.getSelectedItemIndex();
         if (index < 0 || index >= static_cast<int>(visibleRoformerIds_.size())) {
-            roformerStatus_.setText("No matching models", juce::dontSendNotification);
+            roformerStatus_.setText(htfx::tr("roformer.noMatchingModels"),
+                                     juce::dontSendNotification);
             return;
         }
         const auto& id = visibleRoformerIds_[static_cast<std::size_t>(index)];
@@ -3922,13 +3925,17 @@ private:
             models.begin(), models.end(),
             [&id](const auto& model) { return model.id == id; });
         if (found == models.end()) {
-            roformerStatus_.setText("Unknown model", juce::dontSendNotification);
+            roformerStatus_.setText(htfx::tr("roformer.unknownModel"),
+                                     juce::dontSendNotification);
             return;
         }
         roformerStatus_.setText(
-            juce::String(found->experimental ? "Experimental" : "Audited") +
+            (found->experimental ? htfx::tr("roformer.statusExperimental")
+                                  : htfx::tr("roformer.statusAudited")) +
                 " · " +
-                (processor_.isModelInstalled(id) ? "Downloaded" : "Not downloaded"),
+                (processor_.isModelInstalled(id)
+                     ? htfx::tr("roformer.statusDownloaded")
+                     : htfx::tr("roformer.statusNotDownloaded")),
             juce::dontSendNotification);
     }
 
@@ -3946,6 +3953,79 @@ private:
     // the RoFormer manifest categories appended in the constructor.
     bool roformerModeSelected() const {
         return separationModeBox_.getSelectedItemIndex() >= 2;
+    }
+
+    // L4: startup selection persistence. Two lines: a stable mode key
+    // (htdemucs4 / htdemucs6 / category:<name>) and the RoFormer model id
+    // (may be empty). Stable keys survive UI-language changes.
+    static juce::File startupSelectionFile() {
+        const auto overridePath = juce::SystemStats::getEnvironmentVariable(
+            "HTFX_UI_STARTUP_FILE", {}).trim();
+        if (overridePath.isNotEmpty()) {
+            return juce::File(overridePath);
+        }
+        return htfx::Localization::settingsFile().getSiblingFile("ui-startup.txt");
+    }
+
+    void persistStartupSelection() const {
+        const auto index = separationModeBox_.getSelectedItemIndex();
+        juce::String modeKey;
+        if (index == 0) {
+            modeKey = "htdemucs4";
+        } else if (index == 1) {
+            modeKey = "htdemucs6";
+        } else if (index >= 2 && index - 2 < separationModeCategories_.size()) {
+            modeKey = "category:" + separationModeCategories_[index - 2];
+        } else {
+            return;
+        }
+        const auto file = startupSelectionFile();
+        file.getParentDirectory().createDirectory();
+        file.replaceWithText(
+            modeKey + "\n" + processor_.getSelectedRoformerModel() + "\n");
+    }
+
+    void restoreStartupSelection() {
+        juce::String modeKey;
+        juce::String modelId;
+        const auto file = startupSelectionFile();
+        if (file.existsAsFile()) {
+            juce::StringArray lines;
+            file.readLines(lines);
+            if (lines.size() > 0) modeKey = lines[0].trim();
+            if (lines.size() > 1) modelId = lines[1].trim();
+        }
+        int target = -1;
+        if (modeKey == "htdemucs4") {
+            target = 0;
+        } else if (modeKey == "htdemucs6") {
+            target = 1;
+        } else if (modeKey.startsWith("category:")) {
+            const auto category = modeKey.fromFirstOccurrenceOf(":", false, false);
+            const auto categoryIndex = separationModeCategories_.indexOf(category);
+            if (categoryIndex >= 0) target = 2 + categoryIndex;
+        }
+        if (target < 0) {
+            // default startup mode: vocal separation (user-requested default)
+            for (int index = 0; index < separationModeCategories_.size(); ++index) {
+                if (separationModeCategories_[index].equalsIgnoreCase("vocals")) {
+                    target = 2 + index;
+                    break;
+                }
+            }
+            modelId.clear();
+        }
+        if (target < 0) target = 0;
+        separationModeBox_.setSelectedItemIndex(target, juce::sendNotificationSync);
+        if (target >= 2 && modelId.isNotEmpty()) {
+            for (std::size_t index = 0; index < visibleRoformerIds_.size(); ++index) {
+                if (visibleRoformerIds_[index] == modelId) {
+                    roformerModelBox_.setSelectedItemIndex(
+                        static_cast<int>(index), juce::sendNotificationSync);
+                    break;
+                }
+            }
+        }
     }
 
     void selectRoformerCategoryDefault(const juce::String& category) {
@@ -3999,6 +4079,7 @@ private:
             }
         }
         updateSixSourceControls();
+        persistStartupSelection();
     }
 
     void updatePanelVisibility() {
