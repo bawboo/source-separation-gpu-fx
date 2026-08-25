@@ -72,6 +72,36 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
          StringPair{u8"進階選項 v", "Advanced options v"}},
         {"button.advancedPanel", StringPair{u8"進階面板", "Advanced panel"}},
         {"button.generalPanel", StringPair{u8"一般面板", "General panel"}},
+        {"dialog.exportChooseTitle",
+         StringPair{
+             u8"選擇要以原始音量匯出的音軌，或匯出目前介面所聽到的混音。",
+             "Choose original-volume stems, or export the mix currently "
+             "heard in the interface."}},
+        {"dialog.exportSelectedStems", StringPair{u8"匯出所選音軌", "Export selected stems"}},
+        {"dialog.exportAllStems", StringPair{u8"匯出全部音軌", "Export all stems"}},
+        {"dialog.exportMix", StringPair{u8"匯出混音", "Export mix"}},
+        {"dialog.close", StringPair{u8"關閉", "Close"}},
+        {"dialog.audioOnlyWav", StringPair{u8"僅音訊（.wav）", "Audio only (.wav)"}},
+        {"dialog.videoWithMixedAudio",
+         StringPair{u8"含混音音訊的影片（.mp4）", "Video with mixed audio (.mp4)"}},
+        {"dialog.noteVideoExport",
+         StringPair{u8"MP4 匯出會複製原始影像串流，僅取代其音訊。",
+                    "MP4 export copies the original video stream and "
+                    "replaces only its audio."}},
+        {"dialog.noteStemExport",
+         StringPair{u8"個別音軌不受介面增益控制影響，保留 Demucs 原始輸出音量。",
+                    "Individual stems ignore the interface gain controls "
+                    "and preserve Demucs output level."}},
+        {"alert.noStemsSelectedTitle", StringPair{u8"尚未選擇音軌", "No stems selected"}},
+        {"alert.noStemsSelectedMessage",
+         StringPair{u8"請至少選擇一個音軌後再匯出。",
+                    "Select at least one stem before exporting."}},
+        {"filechooser.stemFolderTitle",
+         StringPair{u8"選擇音軌 WAV 檔案的儲存資料夾",
+                    "Choose a folder for the stem WAV files"}},
+        {"filechooser.exportVideoWithMix",
+         StringPair{u8"匯出含介面混音的影片", "Export video with the interface mix"}},
+        {"filechooser.exportMix", StringPair{u8"匯出介面混音", "Export the interface mix"}},
     };
     return table;
 }

@@ -68,3 +68,31 @@ PASS 行本身沒有新增獨立欄位（這批屬既有行為斷言的翻譯接
 **Decision：** continue（status 保持 running，stop_reason null）。
 
 **Lesson：** 承接 L1 的既有教訓——任何把一個字面值英文控件改成 htfx::tr() 接線，都必須同步檢查 tests/ui_configuration_smoke.cpp 裡是否有既有斷言用同一段英文字面值透過 findButton/findCombo/getItemText 尋找或比對該控件；因為預設語言已是 zh-TW，這類舊斷言會在編譯成功後於執行期以「required UI controls were not found」或字串比對失敗的方式現形，而非編譯期錯誤——這不是新教訓（SIGN loop2 wiring 已預告），但本輪是第一次實際踩到，值得記錄具體徵狀（exit 1 且訊息是 fatal required UI controls were not found）供下一輪快速辨識同類問題。
+
+## iter 3 — 2026-08-25T20:57:51+08:00
+
+**Hypothesis：** 承接 iter 1/2（L1 語言基礎架構、L2a 主控制面板控件批次），L2（全部 UI 文字雙語化）再拆一個自包子里程碑：StemExportDialog（`plugin/PluginProcessor.cpp` 內 `ExportDialogContent` 類別）整體接上 `htfx::tr()`。此類別是每次點擊「Export」開啟對話框時才重新建構（非常駐元件），預期不需要像 L2a 三個切換按鈕那樣額外寫 `applyLocalizedStrings()` 重算 helper；且 `tests/ui_configuration_smoke.cpp` 從未對此類別的任何英文字面值做過斷言，預期零既有測試需要同步修改，可在低風險下完成一個完整 UI 區塊。
+
+**Files touched：** `plugin/Localization.cpp`（新增 14 個字串鍵：`dialog.exportChooseTitle`／`dialog.exportSelectedStems`／`dialog.exportAllStems`／`dialog.exportMix`／`dialog.close`／`dialog.audioOnlyWav`／`dialog.videoWithMixedAudio`／`dialog.noteVideoExport`／`dialog.noteStemExport`／`alert.noStemsSelectedTitle`／`alert.noStemsSelectedMessage`／`filechooser.stemFolderTitle`／`filechooser.exportVideoWithMix`／`filechooser.exportMix`）、`plugin/PluginProcessor.cpp`（`ExportDialogContent` 建構式內 `title_`/`selectedButton_`/`allButton_`/`mixButton_`/`closeButton_`/`audioOnlyButton_`/`videoButton_`/`note_` 的字面值改 `htfx::tr(...)`；`chooseStemFolder()` 的 `AlertWindow::showMessageBoxAsync` 警告標題/訊息與 `juce::FileChooser` 資料夾選擇標題改 `htfx::tr(...)`；`chooseMixFile()` 的 `juce::FileChooser` 儲存標題（依 video/audio 分支）改 `htfx::tr(...)`）。
+
+**Verification — cheap tier（協定 step 6，每輪必跑）：** `cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true stem_slider_relabels=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true language_default=zh-TW language_toggle=true language_persist_reopen=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.002s OK / Ran 2 tests in 0.051s OK / Ran 8 tests in 0.098s OK
+```
+PASS 行沒有新增獨立欄位（StemExportDialog 本身在 `ui_configuration_smoke.cpp` 中無任何既有斷言路徑覆蓋），假設驗證屬實：全部既有斷言在建置成功後維持全綠，代表本批次翻譯字串接線正確、未破壞任何邏輯；本批次的「雙語化本身」正確性靠原始碼審查（14 個鍵全數在 `ExportDialogContent` 建構式與兩個 `chooser_` 建立點被引用，無遺漏字面值）與 build 成功（模板/型別皆正確）佐證。
+
+**Scope self-check（協定 step 7）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 54 changed path(s) within policy`。
+
+**Full tier / backlog checker：** 本輪未跑（iteration 3 非第 5 輪倍數，亦未宣告 converged）——criteria C1/C2 本輪標記 fail，C3 pass。
+
+**Criteria：** C1 fail（full tier 未跑）／C2 fail（backlog checker 未跑）／C3 pass（scope 無違規）。AND 規則下未全數通過，非 converged。
+
+**Backlog：** 新增 discovered 項目 L2b（StemExportDialog 雙語化子里程碑）passes=true，evidence 見 backlog.json。L2 本身仍為 false——segment/model/compute 選單描述文字、狀態列（`status_`/`metrics_`/`roformerStatus_`/`cpuWarning_`）、其餘 `AlertWindow` 錯誤訊息、`getStateDisplayName()`/`getResolvedDeviceName()` 等尚未接線，留給後續輪次。L1、L2a 維持 true。L3–L7 維持 false。
+
+**Metric：** backlog_items_passing = 3（較上一輪 2 增加 1：L2b 新增為 true）；improved: true。
+
+**Decision：** continue（status 保持 running，stop_reason null）。
+
+**Lesson：** 承接 SIGN loop2 iter-1 的批次拆分策略——優先挑選「自包、無既有測試斷言覆蓋」的 UI 區塊（例如本輪的模態對話框類別，每次開啟才重新建構、不需要額外的即時刷新 helper）作為 L2 子里程碑，能在同一輪內完成「新增字串鍵＋接線＋驗證＋commit」而不需要同時處理 L2a 那類「切換態按鈕需要額外 helper 重算文字」或「舊斷言用英文字面值查找控件」的複雜度；下一輪可以往狀態列／錯誤訊息／`getStateDisplayName()` 這類分散在多處呼叫點、且已被至少一個既有斷言引用的字串移動，屆時要重新套用 iter 2 學到的「同步檢查 `tests/ui_configuration_smoke.cpp` 既有斷言」步驟。

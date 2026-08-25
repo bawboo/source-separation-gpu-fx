@@ -28,3 +28,9 @@ LOOP STATUS: running — iter 1 continue: L1 language infrastructure (string tab
 [driver] pilot done 2026-08-25T20:31:31+0800 — FINAL_REPORT skipped (run not terminated; status=running). Check .loop/iterations/, .loop/journal.md and the checkpoint commit, then relaunch.
 [driver] start 2026-08-25T20:31:40+0800  AGENT_CMD_JSON='["C:\\nvm4w\\nodejs\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe","-p","--permission-mode","acceptEdits","--allowedTools","Bash,Edit,Write,Read,Glob,Grep,Task,WebFetch,WebSearch"]'  prompt_mode=ref  wall=disabled  iter_timeout=90m  max_launches=0  py=python3
 [driver] iteration 2 launching  2026-08-25T20:31:41+0800
+Checkpoint committed cleanly, working tree clean. This iteration is complete.
+
+LOOP STATUS: running — iter 2 continue: L2 sub-milestone L2a (Advanced/full-screen/panel-switch/import/export/quick-export buttons + mode/separation-mode/RoFormer-category combo items) localized via htfx::tr(), fixed the pre-existing English-literal test assertions it broke, cheap tier PASS, committed to loop/ui-language; L2 (remaining segment/model/compute menus, status/error text, StemExportDialog) and L3–L7 remain for future iterations.
+[driver] agent process exited rc=0
+[scope] OK �X 54 changed path(s) within policy
+[driver] iteration 3 launching  2026-08-25T20:52:38+0800

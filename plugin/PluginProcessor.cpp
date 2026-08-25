@@ -2916,7 +2916,7 @@ public:
     explicit ExportDialogContent(HTDemucsGpuFXAudioProcessor& processor)
         : processor_(processor) {
         title_.setText(
-            "Choose original-volume stems, or export the mix currently heard in the interface.",
+            htfx::tr("dialog.exportChooseTitle"),
             juce::dontSendNotification);
         title_.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(title_);
@@ -2933,9 +2933,9 @@ public:
                 source < sourceCount);
         }
 
-        selectedButton_.setButtonText("Export selected stems");
+        selectedButton_.setButtonText(htfx::tr("dialog.exportSelectedStems"));
         selectedButton_.onClick = [this] { chooseStemFolder(selectedSources()); };
-        allButton_.setButtonText("Export all stems");
+        allButton_.setButtonText(htfx::tr("dialog.exportAllStems"));
         allButton_.onClick = [this] {
             std::vector<int> all;
             for (int source = 0; source < processor_.getActiveSourceCount(); ++source) {
@@ -2943,9 +2943,9 @@ public:
             }
             chooseStemFolder(std::move(all));
         };
-        mixButton_.setButtonText("Export mix");
+        mixButton_.setButtonText(htfx::tr("dialog.exportMix"));
         mixButton_.onClick = [this] { chooseMixFile(); };
-        closeButton_.setButtonText("Close");
+        closeButton_.setButtonText(htfx::tr("dialog.close"));
         closeButton_.onClick = [this] {
             if (auto* dialog = findParentComponentOfClass<juce::DialogWindow>()) {
                 dialog->exitModalState(0);
@@ -2956,8 +2956,8 @@ public:
             addAndMakeVisible(button);
         }
 
-        audioOnlyButton_.setButtonText("Audio only (.wav)");
-        videoButton_.setButtonText("Video with mixed audio (.mp4)");
+        audioOnlyButton_.setButtonText(htfx::tr("dialog.audioOnlyWav"));
+        videoButton_.setButtonText(htfx::tr("dialog.videoWithMixedAudio"));
         audioOnlyButton_.setRadioGroupId(0x48544658, juce::dontSendNotification);
         videoButton_.setRadioGroupId(0x48544658, juce::dontSendNotification);
         audioOnlyButton_.setToggleState(true, juce::dontSendNotification);
@@ -2968,9 +2968,8 @@ public:
         videoButton_.setVisible(videoInput);
 
         note_.setText(
-            videoInput
-                ? "MP4 export copies the original video stream and replaces only its audio."
-                : "Individual stems ignore the interface gain controls and preserve Demucs output level.",
+            videoInput ? htfx::tr("dialog.noteVideoExport")
+                       : htfx::tr("dialog.noteStemExport"),
             juce::dontSendNotification);
         note_.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
         note_.setFont(juce::FontOptions{12.0f});
@@ -3030,12 +3029,12 @@ private:
         if (sources.empty()) {
             juce::AlertWindow::showMessageBoxAsync(
                 juce::MessageBoxIconType::WarningIcon,
-                "No stems selected",
-                "Select at least one stem before exporting.");
+                htfx::tr("alert.noStemsSelectedTitle"),
+                htfx::tr("alert.noStemsSelectedMessage"));
             return;
         }
         chooser_ = std::make_unique<juce::FileChooser>(
-            "Choose a folder for the stem WAV files",
+            htfx::tr("filechooser.stemFolderTitle"),
             juce::File::getSpecialLocation(juce::File::userDocumentsDirectory));
         juce::Component::SafePointer<ExportDialogContent> safeThis(this);
         chooser_->launchAsync(
@@ -3068,8 +3067,8 @@ private:
                              .getChildFile(
                                  base + "_mix" + (video ? ".mp4" : ".wav"));
         chooser_ = std::make_unique<juce::FileChooser>(
-            video ? "Export video with the interface mix"
-                  : "Export the interface mix",
+            video ? htfx::tr("filechooser.exportVideoWithMix")
+                  : htfx::tr("filechooser.exportMix"),
             suggested,
             video ? "*.mp4" : "*.wav");
         juce::Component::SafePointer<ExportDialogContent> safeThis(this);
