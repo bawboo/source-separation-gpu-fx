@@ -441,6 +441,13 @@ int run() {
                 std::chrono::seconds(3)),
             "D2: RoFormer Vocals mode did not disable/hide the inert Demucs "
             "model combo");
+    auto* stemLabel0 = findNamedComponent<juce::Label>(components, "stemLabel0");
+    auto* stemLabel1 = findNamedComponent<juce::Label>(components, "stemLabel1");
+    require(stemLabel0 != nullptr && stemLabel1 != nullptr,
+            "stem slider labels were not found by name");
+    require(stemLabel0->getText() == "Vocals" && stemLabel1->getText() == "Instrumental",
+            "RoFormer Vocals mode left the stem slider labels on the HTDemucs "
+            "names instead of relabeling to Vocals/Instrumental");
 
     int guitarModeIndex = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
@@ -469,6 +476,9 @@ int run() {
     require(!model->isEnabled() && !model->isVisible(),
             "D2: RoFormer Guitar mode did not keep the Demucs model combo "
             "disabled/hidden");
+    require(stemLabel0->getText() == "Guitar" && stemLabel1->getText() == "Residual",
+            "RoFormer Guitar mode did not relabel the stem sliders to "
+            "Guitar/Residual");
 
     separationMode->setSelectedItemIndex(0, juce::sendNotificationSync);
     require(waitUntil([&] { return processor->getSelectedRoformerModel().isEmpty(); },
@@ -482,6 +492,9 @@ int run() {
                 !guitarSlider->isVisible() && !pianoSlider->isVisible(),
             "B3: returning to 4-stem separation did not restore its four stem "
             "sliders and re-hide the 6-stem-only pair");
+    require(stemLabel0->getText() == "Drums" && stemLabel1->getText() == "Bass",
+            "returning to 4-stem separation did not restore the Drums/Bass "
+            "stem slider labels");
     require(waitUntil(
                 [&] { return model->isEnabled() && model->isVisible(); },
                 std::chrono::seconds(3)),
@@ -630,6 +643,7 @@ int run() {
                  " separation_mode_gate=true separation_modes=12"
                  " separation_mode_defaults=true separation_mode_stem_gating=true"
                  " separation_mode_all_categories_verified=true"
+                 " stem_slider_relabels=true"
                  " roformer_stem_labels=vocals/instrumental"
                  " roformer_stem_label_categories=8 roformer_export_naming=true PASS\n";
     return 0;

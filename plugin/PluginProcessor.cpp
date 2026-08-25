@@ -3183,6 +3183,7 @@ public:
             stemIds{"drumsGain", "bassGain", "otherGain", "vocalsGain", "guitarGain", "pianoGain"};
         for (std::size_t index = 0; index < stemSliders_.size(); ++index) {
             stemLabels_[index].setText(stemNames[index], juce::dontSendNotification);
+            stemLabels_[index].setName("stemLabel" + juce::String(static_cast<int>(index)));
             stemLabels_[index].setJustificationType(juce::Justification::centredRight);
             stemSliders_[index].setSliderStyle(juce::Slider::LinearHorizontal);
             stemSliders_[index].setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 24);
@@ -3932,10 +3933,40 @@ private:
             juce::dontSendNotification);
     }
 
+    // Display names for the two stems of a RoFormer category (target,
+    // residual). Pre-separation the exact worker output names are unknown, so
+    // these are the category-level display pairs; the preview stem buttons
+    // still switch to the worker's real labels once a separation completes.
+    static std::pair<const char*, const char*> roformerStemDisplayNames(
+        const juce::String& category) {
+        const auto c = category.toLowerCase();
+        if (c == "vocals" || c == "instvoc") return {"Vocals", "Instrumental"};
+        if (c == "instrumental") return {"Instrumental", "Vocals"};
+        if (c == "karaoke") return {"Karaoke", "Vocals"};
+        if (c == "guitar") return {"Guitar", "Residual"};
+        if (c == "denoise") return {"Clean", "Noise"};
+        if (c == "dereverb") return {"Dry", "Reverb"};
+        if (c == "aspiration") return {"Aspiration", "Residual"};
+        if (c == "crowd") return {"Crowd", "Residual"};
+        return {"Target", "Residual"};
+    }
+
     void updateSixSourceControls() {
         const bool modeChosen = separationModeBox_.getSelectedItemIndex() >= 0;
         const bool roformerMode = roformerModeSelected();
         const bool sixSources = !roformerMode && modelBox_.getSelectedItemIndex() == 2;
+        constexpr std::array<const char*, HTDemucsGpuFXAudioProcessor::kMaxSources>
+            defaultStemNames{"Drums", "Bass", "Other", "Vocals", "Guitar", "Piano"};
+        if (roformerMode) {
+            const auto names = roformerStemDisplayNames(separationModeBox_.getText());
+            stemLabels_[0].setText(names.first, juce::dontSendNotification);
+            stemLabels_[1].setText(names.second, juce::dontSendNotification);
+        } else {
+            for (std::size_t index = 0; index < stemLabels_.size(); ++index) {
+                stemLabels_[index].setText(
+                    defaultStemNames[index], juce::dontSendNotification);
+            }
+        }
         for (std::size_t index = 0; index < stemSliders_.size(); ++index) {
             // RoFormer modes are always a 2-stem split (target + residual), so
             // only the first two sliders are relevant; HTDemucs modes show the
