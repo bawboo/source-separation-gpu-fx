@@ -131,6 +131,8 @@ if(HTFX_BUILD_PLUGIN)
     )
 
     target_sources(HTDemucsGpuFX PRIVATE
+        plugin/Localization.cpp
+        plugin/Localization.h
         plugin/MmeAudioIODevice.cpp
         plugin/MmeAudioIODevice.h
         plugin/PluginProcessor.cpp

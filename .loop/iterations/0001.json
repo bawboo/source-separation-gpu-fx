@@ -1,0 +1,37 @@
+{
+  "iteration": 1,
+  "timestamp": "2026-08-25T20:29:43+08:00",
+  "hypothesis": "Prior launch attempt (killed by the then-60min hang guard) left an uncommitted Localization module (zh-TW/en string table + persisted preference + in-editor toggle) wired into 18 static UI strings. STEER.md narrows this iteration to: verify the inherited change-set actually compiles and cheap tier is green, then commit it as this iteration one sub-milestone (L1), leaving the rest of L1 wiring and all of L2 to future iterations.",
+  "files_touched": [
+    "plugin/Localization.h",
+    "plugin/Localization.cpp",
+    "CMakeLists.txt",
+    "plugin/PluginProcessor.cpp",
+    "tests/ui_configuration_smoke.cpp"
+  ],
+  "commands": [
+    {
+      "cmd": "cmd //c '.loop\\checks\\cheap.cmd'",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "cmd": "python .loop/check_scope.py",
+      "exit_code": 0,
+      "timed_out": false
+    }
+  ],
+  "criteria": {
+    "C1": "fail",
+    "C2": "fail",
+    "C3": "pass"
+  },
+  "metrics": {
+    "name": "backlog_items_passing",
+    "value": 1,
+    "improved": true
+  },
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}

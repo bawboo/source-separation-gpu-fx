@@ -1,3 +1,4 @@
+#include "Localization.h"
 #include "PluginProcessor.h"
 
 #include <juce_events/juce_events.h>
@@ -136,6 +137,15 @@ int run() {
     _wputenv_s(L"HTFX_ROFORMER_WORKER", roformerWorker.getFullPathName().toWideCharPointer());
     _wputenv_s(L"HTFX_ROFORMER_MODELS_DIR", roformerCache.getFullPathName().toWideCharPointer());
     _wputenv_s(L"HTFX_ROFORMER_OUTPUT_DIR", roformerOutput.getFullPathName().toWideCharPointer());
+
+    // Isolate the UI language preference from a real user's saved choice —
+    // must be set before the first Localization::instance() access, which
+    // happens inside the very first HTDemucsGpuFXEditor constructed below.
+    const auto languageSettingsFile =
+        juce::File::getSpecialLocation(juce::File::tempDirectory)
+            .getChildFile("htfx-ui-language-" + juce::Uuid().toString() + ".txt");
+    _wputenv_s(L"HTFX_UI_LANGUAGE_FILE",
+               languageSettingsFile.getFullPathName().toWideCharPointer());
 
     juce::AudioProcessor::setTypeOfNextNewPlugin(
         juce::AudioProcessor::wrapperType_Standalone);
@@ -631,6 +641,45 @@ int run() {
                 editor->getWidth() == 560 && editor->getHeight() == 260,
             "full-screen fallback did not restore the editor");
 
+    // L1: language infrastructure — string table default (zh-TW), the
+    // in-editor toggle switching a wired label live, and the choice
+    // persisting so a freshly (re)opened editor observes it. This is
+    // additive coverage for the new Localization module; it does not touch
+    // any pre-existing English-string assertion above (those stay in
+    // English until L2/L6 wire the remaining UI and update the assertions
+    // together).
+    require(htfx::Localization::instance().getLanguage() == htfx::Language::zhTW,
+            "language did not default to zh-TW");
+    auto* languageToggle =
+        findNamedComponent<juce::TextButton>(components, "Language toggle");
+    auto* resetWorker = findNamedComponent<juce::TextButton>(components, "Reset worker");
+    require(languageToggle != nullptr && resetWorker != nullptr,
+            "language toggle / reset worker controls were not found");
+    require(languageToggle->getButtonText() == "EN",
+            "zh-TW language toggle should offer switching to EN");
+    require(resetWorker->getButtonText() == htfx::tr("button.resetWorker") &&
+                resetWorker->getButtonText() != "Reset worker",
+            "zh-TW default did not localize a wired static label");
+
+    languageToggle->onClick();
+    require(htfx::Localization::instance().getLanguage() == htfx::Language::en,
+            "language toggle did not switch to English");
+    require(resetWorker->getButtonText() == "Reset worker",
+            "English toggle did not re-localize the wired label live");
+    require(languageToggle->getButtonText() != "EN",
+            "English language toggle should offer switching back to zh-TW");
+    require(languageSettingsFile.loadFileAsString().trim() == "en",
+            "language choice was not persisted to disk");
+
+    std::unique_ptr<juce::AudioProcessorEditor> reopenedEditor(processor->createEditor());
+    require(reopenedEditor != nullptr, "editor could not be reopened");
+    std::vector<juce::Component*> reopenedComponents;
+    collectComponents(*reopenedEditor, reopenedComponents);
+    auto* reopenedResetWorker = findButton(reopenedComponents, "Reset worker");
+    require(reopenedResetWorker != nullptr,
+            "a freshly (re)opened editor did not restore the persisted English choice");
+    reopenedEditor.reset();
+
     processor->releaseResources();
     std::cout << "default_panel=general quick_exports=vocals/accompany "
                  "default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed"
@@ -645,7 +694,9 @@ int run() {
                  " separation_mode_all_categories_verified=true"
                  " stem_slider_relabels=true"
                  " roformer_stem_labels=vocals/instrumental"
-                 " roformer_stem_label_categories=8 roformer_export_naming=true PASS\n";
+                 " roformer_stem_label_categories=8 roformer_export_naming=true"
+                 " language_default=zh-TW language_toggle=true"
+                 " language_persist_reopen=true PASS\n";
     return 0;
 }
 

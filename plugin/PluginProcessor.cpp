@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 
 #include "GpuWorkerClient.h"
+#include "Localization.h"
 
 #include <algorithm>
 #include <chrono>
@@ -3110,11 +3111,23 @@ public:
           processor_(processor),
           state_(processor.parameters()),
           progressBar_(progressValue_) {
+        htfx::Localization::instance().reload();
+
         panelSwitchButton_.setButtonText("Advanced panel");
         panelSwitchButton_.onClick = [this] { setAdvancedPanel(!advancedPanel_); };
         addAndMakeVisible(panelSwitchButton_);
 
-        simpleTitle_.setText("HTDemucs Quick Separation", juce::dontSendNotification);
+        languageButton_.setName("Language toggle");
+        languageButton_.onClick = [this] {
+            const auto next =
+                htfx::Localization::instance().getLanguage() == htfx::Language::zhTW
+                    ? htfx::Language::en
+                    : htfx::Language::zhTW;
+            htfx::Localization::instance().setLanguage(next);
+            applyLocalizedStrings();
+        };
+        addAndMakeVisible(languageButton_);
+
         simpleTitle_.setFont(juce::FontOptions{22.0f, juce::Font::bold});
         simpleTitle_.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(simpleTitle_);
@@ -3135,7 +3148,6 @@ public:
         addAndMakeVisible(vocalsOnlyButton_);
         addAndMakeVisible(accompanyOnlyButton_);
 
-        separationModeLabel_.setText("Separation mode", juce::dontSendNotification);
         addAndMakeVisible(separationModeLabel_);
         separationModeBox_.setName("Separation mode");
         separationModeBox_.setTextWhenNothingSelected("Choose a separation mode...");
@@ -3155,7 +3167,6 @@ public:
         separationModeBox_.onChange = [this] { onSeparationModeChanged(); };
         addAndMakeVisible(separationModeBox_);
 
-        modeLabel_.setText("Mode", juce::dontSendNotification);
         addAndMakeVisible(modeLabel_);
         addAndMakeVisible(modeBox_);
         modeBox_.addItem("Record mode", 1);
@@ -3195,7 +3206,6 @@ public:
                 state_, stemIds[index], stemSliders_[index]);
         }
 
-        outputLabel_.setText("Output Trim", juce::dontSendNotification);
         outputLabel_.setJustificationType(juce::Justification::centredRight);
         outputSlider_.setSliderStyle(juce::Slider::LinearHorizontal);
         outputSlider_.setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 24);
@@ -3206,7 +3216,6 @@ public:
         outputAttachment_ = std::make_unique<SliderAttachment>(
             state_, "outputTrim", outputSlider_);
 
-        bypassButton_.setButtonText("Bypass (preview original recording)");
         addAndMakeVisible(bypassButton_);
         bypassAttachment_ = std::make_unique<ButtonAttachment>(
             state_, "bypass", bypassButton_);
@@ -3228,13 +3237,11 @@ public:
         importButton_.onClick = [this] { chooseMediaFile(); };
         addAndMakeVisible(importButton_);
 
-        separateButton_.setButtonText("Separate");
         separateButton_.onClick = [this] { processor_.beginSeparation(); };
         addAndMakeVisible(separateButton_);
         exportButton_.setButtonText("Export");
         exportButton_.onClick = [this] { showExportDialog(); };
         addAndMakeVisible(exportButton_);
-        cancelButton_.setButtonText("Cancel");
         cancelButton_.onClick = [this] {
             if (processor_.isModelDownloadBusy()) {
                 processor_.cancelModelDownload();
@@ -3247,11 +3254,9 @@ public:
         addAndMakeVisible(cancelButton_);
         addAndMakeVisible(progressBar_);
 
-        previewGroup_.setText("Preview");
         addAndMakeVisible(previewGroup_);
         previewPlayButton_.setButtonText("Play");
         previewPlayButton_.onClick = [this] { processor_.togglePreviewPlayback(); };
-        previewStopButton_.setButtonText("Stop");
         previewStopButton_.onClick = [this] { processor_.stopPreview(); };
         previewPosition_.setSliderStyle(juce::Slider::LinearHorizontal);
         previewPosition_.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
@@ -3279,7 +3284,6 @@ public:
         };
         addAndMakeVisible(advancedButton_);
 
-        segmentLabel_.setText("Inference window", juce::dontSendNotification);
         segmentBox_.addItem("2 seconds", 1);
         segmentBox_.addItem("3 seconds", 2);
         segmentBox_.addItem("4 seconds", 3);
@@ -3291,7 +3295,6 @@ public:
             processor_.applyUserConfiguration();
         };
 
-        modelLabel_.setText("Demucs model", juce::dontSendNotification);
         modelBox_.addItem("htdemucs", 1);
         modelBox_.addItem("htdemucs_ft", 2);
         modelBox_.addItem("htdemucs_6s", 3);
@@ -3310,7 +3313,6 @@ public:
         };
         addAndMakeVisible(modelDownloadButton_);
 
-        roformerCategoryLabel_.setText("RoFormer category", juce::dontSendNotification);
         roformerCategoryBox_.setName("RoFormer category");
         roformerCategoryBox_.addItem("All categories", 1);
         juce::StringArray roformerCategories;
@@ -3324,13 +3326,11 @@ public:
         roformerCategoryBox_.setSelectedItemIndex(0, juce::dontSendNotification);
         roformerCategoryBox_.onChange = [this] { refreshRoformerBrowser(); };
 
-        roformerSearchLabel_.setText("Search models", juce::dontSendNotification);
         roformerSearch_.setName("RoFormer search");
         roformerSearch_.setTextToShowWhenEmpty(
             "Name or model ID", juce::Colours::grey);
         roformerSearch_.onTextChange = [this] { refreshRoformerBrowser(); };
 
-        roformerModelLabel_.setText("RoFormer model", juce::dontSendNotification);
         roformerModelBox_.setName("RoFormer model");
         roformerModelBox_.onChange = [this] {
             const auto index = roformerModelBox_.getSelectedItemIndex();
@@ -3341,7 +3341,6 @@ public:
             updateRoformerStatus();
         };
 
-        roformerStatusLabel_.setText("Download status", juce::dontSendNotification);
         roformerStatus_.setName("RoFormer download status");
         roformerStatus_.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
         refreshRoformerBrowser();
@@ -3354,7 +3353,6 @@ public:
             addAndMakeVisible(component);
         }
 
-        computeLabel_.setText("Compute device", juce::dontSendNotification);
 #if JUCE_MAC
         computeBox_.addItem("Auto (Apple MPS, otherwise CPU)", 1);
 #else
@@ -3370,7 +3368,6 @@ public:
             updateCpuWarning();
         };
 
-        gpuLabel_.setText("CUDA GPU index", juce::dontSendNotification);
         gpuSlider_.setSliderStyle(juce::Slider::LinearHorizontal);
         gpuSlider_.setTextBoxStyle(juce::Slider::TextBoxRight, false, 48, 24);
         gpuSlider_.setRange(0, 7, 1);
@@ -3394,7 +3391,7 @@ public:
         metrics_.setJustificationType(juce::Justification::centredLeft);
         status_.setFont(juce::FontOptions{15.0f, juce::Font::bold});
         metrics_.setFont(juce::FontOptions{12.0f});
-        resetWorker_.setButtonText("Reset worker");
+        resetWorker_.setName("Reset worker");
         resetWorker_.onClick = [this] { processor_.requestWorkerRecovery(); };
         while (getNumChildComponents() > 0) {
             auto* child = getChildComponent(0);
@@ -3404,6 +3401,7 @@ public:
         }
         addAndMakeVisible(scaledContent_);
         setResizable(false, false);
+        applyLocalizedStrings();
         updateSixSourceControls();
         updateAdvancedVisibility();
         updatePanelVisibility();
@@ -3421,7 +3419,9 @@ public:
         if (!advancedPanel_) {
             auto header = area.removeFromTop(34);
             simpleTitle_.setBounds(header.removeFromLeft(330));
-            panelSwitchButton_.setBounds(header.removeFromRight(150));
+            languageButton_.setBounds(header.removeFromRight(64));
+            header.removeFromRight(6);
+            panelSwitchButton_.setBounds(header.removeFromRight(130));
             area.removeFromTop(10);
             simpleFile_.setBounds(area.removeFromTop(26));
             area.removeFromTop(8);
@@ -3457,9 +3457,11 @@ public:
         modeLabel_.setBounds(modeRow.removeFromLeft(72));
         modeBox_.setBounds(modeRow.removeFromLeft(260));
         modeRow.removeFromLeft(6);
-        fullScreenButton_.setBounds(modeRow.removeFromLeft(100));
+        fullScreenButton_.setBounds(modeRow.removeFromLeft(90));
         modeRow.removeFromLeft(6);
-        scaleButton_.setBounds(modeRow.removeFromLeft(90));
+        scaleButton_.setBounds(modeRow.removeFromLeft(80));
+        modeRow.removeFromLeft(6);
+        languageButton_.setBounds(modeRow.removeFromLeft(64));
         modeRow.removeFromLeft(6);
         panelSwitchButton_.setBounds(modeRow);
 
@@ -3545,6 +3547,40 @@ private:
 
     [[nodiscard]] int designHeight() const noexcept {
         return advancedPanel_ ? (advancedVisible_ ? 826 : 576) : 260;
+    }
+
+    // Re-applies every localized static string from the current language
+    // (see Localization.h). Called once at construction and again whenever
+    // languageButton_ toggles the language, so the switch takes effect
+    // immediately without reopening the editor. Dynamic status/error text
+    // (status_, metrics_, simpleFile_, cpuWarning_, modelDownloadButton_) is
+    // computed elsewhere from live processor state and is out of scope here.
+    void applyLocalizedStrings() {
+        simpleTitle_.setText(htfx::tr("editor.title"), juce::dontSendNotification);
+        separationModeLabel_.setText(
+            htfx::tr("label.separationMode"), juce::dontSendNotification);
+        modeLabel_.setText(htfx::tr("label.mode"), juce::dontSendNotification);
+        outputLabel_.setText(htfx::tr("label.outputTrim"), juce::dontSendNotification);
+        bypassButton_.setButtonText(htfx::tr("button.bypass"));
+        separateButton_.setButtonText(htfx::tr("button.separate"));
+        cancelButton_.setButtonText(htfx::tr("button.cancel"));
+        previewGroup_.setText(htfx::tr("group.preview"));
+        previewStopButton_.setButtonText(htfx::tr("button.previewStop"));
+        segmentLabel_.setText(
+            htfx::tr("label.inferenceWindow"), juce::dontSendNotification);
+        modelLabel_.setText(htfx::tr("label.demucsModel"), juce::dontSendNotification);
+        roformerCategoryLabel_.setText(
+            htfx::tr("label.roformerCategory"), juce::dontSendNotification);
+        roformerSearchLabel_.setText(
+            htfx::tr("label.roformerSearch"), juce::dontSendNotification);
+        roformerModelLabel_.setText(
+            htfx::tr("label.roformerModel"), juce::dontSendNotification);
+        roformerStatusLabel_.setText(
+            htfx::tr("label.roformerStatus"), juce::dontSendNotification);
+        computeLabel_.setText(htfx::tr("label.computeDevice"), juce::dontSendNotification);
+        gpuLabel_.setText(htfx::tr("label.gpuIndex"), juce::dontSendNotification);
+        resetWorker_.setButtonText(htfx::tr("button.resetWorker"));
+        languageButton_.setButtonText(htfx::tr("button.languageToggle"));
     }
 
     void chooseMediaFile() {
@@ -4179,6 +4215,7 @@ private:
     juce::AudioProcessorValueTreeState& state_;
     juce::Component scaledContent_;
     juce::TextButton panelSwitchButton_;
+    juce::TextButton languageButton_;
     juce::Label simpleTitle_;
     juce::Label simpleFile_;
     juce::TextButton vocalsOnlyButton_;
