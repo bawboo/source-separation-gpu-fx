@@ -1,0 +1,19 @@
+{
+  "iteration": 8,
+  "timestamp": "2026-08-25T22:05:00+08:00",
+  "hypothesis": "L2g—承接 L2a-f（主控制面板、StemExportDialog、媒體匯入/匯出錯誤、分離/錄音/RoFormer 狀態列、匯出流程訊息全數雙語化），本輪盤點 HTDemucsGpuFXEditor 層級尚未接線的 AlertWindow 對話框與 FileChooser 標題——chooseMediaFile()/chooseQuickExportFile()/showExportDialog() 共 6 個呼叫點——接上 htfx::tr()，應能在零既有斷言變更的前提下讓新 backlog 項目 L2g 轉 pass（既有測試對這些字串皆無斷言路徑覆蓋，經 grep 確認）。",
+  "files_touched": [
+    "plugin/Localization.cpp",
+    "plugin/PluginProcessor.cpp",
+    ".loop/backlog.json"
+  ],
+  "commands": [
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd'", "exit_code": 0, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 8, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}

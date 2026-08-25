@@ -87,3 +87,9 @@ LOOP STATUS: running â€” skipped iteration 7 (background driver already mid-flig
 [scope] OK ¡X 54 changed path(s) within policy
 [driver] WARNING: iteration counter did not advance (failed launch #1, rc=0)
 [driver] iteration 7 launching  2026-08-25T21:31:36+0800
+Checkpoint committed successfully, working tree clean.
+
+LOOP STATUS: running â€” iter-7 L2f export-flow dynamic-value setMediaMessage() calls (9 sites) localized via prefix/suffix keys; cheap tier + scope check PASS; backlog 7/13 passing
+[driver] agent process exited rc=0
+[scope] OK ¡X 54 changed path(s) within policy
+[driver] iteration 8 launching  2026-08-25T21:40:17+0800

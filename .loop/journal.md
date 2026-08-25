@@ -226,3 +226,33 @@ PASS 行沒有新增獨立欄位（這批訊息在 `ui_configuration_smoke.cpp`�
 **Decision：** continue（status 保持 running，stop_reason null）。
 
 **Lesson：** 「動態值在句首、句尾接靜態文字」（例如本輪 `error + " (The source video codec may not be compatible...)"`）只需要一個 suffix 鍵、不需要對應的 prefix 鍵——因為變數本身已經在句首，呼叫端寫法就是 `error + htfx::tr(suffix)`，與 iter 4/5「靜態文字在句首、動態值在句尾」時只需要 prefix 鍵（`htfx::tr(prefix) + value`）是對稱的鏡像情況。掃描含動態值串接的呼叫點時，應先判斷「動態值在句子的哪個位置」（純句尾／純句首／句中兩側都有靜態文字／句中有兩個動態值），再決定要拆 prefix-only、suffix-only、還是 prefix/middle（/suffix）——不要預設每個含動態值的呼叫點都需要完整的三段式拆分。
+
+---
+
+## iter 8 — 2026-08-25T22:05:00+08:00
+
+**Hypothesis：** 承接 iter 1–7（L1、L2a–L2f 全數 pass），本輪盤點 `setSeparationMessage()`/`setMediaMessage()` 以外、`HTDemucsGpuFXEditor` 類別層級尚未接線的英文字面值——用 grep 掃過 `setButtonText`/`setText`/`addItem`/`AlertWindow::show`/`setTitle` 等呼叫模式後，找到四群不同性質的缺口：(1) `chooseMediaFile()`/`chooseQuickExportFile()`/`showExportDialog()` 內 6 個 AlertWindow/FileChooser/DialogWindow 呼叫點（零既有斷言覆蓋，可直接做）；(2) `refreshRoformerBrowser()`/`updateRoformerStatus()` 的 RoFormer 瀏覽器狀態文字（`tests/ui_configuration_smoke.cpp` 有 4 處既有英文斷言直接比對，需同步改斷言）；(3) `segmentBox_`/`computeBox_` 選單項目（測試用文字內容尋找元件、且多處直接比對選項文字，需先補 `setName()` 才能安全改斷言）；(4) `separationModeBox_` 12 個模式項目與 stem slider 標籤（需要 RoFormer 類別→雙語顯示名稱翻譯表，且與 L4/L5 預設模式高度相關）。依協定「一輪一個 hypothesis」與 iter 5/6 已確立的複雜度分流原則，本輪只做 (1)（零既有斷言、風險最低、範圍明確自洽），(2)(3)(4) 記錄為新 discovered 項目 L2h/L2i/L2j 留給後續輪次，且在各自 evidence 中預先寫明「為什麼需要同步改測試」以降低下一輪的偵察成本。
+
+**Files touched：** `plugin/Localization.cpp`（新增 10 個字串鍵：`filechooser.importMediaTitle`／`filechooser.exportVocalsTitle`／`filechooser.exportAccompanyTitle`／`alert.importMediaFirstTitle`／`alert.importMediaFirstMessage`／`alert.defaultModelMissingTitle`／`alert.defaultModelMissingMessage`／`alert.nothingToExportTitle`／`alert.nothingToExportMessage`／`dialog.exportStemsOrMixTitle`）、`plugin/PluginProcessor.cpp`（`HTDemucsGpuFXEditor::chooseMediaFile()`/`chooseQuickExportFile()`/`showExportDialog()` 內全部 6 個呼叫點改 `htfx::tr(...)`：FileChooser 建構子標題參數 ×3、`AlertWindow::showMessageBoxAsync` 的 title/message 各 ×2 組、`DialogWindow::LaunchOptions::dialogTitle` ×1；這些對話框皆為使用者觸發時動態建構的一次性物件，不需要 `applyLocalizedStrings()` 式的即時刷新 helper，`tr()` 在每次呼叫時即時取值即可反映當下語言）、`.loop/backlog.json`（新增 discovered 項目 L2g `passes:true`＋evidence，並新增 L2h／L2i／L2j 三個 `passes:false` 的 discovered 項目，各自記錄範圍與「為何需要同步改測試」）。
+
+**Verification — cheap tier（協定 step 6，每輪必跑）：** `cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true stem_slider_relabels=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true language_default=zh-TW language_toggle=true language_persist_reopen=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.009s OK / Ran 2 tests in 0.134s OK / Ran 8 tests in 0.328s OK
+```
+PASS 行沒有新增獨立欄位（這批對話框在 `ui_configuration_smoke.cpp`／`media_io_smoke.cpp` 中皆無既有斷言路徑覆蓋——事先以 grep 逐一確認 `"Import media first"`／`"Nothing to export"`／`"Export HTDemucs stems or mix"`／`"Import an audio or video file"`／`"Export vocals"`／`"Export accompaniment"`／`"Default model is missing"` 在 `tests/` 內零匹配），全部既有斷言在建置成功後維持全綠，代表本批次翻譯字串接線正確、未破壞任何邏輯；本批次「雙語化本身」正確性靠原始碼審查＋grep 佐證——`grep -n '"Import media first"\|"Nothing to export"\|"Export HTDemucs stems or mix"\|"Import an audio or video file"\|"Export vocals"\|"Export accompaniment"\|"Default model is missing"' plugin/PluginProcessor.cpp` 於本輪變更後回傳零筆。
+
+**Scope self-check（協定 step 7）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 54 changed path(s) within policy`。
+
+**Full tier / backlog checker：** 本輪未跑（iteration 8 非第 5 輪倍數，亦未宣告 converged）——criteria C1/C2 本輪標記 fail，C3 pass。
+
+**Criteria：** C1 fail（full tier 未跑）／C2 fail（backlog checker 未跑）／C3 pass（scope 無違規）。AND 規則下未全數通過，非 converged。
+
+**Backlog：** 新增 discovered 項目 L2g（Editor 層級 AlertWindow/FileChooser 對話框雙語化）`passes:true`，evidence 見 backlog.json。同時新增三個 discovered 項目留給後續輪次：L2h（RoFormer 瀏覽器狀態文字，需同步改 4 處既有英文斷言）、L2i（segmentBox_/computeBox_ 選單項目，需先補 setName() 再改既有斷言）、L2j（separationModeBox_ 12 模式項目與 stem slider 標籤，需要類別→雙語顯示名稱翻譯表，建議併入 L4/L5 規劃），三者皆 `passes:false`。L2 本身仍為 false——這四群缺口中僅 L2g 本輪清空，L2h/L2i/L2j 仍待後續輪次。L1、L2a–L2f 維持 true。L3–L7 維持 false。
+
+**Metric：** backlog_items_passing = 8（較上一輪 7 增加 1：L2g 新增為 true）；improved: true。
+
+**Decision：** continue（status 保持 running，stop_reason null）。
+
+**Lesson：** 掃描「L2 全部 UI 文字雙語化」的剩餘缺口時，不能只靠 grep `setSeparationMessage`/`setMediaMessage` 這類已知函式名——用更廣的 pattern（`setButtonText`/`setText`/`addItem`/`AlertWindow::show`/`setTitle`）掃過整個檔案後才發現 `HTDemucsGpuFXEditor` 類別層級（非 `ExportDialogContent`）自己也有 3 個函式共 6 個 AlertWindow/FileChooser/DialogWindow 呼叫點從未被前幾輪掃到過。找到缺口後第一步永遠是「這批文字有沒有既有測試斷言直接比對」——本輪用 grep 精準區分出四群缺口中只有 1 群（L2g）零斷言覆蓋可直接做，另外 3 群（L2h 的 RoFormer 狀態文字、L2i 的 segmentBox_/computeBox_ 選單、L2j 的 separationModeBox_ 類別與 stem 標籤）都有既有英文斷言直接比對文字內容，且 L2i 還多一層「元件目前靠文字內容而非 setName() 被測試尋找」的額外前置工作——這些都不是能在同一輪跟 L2g 一起做掉的「掃描到就順手做」，必須各自成為獨立的 discovered 項目，避免打破「一輪一個 hypothesis」的可歸因性，也避免本輪因為要同時改動 production 程式碼與多處測試斷言而超出可審查的變更集大小。

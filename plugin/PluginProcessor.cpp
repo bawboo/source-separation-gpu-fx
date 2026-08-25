@@ -3621,7 +3621,7 @@ private:
 
     void chooseMediaFile() {
         mediaChooser_ = std::make_unique<juce::FileChooser>(
-            "Import an audio or video file",
+            htfx::tr("filechooser.importMediaTitle"),
             juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
             "*.wav;*.flac;*.aif;*.aiff;*.mp3;*.ogg;*.m4a;*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v;*.wmv;*.mpeg");
         juce::Component::SafePointer<HTDemucsGpuFXEditor> safeThis(this);
@@ -3646,15 +3646,15 @@ private:
         if (!imported.existsAsFile() || processor_.getRecordedSeconds() <= 0.0) {
             juce::AlertWindow::showMessageBoxAsync(
                 juce::MessageBoxIconType::InfoIcon,
-                "Import media first",
-                "Choose an audio or video file before exporting.");
+                htfx::tr("alert.importMediaFirstTitle"),
+                htfx::tr("alert.importMediaFirstMessage"));
             return;
         }
         if (!processor_.isModelInstalled("htdemucs")) {
             juce::AlertWindow::showMessageBoxAsync(
                 juce::MessageBoxIconType::WarningIcon,
-                "Default model is missing",
-                "The general panel requires the htdemucs model. Re-run the installer or open the Advanced panel to install it.");
+                htfx::tr("alert.defaultModelMissingTitle"),
+                htfx::tr("alert.defaultModelMissingMessage"));
             return;
         }
 
@@ -3670,8 +3670,8 @@ private:
         const auto suggested = imported.getParentDirectory().getChildFile(base + suffix);
         mediaChooser_ = std::make_unique<juce::FileChooser>(
             kind == HTDemucsGpuFXAudioProcessor::QuickExportKind::vocals
-                ? "Export vocals"
-                : "Export accompaniment",
+                ? htfx::tr("filechooser.exportVocalsTitle")
+                : htfx::tr("filechooser.exportAccompanyTitle"),
             suggested,
             "*.wav");
         juce::Component::SafePointer<HTDemucsGpuFXEditor> safeThis(this);
@@ -3720,13 +3720,13 @@ private:
         if (!processor_.hasPreview()) {
             juce::AlertWindow::showMessageBoxAsync(
                 juce::MessageBoxIconType::InfoIcon,
-                "Nothing to export",
-                "Import or record audio, then run Separate before exporting.");
+                htfx::tr("alert.nothingToExportTitle"),
+                htfx::tr("alert.nothingToExportMessage"));
             return;
         }
         auto* content = new ExportDialogContent(processor_);
         juce::DialogWindow::LaunchOptions options;
-        options.dialogTitle = "Export HTDemucs stems or mix";
+        options.dialogTitle = htfx::tr("dialog.exportStemsOrMixTitle");
         options.dialogBackgroundColour = getLookAndFeel().findColour(
             juce::ResizableWindow::backgroundColourId);
         options.content.setOwned(content);
