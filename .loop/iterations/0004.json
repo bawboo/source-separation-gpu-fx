@@ -1,0 +1,18 @@
+{
+  "iteration": 4,
+  "timestamp": "2026-08-25T21:15:00+08:00",
+  "hypothesis": "承接 iter 1-3（L1 語言基礎架構、L2a 主控制面板、L2b StemExportDialog），L2 再拆一個自包子里程碑：PluginProcessor.cpp 匿名命名空間內三個媒體匯入/匯出自由函式（runFfmpeg/readAudioFileAtProjectRate/writeFloatWav）的錯誤與診斷字面值接上 htfx::tr()。因為 htfx::tr() 是行程全域單例的自由函式（非類別成員方法），預期在匿名命名空間的自由函式內同樣可直接呼叫；且 tests/ui_configuration_smoke.cpp 與 media_io_smoke.cpp 都只斷言檔案是否成功產生等行為結果、從未比對這些錯誤訊息的確切文字內容，預期零既有斷言需要同步修改，可在低風險下完成，cheap tier 保持綠燈。",
+  "files_touched": [
+    "plugin/Localization.cpp",
+    "plugin/PluginProcessor.cpp"
+  ],
+  "commands": [
+    {"cmd": "cmd //c '.loop\\checks\\cheap.cmd'", "exit_code": 0, "timed_out": false},
+    {"cmd": "python .loop/check_scope.py", "exit_code": 0, "timed_out": false}
+  ],
+  "criteria": {"C1": "fail", "C2": "fail", "C3": "pass"},
+  "metrics": {"name": "backlog_items_passing", "value": 4, "improved": true},
+  "decision": "continue",
+  "status": "running",
+  "stop_reason": null
+}

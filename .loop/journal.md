@@ -96,3 +96,33 @@ PASS 行沒有新增獨立欄位（StemExportDialog 本身在 `ui_configuration_
 **Decision：** continue（status 保持 running，stop_reason null）。
 
 **Lesson：** 承接 SIGN loop2 iter-1 的批次拆分策略——優先挑選「自包、無既有測試斷言覆蓋」的 UI 區塊（例如本輪的模態對話框類別，每次開啟才重新建構、不需要額外的即時刷新 helper）作為 L2 子里程碑，能在同一輪內完成「新增字串鍵＋接線＋驗證＋commit」而不需要同時處理 L2a 那類「切換態按鈕需要額外 helper 重算文字」或「舊斷言用英文字面值查找控件」的複雜度；下一輪可以往狀態列／錯誤訊息／`getStateDisplayName()` 這類分散在多處呼叫點、且已被至少一個既有斷言引用的字串移動，屆時要重新套用 iter 2 學到的「同步檢查 `tests/ui_configuration_smoke.cpp` 既有斷言」步驟。
+
+---
+
+## iter 4 — 2026-08-25T21:15:00+08:00
+
+**Hypothesis：** 承接 iter 1–3（L1 語言基礎架構、L2a 主控制面板、L2b StemExportDialog），L2（全部 UI 文字雙語化）再拆一個自包子里程碑：`plugin/PluginProcessor.cpp` 匿名命名空間內三個媒體匯入/匯出自由函式（`runFfmpeg()`／`readAudioFileAtProjectRate()`／`writeFloatWav()`）的錯誤與診斷字面值接上 `htfx::tr()`。因為 `htfx::tr()` 是行程全域單例的自由函式（非類別成員方法），預期在匿名命名空間的自由函式內同樣可直接呼叫；且 `tests/ui_configuration_smoke.cpp` 與 `media_io_smoke.cpp` 都只斷言檔案是否成功產生等行為結果、從未比對這些錯誤訊息的確切文字內容，預期零既有斷言需要同步修改，可在低風險下完成，cheap tier 保持綠燈。
+
+**Files touched：** `plugin/Localization.cpp`（新增 16 個 `error.*` 字串鍵：`error.ffmpegNotStarted`／`error.mediaOperationCancelled`／`error.ffmpegFailedPrefix`＋`error.ffmpegFailedSuffix`（結束碼數字嵌入句中，拆成 prefix/suffix 兩鍵）／`error.unsupportedAudioFile`／`error.mediaDurationInvalid`／`error.audioStreamDecodeFailed`／`error.audioStreamNoSampleRate`／`error.resampledAudioTooLarge`／`error.noAudioToExport`／`error.couldNotCreateOutputFolder`／`error.couldNotOpenOutputFile`／`error.couldNotCreateWavWriter`／`error.wavWriteFailed`／`error.couldNotReplaceExistingFile`／`error.couldNotCommitOutputFile`）、`plugin/PluginProcessor.cpp`（`runFfmpeg()` 的啟動失敗／操作取消／失敗含結束碼三處，`readAudioFileAtProjectRate()` 的不支援檔案／時長無效／解碼失敗／取樣率無效／重取樣過大五處，`writeFloatWav()` 的無音訊可匯出／建立資料夾失敗／開啟檔案失敗／建立 WAV 寫入器失敗／寫入失敗／取代既有檔失敗／提交輸出檔失敗七處，共 16 處字面值全數改 `htfx::tr(...)`；含動態值的訊息用 `htfx::tr(prefix/前綴含尾隨冒號) + 動態值` 或 `htfx::tr(prefix) + 動態值 + htfx::tr(suffix)` 組回完整句子）。
+
+**Verification — cheap tier（協定 step 6，每輪必跑）：** `cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true stem_slider_relabels=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true language_default=zh-TW language_toggle=true language_persist_reopen=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s OK / Ran 2 tests in 0.044s OK / Ran 8 tests in 0.118s OK
+```
+PASS 行沒有新增獨立欄位（這批錯誤/診斷訊息在 `ui_configuration_smoke.cpp`／`media_io_smoke.cpp` 中皆無任何既有斷言路徑覆蓋），假設驗證屬實：全部既有斷言在建置成功後維持全綠，代表本批次翻譯字串接線正確、未破壞任何邏輯；本批次的「雙語化本身」正確性靠原始碼審查（16 個鍵全數在三個函式內被引用，`grep -n 'diagnostics = "\|error = "' plugin/PluginProcessor.cpp` 確認該區塊零殘留英文字面值）與 build 成功佐證。
+
+**Scope self-check（協定 step 7）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 54 changed path(s) within policy`。
+
+**Full tier / backlog checker：** 本輪未跑（iteration 4 非第 5 輪倍數，亦未宣告 converged）——criteria C1/C2 本輪標記 fail，C3 pass。
+
+**Criteria：** C1 fail（full tier 未跑）／C2 fail（backlog checker 未跑）／C3 pass（scope 無違規）。AND 規則下未全數通過，非 converged。
+
+**Backlog：** 新增 discovered 項目 L2c（媒體匯入/匯出錯誤訊息雙語化子里程碑）passes=true，evidence 見 backlog.json。L2 本身仍為 false——狀態列訊息（`setSeparationMessage()` 約 20 處呼叫點，散布在錄音/HTDemucs/RoFormer 分離流程）、`getStateDisplayName()`/`getResolvedDeviceName()` 等尚未接線，留給後續輪次。L1、L2a、L2b 維持 true。L3–L7 維持 false。
+
+**Metric：** backlog_items_passing = 4（較上一輪 3 增加 1：L2c 新增為 true）；improved: true。
+
+**Decision：** continue（status 保持 running，stop_reason null）。
+
+**Lesson：** `Localization::tr()` 目前沒有樣板/佔位符替換機制，遇到句子中間需要嵌入動態值（例如本輪的 FFmpeg 結束碼、檔名）時，可行做法是把該句拆成 prefix/suffix 兩個獨立 key（結束碼案例：`error.ffmpegFailedPrefix`／`error.ffmpegFailedSuffix`，呼叫端 `htfx::tr(prefix) + 動態值 + htfx::tr(suffix)`），或當動態值只出現在句尾時單一 key 即可（value 本身含尾隨冒號/空白，呼叫端直接 `htfx::tr(key) + 動態值`）。下一個子里程碑（`setSeparationMessage()` 狀態列訊息，例如 `"Loading RoFormer " + modelName + " on " + device`）會大量遇到同樣情境，可直接套用此模式；同時也確認了 `htfx::tr()` 是行程全域單例的自由函式，匿名命名空間內非類別成員的自由函式（本輪的 `runFfmpeg()`/`readAudioFileAtProjectRate()`/`writeFloatWav()`）同樣可直接呼叫，不需要額外傳遞或建構。

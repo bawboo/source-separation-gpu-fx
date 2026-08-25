@@ -34,3 +34,9 @@ LOOP STATUS: running â€” iter 2 continue: L2 sub-milestone L2a (Advanced/full-sc
 [driver] agent process exited rc=0
 [scope] OK ¡X 54 changed path(s) within policy
 [driver] iteration 3 launching  2026-08-25T20:52:38+0800
+Commit successful. Iteration complete.
+
+LOOP STATUS: running â€” L2b StemExportDialog localized (cheap tier PASS), backlog_items_passing=3
+[driver] agent process exited rc=0
+[scope] OK ¡X 54 changed path(s) within policy
+[driver] iteration 4 launching  2026-08-25T20:59:17+0800

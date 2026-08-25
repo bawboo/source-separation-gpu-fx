@@ -29,3 +29,4 @@
 - SIGN (loop2 wiring): relabel 修復（stemSliderLabel 斷言）已由 operator 完成並 commit（2cb63b5＋後續）——不要重做，只需在 L7 確認回歸保持綠。
 - SIGN (loop2 iter-1): L1 全量一次做會超過 60 分鐘 ceiling——雙語化工作每輪只做一個子里程碑（例：本輪只讓 Localization 模組編譯通過＋接一組控件），cheap tier 綠了就 record+commit，下一輪再擴。
 - SIGN (loop2 iter-1): `.loop-archive-*` 目錄已加入 .gitignore（operator 歸檔，非 agent 工作範圍）。
+- SIGN (loop2 iter-4): `htfx::Localization::tr()` 沒有樣板/佔位符替換機制。句子中間需要嵌入動態值（結束碼、檔名、模型名稱等）時，拆成 prefix/suffix 兩個獨立 key，呼叫端 `htfx::tr(prefix) + 動態值 + htfx::tr(suffix)`；動態值只在句尾則單一 key（value 含尾隨冒號/空白）＋呼叫端 `htfx::tr(key) + 動態值` 即可，不需要 suffix key。`setSeparationMessage()` 狀態列訊息（下個 L2 子里程碑，約 20 處呼叫點）會大量遇到同類情境，直接套用此模式。另外，`htfx::tr()` 是行程全域單例的自由函式，匿名命名空間內的非類別成員自由函式（不只類別方法）也能直接呼叫，不需要額外傳遞或建構。

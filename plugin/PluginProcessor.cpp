@@ -365,7 +365,7 @@ bool runFfmpeg(
     juce::ChildProcess process;
     if (!process.start(command, juce::ChildProcess::wantStdOut |
                                     juce::ChildProcess::wantStdErr)) {
-        diagnostics = "FFmpeg could not be started. The portable FFmpeg runtime is missing or invalid.";
+        diagnostics = htfx::tr("error.ffmpegNotStarted");
         return false;
     }
 
@@ -374,7 +374,7 @@ bool runFfmpeg(
     while (process.isRunning()) {
         if (stopToken.stop_requested()) {
             process.kill();
-            diagnostics = "Media operation cancelled";
+            diagnostics = htfx::tr("error.mediaOperationCancelled");
             return false;
         }
         const int bytesRead = process.readProcessOutput(
@@ -402,8 +402,9 @@ bool runFfmpeg(
         if (diagnostics.length() > 1800) {
             diagnostics = diagnostics.substring(diagnostics.length() - 1800);
         }
-        diagnostics = "FFmpeg failed (exit " + juce::String(exitCode) + "): " +
-                      diagnostics;
+        diagnostics = htfx::tr("error.ffmpegFailedPrefix") +
+                      juce::String(exitCode) +
+                      htfx::tr("error.ffmpegFailedSuffix") + diagnostics;
         return false;
     }
     return true;
@@ -428,25 +429,25 @@ bool readAudioFileAtProjectRate(
     auto reader = std::unique_ptr<juce::AudioFormatReader>(
         formats.createReaderFor(file));
     if (reader == nullptr) {
-        error = "Unsupported or unreadable audio file: " + file.getFileName();
+        error = htfx::tr("error.unsupportedAudioFile") + file.getFileName();
         return false;
     }
     if (reader->lengthInSamples <= 0 ||
         reader->lengthInSamples > std::numeric_limits<int>::max()) {
-        error = "The media duration is empty or too large to hold in memory";
+        error = htfx::tr("error.mediaDurationInvalid");
         return false;
     }
 
     const int sourceSamples = static_cast<int>(reader->lengthInSamples);
     juce::AudioBuffer<float> source(2, sourceSamples);
     if (!reader->read(&source, 0, sourceSamples, 0, true, true)) {
-        error = "The audio stream could not be decoded";
+        error = htfx::tr("error.audioStreamDecodeFailed");
         return false;
     }
 
     const auto sourceRate = reader->sampleRate;
     if (!(sourceRate > 0.0)) {
-        error = "The audio stream has no valid sample rate";
+        error = htfx::tr("error.audioStreamNoSampleRate");
         return false;
     }
     const auto targetSamples64 = static_cast<std::int64_t>(std::llround(
@@ -454,7 +455,7 @@ bool readAudioFileAtProjectRate(
         HTDemucsGpuFXAudioProcessor::kSampleRate / sourceRate));
     if (targetSamples64 <= 0 ||
         targetSamples64 > std::numeric_limits<int>::max()) {
-        error = "The resampled audio is too large to hold in memory";
+        error = htfx::tr("error.resampledAudioTooLarge");
         return false;
     }
 
@@ -508,11 +509,11 @@ bool writeFloatWav(
     std::size_t sampleCount,
     juce::String& error) {
     if (sampleCount == 0 || left == nullptr || right == nullptr) {
-        error = "There is no audio to export";
+        error = htfx::tr("error.noAudioToExport");
         return false;
     }
     if (!output.getParentDirectory().createDirectory()) {
-        error = "Could not create output folder: " +
+        error = htfx::tr("error.couldNotCreateOutputFolder") +
                 output.getParentDirectory().getFullPathName();
         return false;
     }
@@ -523,7 +524,7 @@ bool writeFloatWav(
 
     std::unique_ptr<juce::OutputStream> stream = temporaryOutput.createOutputStream();
     if (stream == nullptr) {
-        error = "Could not open output file: " + output.getFullPathName();
+        error = htfx::tr("error.couldNotOpenOutputFile") + output.getFullPathName();
         return false;
     }
     juce::WavAudioFormat wav;
@@ -536,7 +537,7 @@ bool writeFloatWav(
                                  juce::AudioFormatWriterOptions::SampleFormat::floatingPoint);
     auto writer = wav.createWriterFor(stream, options);
     if (writer == nullptr) {
-        error = "Could not create a 32-bit float WAV writer";
+        error = htfx::tr("error.couldNotCreateWavWriter");
         return false;
     }
 
@@ -546,7 +547,7 @@ bool writeFloatWav(
             (std::min)(blockSize, sampleCount - offset));
         const std::array<const float*, 2> channels{left + offset, right + offset};
         if (!writer->writeFromFloatArrays(channels.data(), 2, count)) {
-            error = "Writing the WAV file failed";
+            error = htfx::tr("error.wavWriteFailed");
             writer.reset();
             temporaryOutput.deleteFile();
             return false;
@@ -555,12 +556,14 @@ bool writeFloatWav(
     writer.reset();
     if (output.existsAsFile() && !output.deleteFile()) {
         temporaryOutput.deleteFile();
-        error = "Could not replace existing file: " + output.getFullPathName();
+        error = htfx::tr("error.couldNotReplaceExistingFile") +
+                output.getFullPathName();
         return false;
     }
     if (!temporaryOutput.moveFileTo(output)) {
         temporaryOutput.deleteFile();
-        error = "Could not commit output file: " + output.getFullPathName();
+        error = htfx::tr("error.couldNotCommitOutputFile") +
+                output.getFullPathName();
         return false;
     }
     return true;
