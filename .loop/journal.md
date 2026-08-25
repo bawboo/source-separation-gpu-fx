@@ -168,3 +168,33 @@ roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/
 **Decision：** continue（status 保持 running，stop_reason null）。
 
 **Lesson：** 當一句話需要同時嵌入兩個動態值時（本輪 `"Loading " + modelName + " on " + device + " · first load can take a while"`），iter 4 的 prefix/suffix 兩段式 key 不夠用——可自然延伸為 prefix/middle/suffix 三段式 key（`status.loadingModelPrefix` + modelName + `status.loadingModelDeviceMiddle` + device + `status.loadingModelDeviceSuffix`），呼叫端仍是單純字串相加，`Localization::tr()` 本身不需要任何改動。另外，掃描 `setSeparationMessage()`/`setMediaMessage()` 全部呼叫點時会一次看到同一類但語意上分屬不同子系統的字面值（本例：`setSeparationMessage()` 26 處 vs. 匯出流程專屬的 `setMediaMessage()` 14 處）——正確作法是把後者記錄成新的 discovered backlog 項目（本輪為 L2e）而非順手一起做掉，即使兩者程式碼手法完全相同；這能維持「一輪一個 hypothesis」的可歸因性（協定 step 4／Hard rules 最後一條）。
+
+---
+
+## iter 6 — 2026-08-25T22:35:00+08:00
+
+**Hypothesis：** 承接 iter 1–5（L1 語言基礎架構、L2a 主控制面板、L2b StemExportDialog、L2c 媒體匯入/匯出錯誤訊息、L2d 分離/錄音/RoFormer 狀態列訊息），L2（全部 UI 文字雙語化）再拆下一個自包子里程碑：iter 5 discovered 的 L2e——匯出流程（`beginMediaImport()`/`cancelMediaOperation()`/`beginStemExport()`/`stemExportLoop()`/`beginQuickExport()`/`quickExportLoop()`/`beginMixExport()`/`mixExportLoop()`）內全部 15 個純字面值（不含執行期動態值串接，含 2 組僅二選一分支的三元運算式）`setMediaMessage()` 呼叫點接上 `htfx::tr()`。因為這些呼叫點皆為靜態或二選一分支字串（沿用 L2a 已驗證過的三元運算式模式，例如 `advancedButton_` 的展開/收合文字），且 `tests/ui_configuration_smoke.cpp`／`media_io_smoke.cpp` 皆未對這些訊息的確切文字內容做斷言，預期零既有斷言需要同步修改；含動態值串接的 `setMediaMessage()` 呼叫點（`error` 變數、`exception.what()`、檔名/路徑/數量內嵌值）刻意排除在本輪範圍外、記錄為新 discovered 項目 L2f，維持一輪一個 hypothesis 的可歸因性。本輪迭代編號（6）非 5 的倍數，依協定僅需 cheap tier。
+
+**Files touched：** `plugin/Localization.cpp`（新增 18 個 `status.*` 字串鍵：`status.cancellingMediaOperation`／`status.switchToRecordModeBeforeImport`／`status.selectedMediaFileNotFound`／`status.separateBeforeExportingStems`／`status.selectAtLeastOneStemToExport`／`status.exportingOriginalVolumeStems`／`status.stemExportCancelled`／`status.separateBeforeQuickExport`／`status.quickExportRequiresHtdemucs`／`status.chooseDifferentOutputNameProtected`（於 `beginQuickExport()` 與 `beginMixExport()` 兩處共用）／`status.exportingVocalsOriginalLevel`／`status.exportingAccompanyOriginalLevel`／`status.quickExportCancelled`／`status.separateBeforeExportingMix`／`status.videoExportRequiresImportedVideo`／`status.mixingReplacingVideoAudio`／`status.exportingCurrentInterfaceMix`／`status.mixExportCancelled`）、`plugin/PluginProcessor.cpp`（上述 8 個函式內共 15 處字面值 `setMediaMessage(...)` 呼叫改 `htfx::tr(...)`，其中 2 處三元運算式的兩個分支各自改指向不同 key）、`.loop/backlog.json`（L2e 由 `passes:false` 翻為 `true`＋補上 evidence；新增 discovered 項目 L2f，`passes:false`，記錄剩餘 9 個含動態值串接的 `setMediaMessage()` 呼叫點行號）。
+
+**Verification — cheap tier（協定 step 6，每輪必跑）：** `cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true stem_slider_relabels=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true language_default=zh-TW language_toggle=true language_persist_reopen=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s OK / Ran 2 tests in 0.044s OK / Ran 8 tests in 0.075s OK
+```
+PASS 行沒有新增獨立欄位（這批訊息在 `ui_configuration_smoke.cpp`／`media_io_smoke.cpp` 中皆無既有斷言路徑覆蓋），全部既有斷言在建置成功後維持全綠，代表本批次翻譯字串接線正確、未破壞任何邏輯；本批次「雙語化本身」正確性靠原始碼審查佐證——`grep -n 'setMediaMessage("' plugin/PluginProcessor.cpp` 於本輪變更後回傳零筆，確認範圍內 15 個純字面值呼叫點已全數清空，僅剩已本地化的 `htfx::tr(...)` 呼叫、變數傳遞（`error`／`message`／`ffmpegError`，L2c/L2d 已本地化或屬外部例外訊息）、以及本輪刻意排除的 9 個含動態值串接呼叫點（記錄為 L2f）。
+
+**Scope self-check（協定 step 7）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 54 changed path(s) within policy`。
+
+**Full tier / backlog checker：** 本輪未跑（iteration 6 非第 5 輪倍數，亦未宣告 converged）——criteria C1/C2 本輪標記 fail，C3 pass。
+
+**Criteria：** C1 fail（full tier 未跑）／C2 fail（backlog checker 未跑）／C3 pass（scope 無違規）。AND 規則下未全數通過，非 converged。
+
+**Backlog：** L2e 由 `passes:false` 翻為 `true`（見上）。新增 discovered 項目 L2f（匯出流程含動態值串接的 `setMediaMessage()` 訊息雙語化，9 處呼叫點），`passes:false`，留給下一輪。L2 本身仍為 false（等 L2f 與尚未盤點到的其他英文字面值全部接線後才會轉綠）。L1、L2a、L2b、L2c、L2d 維持 true。L3–L7 維持 false。
+
+**Metric：** backlog_items_passing = 6（較上一輪 5 增加 1：L2e 新增為 true）；improved: true。
+
+**Decision：** continue（status 保持 running，stop_reason null）。
+
+**Lesson：** L2a 已驗證過的「三元運算式二選一分支、無動態值內嵌」模式（例如按鈕文字依開合狀態切換）可以直接套用到 `setMediaMessage()` 這類狀態訊息——只要兩個分支都是完整靜態字串（本輪的 `kind == QuickExportKind::vocals ? ... : ...`／`replaceVideoAudio ? ... : ...`），做法與單一字面值呼叫點完全一致（各自對應一個獨立 key），不需要 iter 4/5 那套 prefix/suffix 拆分機制；prefix/suffix（或 prefix/middle/suffix）機制只在句子中間真的需要嵌入執行期字串/數值時才需要。掃描同一類 setter 的全部呼叫點時，若同時看到「純字面值／二選一分支」與「含動態值串接」兩種複雜度截然不同的呼叫點混在一起（本輪：15 處純字面值 vs. 9 處含動態值），繼續維持 iter 5 已確立的作法——只做前者，後者記錄成新的 discovered backlog 項目（本輪為 L2f），不要因為函式相鄰、程式碼手法相近就一起做掉。

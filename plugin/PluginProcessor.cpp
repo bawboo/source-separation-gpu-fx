@@ -1793,7 +1793,7 @@ void HTDemucsGpuFXAudioProcessor::stopMediaThread() {
 void HTDemucsGpuFXAudioProcessor::cancelMediaOperation() {
     if (mediaThread_.joinable() && mediaBusy_.load(std::memory_order_acquire)) {
         mediaThread_.request_stop();
-        setMediaMessage("Cancelling media operation");
+        setMediaMessage(htfx::tr("status.cancellingMediaOperation"));
     }
 }
 
@@ -2039,11 +2039,11 @@ void HTDemucsGpuFXAudioProcessor::modelDownloadLoop(
 
 bool HTDemucsGpuFXAudioProcessor::beginMediaImport(const juce::File& mediaFile) {
     if (getOperatingMode() != OperatingMode::record) {
-        setMediaMessage("Switch to Record mode before importing media");
+        setMediaMessage(htfx::tr("status.switchToRecordModeBeforeImport"));
         return false;
     }
     if (!mediaFile.existsAsFile()) {
-        setMediaMessage("The selected media file does not exist");
+        setMediaMessage(htfx::tr("status.selectedMediaFileNotFound"));
         return false;
     }
     if (mediaBusy_.load(std::memory_order_acquire)) {
@@ -2162,7 +2162,7 @@ bool HTDemucsGpuFXAudioProcessor::beginStemExport(
     std::vector<int> sourceIndices) {
     auto result = previewResult_.load(std::memory_order_acquire);
     if (result == nullptr) {
-        setMediaMessage("Separate some audio before exporting stems");
+        setMediaMessage(htfx::tr("status.separateBeforeExportingStems"));
         return false;
     }
     std::erase_if(sourceIndices, [result](int source) {
@@ -2173,7 +2173,7 @@ bool HTDemucsGpuFXAudioProcessor::beginStemExport(
         std::unique(sourceIndices.begin(), sourceIndices.end()),
         sourceIndices.end());
     if (sourceIndices.empty()) {
-        setMediaMessage("Select at least one stem to export");
+        setMediaMessage(htfx::tr("status.selectAtLeastOneStemToExport"));
         return false;
     }
     if (mediaBusy_.load(std::memory_order_acquire)) {
@@ -2191,7 +2191,7 @@ bool HTDemucsGpuFXAudioProcessor::beginStemExport(
         baseName = importedBaseName_;
     }
     mediaProgress_.store(0.0, std::memory_order_release);
-    setMediaMessage("Exporting original-volume stems");
+    setMediaMessage(htfx::tr("status.exportingOriginalVolumeStems"));
     mediaThread_ = std::jthread(
         [this,
          outputDirectory,
@@ -2218,7 +2218,7 @@ void HTDemucsGpuFXAudioProcessor::stemExportLoop(
         juce::String error;
         for (std::size_t item = 0; item < sourceIndices.size(); ++item) {
             if (stopToken.stop_requested()) {
-                setMediaMessage("Stem export cancelled");
+                setMediaMessage(htfx::tr("status.stemExportCancelled"));
                 mediaBusy_.store(false, std::memory_order_release);
                 return;
             }
@@ -2265,11 +2265,11 @@ bool HTDemucsGpuFXAudioProcessor::beginQuickExport(
     QuickExportKind kind) {
     auto result = previewResult_.load(std::memory_order_acquire);
     if (result == nullptr) {
-        setMediaMessage("Separate some audio before using quick export");
+        setMediaMessage(htfx::tr("status.separateBeforeQuickExport"));
         return false;
     }
     if (result->modelName != "htdemucs" || result->sourceCount < 4) {
-        setMediaMessage("Quick export requires a result from the default htdemucs model");
+        setMediaMessage(htfx::tr("status.quickExportRequiresHtdemucs"));
         return false;
     }
 
@@ -2280,7 +2280,7 @@ bool HTDemucsGpuFXAudioProcessor::beginQuickExport(
         originalMediaFile = importedMediaFile_;
     }
     if (originalMediaFile.existsAsFile() && outputFile == originalMediaFile) {
-        setMediaMessage("Choose a different output name; the imported source is protected");
+        setMediaMessage(htfx::tr("status.chooseDifferentOutputNameProtected"));
         return false;
     }
     if (mediaBusy_.load(std::memory_order_acquire)) {
@@ -2296,8 +2296,8 @@ bool HTDemucsGpuFXAudioProcessor::beginQuickExport(
     mediaProgress_.store(0.0, std::memory_order_release);
     setMediaMessage(
         kind == QuickExportKind::vocals
-            ? "Exporting vocals at original Demucs level"
-            : "Exporting accompaniment at original Demucs level");
+            ? htfx::tr("status.exportingVocalsOriginalLevel")
+            : htfx::tr("status.exportingAccompanyOriginalLevel"));
     mediaThread_ = std::jthread(
         [this,
          outputFile,
@@ -2327,7 +2327,7 @@ void HTDemucsGpuFXAudioProcessor::quickExportLoop(
         for (std::size_t sample = 0; sample < sampleCount; ++sample) {
             if (sample % cancellationBlock == 0) {
                 if (stopToken.stop_requested()) {
-                    setMediaMessage("Quick export cancelled");
+                    setMediaMessage(htfx::tr("status.quickExportCancelled"));
                     mediaBusy_.store(false, std::memory_order_release);
                     return;
                 }
@@ -2389,11 +2389,11 @@ bool HTDemucsGpuFXAudioProcessor::beginMixExport(
     bool replaceVideoAudio) {
     auto result = previewResult_.load(std::memory_order_acquire);
     if (result == nullptr) {
-        setMediaMessage("Separate some audio before exporting a mix");
+        setMediaMessage(htfx::tr("status.separateBeforeExportingMix"));
         return false;
     }
     if (replaceVideoAudio && !importedFromVideo()) {
-        setMediaMessage("Video export is available only when a video was imported");
+        setMediaMessage(htfx::tr("status.videoExportRequiresImportedVideo"));
         return false;
     }
     juce::File originalMediaFile;
@@ -2404,7 +2404,7 @@ bool HTDemucsGpuFXAudioProcessor::beginMixExport(
     const auto outputFile = requestedOutputFile.withFileExtension(
         replaceVideoAudio ? ".mp4" : ".wav");
     if (originalMediaFile.existsAsFile() && outputFile == originalMediaFile) {
-        setMediaMessage("Choose a different output name; the imported source is protected");
+        setMediaMessage(htfx::tr("status.chooseDifferentOutputNameProtected"));
         return false;
     }
     if (mediaBusy_.load(std::memory_order_acquire)) {
@@ -2419,8 +2419,8 @@ bool HTDemucsGpuFXAudioProcessor::beginMixExport(
     const auto settings = currentMixSettings();
     mediaProgress_.store(0.0, std::memory_order_release);
     setMediaMessage(
-        replaceVideoAudio ? "Mixing and replacing the video audio track"
-                          : "Exporting the current interface mix");
+        replaceVideoAudio ? htfx::tr("status.mixingReplacingVideoAudio")
+                          : htfx::tr("status.exportingCurrentInterfaceMix"));
     mediaThread_ = std::jthread(
         [this,
          outputFile,
@@ -2454,7 +2454,7 @@ void HTDemucsGpuFXAudioProcessor::mixExportLoop(
         for (std::size_t sample = 0; sample < sampleCount; ++sample) {
             if (sample % cancellationBlock == 0) {
                 if (stopToken.stop_requested()) {
-                    setMediaMessage("Mix export cancelled");
+                    setMediaMessage(htfx::tr("status.mixExportCancelled"));
                     mediaBusy_.store(false, std::memory_order_release);
                     return;
                 }

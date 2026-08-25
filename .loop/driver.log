@@ -46,3 +46,9 @@ LOOP STATUS: running â€” iter-4 localized 16 media import/export error/diagnosti
 [driver] agent process exited rc=0
 [scope] OK ¡X 54 changed path(s) within policy
 [driver] iteration 5 launching  2026-08-25T21:07:19+0800
+Commit succeeded. This iteration is complete.
+
+LOOP STATUS: running â€” iter-5 L2d done (26 setSeparationMessage + 4 setMediaMessage call sites localized, 34 status.* keys), full tier PASS (all 4 smokes), backlog 5/12 passing, L2e discovered for next iteration
+[driver] agent process exited rc=0
+[scope] OK ¡X 54 changed path(s) within policy
+[driver] iteration 6 launching  2026-08-25T21:21:17+0800
