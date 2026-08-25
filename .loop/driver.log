@@ -40,3 +40,9 @@ LOOP STATUS: running â€” L2b StemExportDialog localized (cheap tier PASS), backl
 [driver] agent process exited rc=0
 [scope] OK ¡X 54 changed path(s) within policy
 [driver] iteration 4 launching  2026-08-25T20:59:17+0800
+Commit checkpointed successfully. This iteration is complete.
+
+LOOP STATUS: running â€” iter-4 localized 16 media import/export error/diagnostic strings (L2c, cheap tier PASS, backlog 4/10)
+[driver] agent process exited rc=0
+[scope] OK ¡X 54 changed path(s) within policy
+[driver] iteration 5 launching  2026-08-25T21:07:19+0800

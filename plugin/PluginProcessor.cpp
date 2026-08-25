@@ -1066,8 +1066,8 @@ void HTDemucsGpuFXAudioProcessor::resetStreamForDiscontinuity() noexcept {
 bool HTDemucsGpuFXAudioProcessor::beginRecording() {
     if (!sampleRateSupported_ || getOperatingMode() != OperatingMode::record) {
         setSeparationMessage(
-            sampleRateSupported_ ? "Switch to Record mode first"
-                                 : "Recording requires 44,100 Hz");
+            sampleRateSupported_ ? htfx::tr("status.switchToRecordModeFirst")
+                                 : htfx::tr("status.recordingRequires44100Hz"));
         separationState_.store(SeparationState::error, std::memory_order_release);
         return false;
     }
@@ -1099,7 +1099,7 @@ bool HTDemucsGpuFXAudioProcessor::beginRecording() {
     setMediaMessage({});
     separationProgress_.store(0.0, std::memory_order_release);
     separationState_.store(SeparationState::recording, std::memory_order_release);
-    setSeparationMessage("Recording stereo input");
+    setSeparationMessage(htfx::tr("status.recordingStereoInput"));
     recording_.store(true, std::memory_order_release);
     recordThread_ = std::jthread([this] { recordLoop(); });
     return true;
@@ -1116,10 +1116,10 @@ void HTDemucsGpuFXAudioProcessor::endRecording() {
         std::memory_order_release);
     setSeparationMessage(
         samples == 0
-            ? "No input was recorded"
-            : "Recorded " + juce::String(
+            ? htfx::tr("status.noInputRecorded")
+            : htfx::tr("status.recordedPrefix") + juce::String(
                   static_cast<double>(samples) / kSampleRate, 1) +
-                  " seconds · press Separate");
+                  htfx::tr("status.recordedSuffix"));
 }
 
 void HTDemucsGpuFXAudioProcessor::recordLoop() {
@@ -1150,21 +1150,22 @@ bool HTDemucsGpuFXAudioProcessor::beginSeparation() {
         return false;
     }
     if (mediaBusy_.load(std::memory_order_acquire)) {
-        setSeparationMessage("Wait for the media operation to finish");
+        setSeparationMessage(htfx::tr("status.waitForMediaOperation"));
         return false;
     }
     const auto configuration = currentRuntimeConfiguration();
     if (!isModelInstalled(configuration.modelName)) {
         separationState_.store(SeparationState::error, std::memory_order_release);
         setSeparationMessage(
-            "Model " + juce::String(configuration.modelName) +
-            " is not installed. Open Advanced options and download it first.");
+            htfx::tr("status.modelNotInstalledPrefix") +
+            juce::String(configuration.modelName) +
+            htfx::tr("status.modelNotInstalledSuffix"));
         return false;
     }
     endRecording();
     if (recordedLeft_.empty() || recordedLeft_.size() != recordedRight_.size()) {
         separationState_.store(SeparationState::error, std::memory_order_release);
-        setSeparationMessage("Record some stereo audio before separating");
+        setSeparationMessage(htfx::tr("status.recordBeforeSeparating"));
         return false;
     }
     stopSeparationThread();
@@ -1177,7 +1178,7 @@ bool HTDemucsGpuFXAudioProcessor::beginSeparation() {
     // Model and CUDA initialization cannot report a truthful percentage.
     separationProgress_.store(-1.0, std::memory_order_release);
     separationState_.store(SeparationState::loading, std::memory_order_release);
-    setSeparationMessage("Starting Demucs worker · waiting for model load");
+    setSeparationMessage(htfx::tr("status.startingDemucsWorker"));
     auto left = recordedLeft_;
     auto right = recordedRight_;
     separationThread_ = std::jthread(
@@ -1198,7 +1199,7 @@ void HTDemucsGpuFXAudioProcessor::cancelSeparation() {
     if (separationThread_.joinable()) {
         separationThread_.request_stop();
         separationState_.store(SeparationState::cancelled, std::memory_order_release);
-        setSeparationMessage("Cancelling after the current inference block");
+        setSeparationMessage(htfx::tr("status.cancellingAfterBlock"));
     }
 }
 
@@ -1230,7 +1231,7 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                 if (stopToken.stop_requested()) {
                     separationState_.store(
                         SeparationState::cancelled, std::memory_order_release);
-                    setSeparationMessage("Separation cancelled");
+                    setSeparationMessage(htfx::tr("status.separationCancelled"));
                     return;
                 }
                 for (int source = 0; source < configuration.sourceCount; ++source) {
@@ -1255,7 +1256,7 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
             separationProgress_.store(1.0, std::memory_order_release);
             separationState_.store(
                 SeparationState::previewReady, std::memory_order_release);
-            setSeparationMessage("Ready to preview - fake worker");
+            setSeparationMessage(htfx::tr("status.readyToPreviewFakeWorker"));
             return;
         }
 
@@ -1275,7 +1276,7 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                 !outputDirectory.createDirectory()) {
                 separationState_.store(SeparationState::error, std::memory_order_release);
                 setSeparationMessage(
-                    "RoFormer Python, worker, model cache, or output directory is unavailable");
+                    htfx::tr("status.roformerPathsUnavailable"));
                 return;
             }
 
@@ -1305,7 +1306,7 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                 "--device", device};
             juce::ChildProcess process;
             setSeparationMessage(
-                "Loading RoFormer " +
+                htfx::tr("status.loadingRoformerPrefix") +
                 juce::String::fromUTF8(configuration.modelName.c_str()) +
                 " · " + device);
             if (!process.start(
@@ -1313,7 +1314,7 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                     juce::ChildProcess::wantStdOut |
                         juce::ChildProcess::wantStdErr)) {
                 separationState_.store(SeparationState::error, std::memory_order_release);
-                setSeparationMessage("Could not start the RoFormer Python worker");
+                setSeparationMessage(htfx::tr("status.couldNotStartRoformerWorker"));
                 return;
             }
 
@@ -1327,7 +1328,7 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                     process.kill();
                     separationState_.store(
                         SeparationState::cancelled, std::memory_order_release);
-                    setSeparationMessage("RoFormer separation cancelled");
+                    setSeparationMessage(htfx::tr("status.roformerSeparationCancelled"));
                     return;
                 }
                 const int bytesRead = process.readProcessOutput(
@@ -1355,8 +1356,9 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                 }
                 separationState_.store(SeparationState::error, std::memory_order_release);
                 setSeparationMessage(
-                    "RoFormer worker failed (exit " +
-                    juce::String(process.getExitCode()) + "): " + message);
+                    htfx::tr("status.roformerWorkerFailedPrefix") +
+                    juce::String(process.getExitCode()) +
+                    htfx::tr("status.roformerWorkerFailedSuffix") + message);
                 return;
             }
 
@@ -1366,8 +1368,9 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
             if (outputFiles.size() != 2) {
                 separationState_.store(SeparationState::error, std::memory_order_release);
                 setSeparationMessage(
-                    "RoFormer worker returned " + juce::String(outputFiles.size()) +
-                    " WAV files; expected two stems");
+                    htfx::tr("status.roformerWrongStemCountPrefix") +
+                    juce::String(outputFiles.size()) +
+                    htfx::tr("status.roformerWrongStemCountSuffix"));
                 return;
             }
 
@@ -1387,8 +1390,9 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                     separationState_.store(
                         SeparationState::error, std::memory_order_release);
                     setSeparationMessage(
-                        error.isNotEmpty() ? error
-                                           : "RoFormer stem duration does not match the input");
+                        error.isNotEmpty()
+                            ? error
+                            : htfx::tr("status.roformerStemDurationMismatch"));
                     return;
                 }
                 const auto leftPlane = static_cast<std::size_t>(source) * 2;
@@ -1425,9 +1429,9 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
             separationState_.store(
                 SeparationState::previewReady, std::memory_order_release);
             setSeparationMessage(
-                "Ready to preview · " +
+                htfx::tr("status.readyToPreviewPrefix") +
                 juce::String::fromUTF8(configuration.modelName.c_str()) +
-                " · two stems");
+                htfx::tr("status.readyToPreviewRoformerSuffix"));
             return;
         }
 
@@ -1461,8 +1465,10 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                 : configuration.backend == 3 ? juce::String{"MPS"}
                                              : juce::String{"CUDA GPU"};
         setSeparationMessage(
-            "Loading " + juce::String(configuration.modelName) + " on " +
-            requestedDevice + " · first load can take a while");
+            htfx::tr("status.loadingModelPrefix") +
+            juce::String(configuration.modelName) +
+            htfx::tr("status.loadingModelDeviceMiddle") + requestedDevice +
+            htfx::tr("status.loadingModelDeviceSuffix"));
         if (!worker.start(workerConfig, 1)) {
             separationState_.store(SeparationState::error, std::memory_order_release);
             setSeparationMessage(juce::String::fromUTF8(worker.lastError().c_str()));
@@ -1482,7 +1488,8 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
         setSeparationMessage(
             juce::String::fromUTF8(worker.gpuName().c_str()) + " · " +
             juce::String(configuration.modelName) +
-            (resolved == 2 ? " · CPU inference may take a long time" : ""));
+            (resolved == 2 ? htfx::tr("status.cpuInferenceSlowSuffix")
+                           : juce::String()));
 
         const std::size_t sampleCount = left.size();
         const std::size_t hopSamples = static_cast<std::size_t>(configuration.hopSamples);
@@ -1492,8 +1499,10 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
         const std::size_t totalHops = realHops + 1;  // Flush the OLA tail.
         separationProgress_.store(0.05, std::memory_order_release);
         setSeparationMessage(
-            "Separating · " + juce::String(resolved == 2 ? "CPU" : "GPU") +
-            " · block 0/" + juce::String(totalHops));
+            htfx::tr("status.separatingPrefix") +
+            juce::String(resolved == 2 ? "CPU" : "GPU") +
+            htfx::tr("status.separatingBlockMiddle") + "0/" +
+            juce::String(totalHops));
         auto result = std::make_shared<SeparationResult>();
         result->sourceCount = configuration.sourceCount;
         result->sampleCount = sampleCount;
@@ -1508,7 +1517,7 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                 worker.stop();
                 workerPid_.store(0, std::memory_order_release);
                 separationState_.store(SeparationState::cancelled, std::memory_order_release);
-                setSeparationMessage("Separation cancelled");
+                setSeparationMessage(htfx::tr("status.separationCancelled"));
                 return;
             }
             std::fill(input.begin(), input.end(), 0.0f);
@@ -1571,8 +1580,10 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                             static_cast<double>(totalHops)),
                 std::memory_order_release);
             setSeparationMessage(
-                "Separating · " + juce::String(resolved == 2 ? "CPU" : "GPU") +
-                " · block " + juce::String(hopIndex + 1) + "/" +
+                htfx::tr("status.separatingPrefix") +
+                juce::String(resolved == 2 ? "CPU" : "GPU") +
+                htfx::tr("status.separatingBlockMiddle") +
+                juce::String(hopIndex + 1) + "/" +
                 juce::String(totalHops));
         }
 
@@ -1588,7 +1599,8 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
         separationProgress_.store(1.0, std::memory_order_release);
         separationState_.store(SeparationState::previewReady, std::memory_order_release);
         setSeparationMessage(
-            "Ready to preview · " + juce::String(configuration.modelName) + " · " +
+            htfx::tr("status.readyToPreviewPrefix") +
+            juce::String(configuration.modelName) + " · " +
             (resolved == 2 ? "CPU" : "GPU"));
     } catch (const std::exception& error) {
         workerPid_.store(0, std::memory_order_release);
@@ -2064,8 +2076,8 @@ bool HTDemucsGpuFXAudioProcessor::beginMediaImport(const juce::File& mediaFile) 
         importedMediaFile_ = mediaFile;
         importedBaseName_ = legalMediaBaseName(mediaFile);
     }
-    setMediaMessage("Importing " + mediaFile.getFileName());
-    setSeparationMessage("Decoding imported media");
+    setMediaMessage(htfx::tr("status.importingPrefix") + mediaFile.getFileName());
+    setSeparationMessage(htfx::tr("status.decodingImportedMedia"));
     mediaThread_ = std::jthread(
         [this, mediaFile](std::stop_token stopToken) {
             importMediaLoop(stopToken, mediaFile);
@@ -2095,8 +2107,8 @@ void HTDemucsGpuFXAudioProcessor::importMediaLoop(
         if (stopToken.stop_requested()) {
             separationState_.store(
                 SeparationState::cancelled, std::memory_order_release);
-            setSeparationMessage("Media import cancelled");
-            setMediaMessage("Media import cancelled");
+            setSeparationMessage(htfx::tr("status.mediaImportCancelled"));
+            setMediaMessage(htfx::tr("status.mediaImportCancelled"));
             mediaBusy_.store(false, std::memory_order_release);
             return;
         }
@@ -2115,15 +2127,16 @@ void HTDemucsGpuFXAudioProcessor::importMediaLoop(
         separationState_.store(SeparationState::recorded, std::memory_order_release);
         const auto duration = static_cast<double>(recordedLeft_.size()) / kSampleRate;
         const auto message =
-            "Imported " + mediaFile.getFileName() + " (" +
-            juce::String(duration, 1) + " s) - press Separate";
+            htfx::tr("status.importedPrefix") + mediaFile.getFileName() + " (" +
+            juce::String(duration, 1) + htfx::tr("status.importedSuffix");
         setSeparationMessage(message);
         setMediaMessage(message);
         mediaProgress_.store(1.0, std::memory_order_release);
         mediaBusy_.store(false, std::memory_order_release);
     } catch (const std::exception& exception) {
         const auto message =
-            "Media import failed: " + juce::String::fromUTF8(exception.what());
+            htfx::tr("status.mediaImportFailedPrefix") +
+            juce::String::fromUTF8(exception.what());
         separationState_.store(SeparationState::error, std::memory_order_release);
         setSeparationMessage(message);
         setMediaMessage(message);

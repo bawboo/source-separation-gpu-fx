@@ -126,3 +126,45 @@ PASS 行沒有新增獨立欄位（這批錯誤/診斷訊息在 `ui_configuratio
 **Decision：** continue（status 保持 running，stop_reason null）。
 
 **Lesson：** `Localization::tr()` 目前沒有樣板/佔位符替換機制，遇到句子中間需要嵌入動態值（例如本輪的 FFmpeg 結束碼、檔名）時，可行做法是把該句拆成 prefix/suffix 兩個獨立 key（結束碼案例：`error.ffmpegFailedPrefix`／`error.ffmpegFailedSuffix`，呼叫端 `htfx::tr(prefix) + 動態值 + htfx::tr(suffix)`），或當動態值只出現在句尾時單一 key 即可（value 本身含尾隨冒號/空白，呼叫端直接 `htfx::tr(key) + 動態值`）。下一個子里程碑（`setSeparationMessage()` 狀態列訊息，例如 `"Loading RoFormer " + modelName + " on " + device`）會大量遇到同樣情境，可直接套用此模式；同時也確認了 `htfx::tr()` 是行程全域單例的自由函式，匿名命名空間內非類別成員的自由函式（本輪的 `runFfmpeg()`/`readAudioFileAtProjectRate()`/`writeFloatWav()`）同樣可直接呼叫，不需要額外傳遞或建構。
+
+---
+
+## iter 5 — 2026-08-25T22:05:00+08:00
+
+**Hypothesis：** 承接 iter 1–4（L1 語言基礎架構、L2a 主控制面板、L2b StemExportDialog、L2c 媒體匯入/匯出錯誤訊息），L2（全部 UI 文字雙語化）再拆一個子里程碑：`plugin/PluginProcessor.cpp` 內全部 26 個 `setSeparationMessage()` 呼叫點（`beginRecording()`/`endRecording()`/`beginSeparation()`/`cancelSeparation()`/`separationLoop()` 的錄音、模型未安裝、Demucs/RoFormer worker 啟動與進度、分離取消、分離完成預覽等狀態訊息）以及 `importMediaLoop()` 內與之成對出現的 4 個 `setMediaMessage()` 呼叫點（匯入中/取消/完成/失敗）接上 `htfx::tr()`。因為既有測試（`ui_configuration_smoke`/`media_io_smoke`/`record_mode_smoke`/`roformer_smoke`）皆未對這些狀態訊息的確切文字內容做斷言（`record_mode_smoke` 雖印出 `status` 欄位但只做行為判斷、不比對其值），預期零既有斷言需要同步修改；含動態值的句子沿用 iter 4 確立的 prefix/suffix 拆分模式，其中一句需要同時嵌入模型名稱與裝置名稱兩個動態值，新增 prefix/middle/suffix 三段式鍵處理。因本輪迭代編號（5）是 5 的倍數，依協定（step 6）本輪同時執行 full tier 與 backlog checker，而非僅 cheap tier。
+
+**Files touched：** `plugin/Localization.cpp`（新增 34 個 `status.*` 字串鍵，含 8 組 prefix/suffix 拆分鍵與 1 組 prefix/middle/suffix 三段式鍵 `status.loadingModelDeviceMiddle`）、`plugin/PluginProcessor.cpp`（`beginRecording()`/`endRecording()`/`beginSeparation()`/`cancelSeparation()`/`separationLoop()`（HTDemucs 與 RoFormer 兩條路徑）/`importMediaLoop()` 內全部字面值改 `htfx::tr(...)`；`worker.lastError()`／`std::exception::what()`／已在 L2c 本地化的 `error`/`ffmpegError` 等變數傳遞路徑維持原樣，未新增字串鍵；`CPU`/`GPU`/`CUDA GPU`/`cuda:N`/`auto` 等裝置識別字與 GPU 名稱維持英文原樣，比照模型 ID 的既有慣例視為技術性專有名詞不翻譯）、`.loop/backlog.json`（新增 discovered 項目 L2d passes=true 與 L2e passes=false）。
+
+**Verification — cheap tier（協定 step 6，每輪必跑）：** `cmd //c '.loop\checks\cheap.cmd'` → exit 0：
+```text
+default_panel=general quick_exports=vocals/accompany default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true record_button=red media_buttons=true proportional_scale=true fullscreen_toggle=true roformer_cpp_route=true roformer_stems=2 roformer_seconds=2 roformer_browser=99 categories=10 search=true experimental=true download_status=true separation_mode_gate=true separation_modes=12 separation_mode_defaults=true separation_mode_stem_gating=true separation_mode_all_categories_verified=true stem_slider_relabels=true roformer_stem_labels=vocals/instrumental roformer_stem_label_categories=8 roformer_export_naming=true language_default=zh-TW language_toggle=true language_persist_reopen=true PASS
+roformer manifest: 99 models, 57 audited, 42 experimental PASS
+Ran 1 test in 0.003s OK / Ran 2 tests in 0.078s OK / Ran 8 tests in 0.095s OK
+```
+
+**Verification — full tier（本輪迭代編號 5 為 5 的倍數，依協定執行）：** `cmd //c '.loop\checks\full.cmd'` → exit 0：
+```text
+=== ui_configuration_smoke ===
+...(欄位與上方 cheap tier 輸出相同) PASS
+=== media_io_smoke ===
+audio_import=true quick_vocals=true quick_accompany=true raw_stem_unchanged=true mix_controls=true video_import=true mp4_replace_audio=true mp4_bytes=31942 PASS
+=== record_mode_smoke (auto/GPU) ===
+backend=auto recorded_seconds=1.00426 preview_seconds=1.00426 progress=1 inference_ms=185.304 full_mix_energy=360.007 muted_stem_energy=2.3891 bypass_original_energy=356.806 mix_controls=true status=準備預覽 · htdemucs · GPU PASS=true
+=== roformer_smoke ===
+roformer_catalog=99 roformer_audited=57 roformer_stems=2 roformer_labels=vocals/instrumental roformer_export_naming=true roformer_sample_rate=44100 roformer_channels=2 roformer_bit_depth=32float roformer_finite=true PASS
+```
+四個 smoke 全數 PASS；`record_mode_smoke` 印出的 `status=準備預覽 · htdemucs · GPU` 是本輪新翻譯的 `status.readyToPreviewPrefix`（"準備預覽 · "）在一次真實（fake-worker 停用、`--cpu` 未指定，走 auto/GPU 路徑）分離流程中實際產生的訊息，直接證明本輪翻譯接線在端到端流程中確實生效，而非僅通過編譯。
+
+**Backlog checker：** `python -c "import json,sys; sys.exit(any(not i['passes'] for i in json.load(open('.loop/backlog.json',encoding='utf-8'))))"` → exit 1（預期：L2 本身、L2e、L3–L7 仍為 false，AND 規則下尚未全數轉綠）。
+
+**Scope self-check（協定 step 7）：** `python .loop/check_scope.py` → exit 0：`[scope] OK — 54 changed path(s) within policy`。
+
+**Criteria：** C1 pass（full tier 本輪執行且 exit 0）／C2 fail（backlog checker exit 1，L2/L2e/L3–L7 仍有 false 項）／C3 pass（scope 無違規）。AND 規則下未全數通過，非 converged。
+
+**Backlog：** 新增 discovered 項目 L2d（分離/錄音/RoFormer 狀態列訊息＋媒體匯入 setMediaMessage 雙語化子里程碑）passes=true，evidence 見 backlog.json。同時新增 discovered 項目 L2e（匯出流程 `setMediaMessage()` 訊息雙語化，StemExportDialog 驗證/匯出所選/快速匯出/匯出混音/匯出取消等 14 處呼叫點）passes=false，留給下一輪——本輪掃描 `setSeparationMessage`/`setMediaMessage` 全部呼叫點時發現的、但不屬於本輪「一個子里程碑」範圍的工作，依協定 append 為新項目而非併入本次變更集。L2 本身仍為 false（等 L2e 與尚未盤點到的其他英文字面值全部接線後才會轉綠）。L1、L2a、L2b、L2c 維持 true。L3–L7 維持 false。
+
+**Metric：** backlog_items_passing = 5（較上一輪 4 增加 1：L2d 新增為 true）；improved: true。
+
+**Decision：** continue（status 保持 running，stop_reason null）。
+
+**Lesson：** 當一句話需要同時嵌入兩個動態值時（本輪 `"Loading " + modelName + " on " + device + " · first load can take a while"`），iter 4 的 prefix/suffix 兩段式 key 不夠用——可自然延伸為 prefix/middle/suffix 三段式 key（`status.loadingModelPrefix` + modelName + `status.loadingModelDeviceMiddle` + device + `status.loadingModelDeviceSuffix`），呼叫端仍是單純字串相加，`Localization::tr()` 本身不需要任何改動。另外，掃描 `setSeparationMessage()`/`setMediaMessage()` 全部呼叫點時会一次看到同一類但語意上分屬不同子系統的字面值（本例：`setSeparationMessage()` 26 處 vs. 匯出流程專屬的 `setMediaMessage()` 14 處）——正確作法是把後者記錄成新的 discovered backlog 項目（本輪為 L2e）而非順手一起做掉，即使兩者程式碼手法完全相同；這能維持「一輪一個 hypothesis」的可歸因性（協定 step 4／Hard rules 最後一條）。
