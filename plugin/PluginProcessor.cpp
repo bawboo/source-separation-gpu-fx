@@ -2042,6 +2042,302 @@ void HTDemucsGpuFXAudioProcessor::modelDownloadLoop(
     modelDownloadBusy_.store(false, std::memory_order_release);
 }
 
+// == Multi-clip support ==================================================
+// One Clip per imported file. The active clip owns the preview transport and
+// the mixer parameters; switching clips swaps both, so every file keeps its
+// own fader positions and its own separation result.
+
+void HTDemucsGpuFXAudioProcessor::storeActiveClipMixerState() {
+    const auto index = activeClipIndex_.load(std::memory_order_acquire);
+    const juce::ScopedLock lock(clipsLock_);
+    if (index < 0 || index >= static_cast<int>(clips_.size())) {
+        return;
+    }
+    auto& clip = clips_[static_cast<std::size_t>(index)];
+    for (std::size_t stem = 0; stem < kStemParameterIds.size(); ++stem) {
+        if (auto* raw = parameters_.getRawParameterValue(kStemParameterIds[stem])) {
+            clip.stemGains[stem] = raw->load(std::memory_order_relaxed);
+        }
+    }
+    if (auto* trim = parameters_.getRawParameterValue("outputTrim")) {
+        clip.outputTrim = trim->load(std::memory_order_relaxed);
+    }
+}
+
+void HTDemucsGpuFXAudioProcessor::applyClipMixerState(const Clip& clip) {
+    for (std::size_t stem = 0; stem < kStemParameterIds.size(); ++stem) {
+        if (auto* parameter = parameters_.getParameter(kStemParameterIds[stem])) {
+            parameter->setValueNotifyingHost(
+                parameter->convertTo0to1(clip.stemGains[stem]));
+        }
+    }
+    if (auto* trim = parameters_.getParameter("outputTrim")) {
+        trim->setValueNotifyingHost(trim->convertTo0to1(clip.outputTrim));
+    }
+}
+
+// Caller must hold clipsLock_.
+void HTDemucsGpuFXAudioProcessor::activateClipLocked(int index) {
+    if (index < 0 || index >= static_cast<int>(clips_.size())) {
+        return;
+    }
+    const auto& clip = clips_[static_cast<std::size_t>(index)];
+    activeClipIndex_.store(index, std::memory_order_release);
+    recordedLeft_ = clip.left;
+    recordedRight_ = clip.right;
+    recordedSamples_.store(recordedLeft_.size(), std::memory_order_release);
+    previewPlaying_.store(false, std::memory_order_release);
+    previewCursor_.store(0, std::memory_order_release);
+    previewResult_.store(clip.result, std::memory_order_release);
+    if (clip.result != nullptr) {
+        activeSourceCount_.store(clip.result->sourceCount, std::memory_order_release);
+        separationState_.store(
+            SeparationState::previewReady, std::memory_order_release);
+        separationProgress_.store(1.0, std::memory_order_release);
+    } else {
+        separationState_.store(SeparationState::recorded, std::memory_order_release);
+        separationProgress_.store(0.0, std::memory_order_release);
+    }
+    {
+        const juce::ScopedLock metadata(mediaMetadataLock_);
+        importedMediaFile_ = clip.sourceFile;
+        importedBaseName_ = clip.sourceFile.getFileNameWithoutExtension();
+    }
+    importedVideo_.store(clip.fromVideo, std::memory_order_release);
+}
+
+int HTDemucsGpuFXAudioProcessor::getClipCount() const {
+    const juce::ScopedLock lock(clipsLock_);
+    return static_cast<int>(clips_.size());
+}
+
+HTDemucsGpuFXAudioProcessor::ClipInfo HTDemucsGpuFXAudioProcessor::getClipInfo(
+    int index) const {
+    const juce::ScopedLock lock(clipsLock_);
+    ClipInfo info;
+    if (index < 0 || index >= static_cast<int>(clips_.size())) {
+        return info;
+    }
+    const auto& clip = clips_[static_cast<std::size_t>(index)];
+    info.name = clip.name;
+    info.selected = clip.selected;
+    info.separated = clip.result != nullptr;
+    info.status = clip.status;
+    info.seconds = static_cast<double>(clip.left.size()) / kSampleRate;
+    return info;
+}
+
+void HTDemucsGpuFXAudioProcessor::setActiveClip(int index) {
+    if (index == activeClipIndex_.load(std::memory_order_acquire)) {
+        return;
+    }
+    storeActiveClipMixerState();
+    std::array<float, kMaxSources> gains{};
+    float trim = 0.0f;
+    {
+        const juce::ScopedLock lock(clipsLock_);
+        if (index < 0 || index >= static_cast<int>(clips_.size())) {
+            return;
+        }
+        activateClipLocked(index);
+        gains = clips_[static_cast<std::size_t>(index)].stemGains;
+        trim = clips_[static_cast<std::size_t>(index)].outputTrim;
+    }
+    Clip snapshot;
+    snapshot.stemGains = gains;
+    snapshot.outputTrim = trim;
+    applyClipMixerState(snapshot);
+}
+
+void HTDemucsGpuFXAudioProcessor::setClipSelected(int index, bool selected) {
+    const juce::ScopedLock lock(clipsLock_);
+    if (index >= 0 && index < static_cast<int>(clips_.size())) {
+        clips_[static_cast<std::size_t>(index)].selected = selected;
+    }
+}
+
+int HTDemucsGpuFXAudioProcessor::getSelectedClipCount() const {
+    const juce::ScopedLock lock(clipsLock_);
+    return static_cast<int>(std::count_if(
+        clips_.begin(), clips_.end(),
+        [](const Clip& clip) { return clip.selected; }));
+}
+
+bool HTDemucsGpuFXAudioProcessor::beginMultiMediaImport(
+    const juce::Array<juce::File>& mediaFiles) {
+    if (mediaFiles.isEmpty()) {
+        return false;
+    }
+    if (getOperatingMode() != OperatingMode::record) {
+        setMediaMessage(htfx::tr("status.switchToRecordModeBeforeImport"));
+        return false;
+    }
+    if (mediaBusy_.load(std::memory_order_acquire)) {
+        return false;
+    }
+    stopMediaThread();
+    bool expected = false;
+    if (!mediaBusy_.compare_exchange_strong(
+            expected, true, std::memory_order_acq_rel)) {
+        return false;
+    }
+    recording_.store(false, std::memory_order_release);
+    stopRecordingThread();
+    stopSeparationThread();
+    recordRing_.clearWhenStopped();
+    {
+        const juce::ScopedLock lock(clipsLock_);
+        clips_.clear();
+        activeClipIndex_.store(-1, std::memory_order_release);
+    }
+    previewPlaying_.store(false, std::memory_order_release);
+    previewCursor_.store(0, std::memory_order_release);
+    previewResult_.store(
+        std::shared_ptr<const SeparationResult>{}, std::memory_order_release);
+    mediaProgress_.store(0.0, std::memory_order_release);
+    separationProgress_.store(0.0, std::memory_order_release);
+    separationState_.store(SeparationState::loading, std::memory_order_release);
+
+    juce::Array<juce::File> files(mediaFiles);
+    mediaThread_ = std::jthread([this, files](std::stop_token stopToken) {
+        try {
+            const int total = files.size();
+            int imported = 0;
+            for (int index = 0; index < total; ++index) {
+                if (stopToken.stop_requested()) {
+                    break;
+                }
+                const auto file = files.getReference(index);
+                setMediaMessage(
+                    htfx::tr("status.mediaImportInProgress") + " " +
+                    juce::String(index + 1) + "/" + juce::String(total) + " - " +
+                    file.getFileName());
+                std::vector<float> left;
+                std::vector<float> right;
+                juce::String decodeError;
+                const bool video = hasVideoExtension(file);
+                bool decoded = decodeMediaWithFfmpeg(
+                    file, stopToken, left, right, decodeError);
+                if (!decoded && !video && !stopToken.stop_requested()) {
+                    juce::String fallbackError;
+                    decoded = readAudioFileAtProjectRate(
+                        file, left, right, fallbackError);
+                }
+                if (!decoded || left.empty() || left.size() != right.size()) {
+                    continue;
+                }
+                Clip clip;
+                clip.sourceFile = file;
+                clip.name = file.getFileName();
+                clip.left = std::move(left);
+                clip.right = std::move(right);
+                clip.fromVideo = video;
+                clip.status = htfx::tr("clip.statusPending");
+                {
+                    const juce::ScopedLock lock(clipsLock_);
+                    clips_.push_back(std::move(clip));
+                    if (clips_.size() == 1) {
+                        activateClipLocked(0);
+                    }
+                }
+                ++imported;
+                mediaProgress_.store(
+                    static_cast<double>(index + 1) / juce::jmax(1, total),
+                    std::memory_order_release);
+            }
+            const auto message = htfx::tr("clip.importedCountPrefix") +
+                                 juce::String(imported) +
+                                 htfx::tr("clip.importedCountSuffix");
+            setSeparationMessage(message);
+            setMediaMessage(message);
+            mediaProgress_.store(1.0, std::memory_order_release);
+            mediaBusy_.store(false, std::memory_order_release);
+        } catch (const std::exception& exception) {
+            const auto message = htfx::tr("status.mediaImportFailedPrefix") +
+                                 juce::String::fromUTF8(exception.what());
+            separationState_.store(SeparationState::error, std::memory_order_release);
+            setSeparationMessage(message);
+            setMediaMessage(message);
+            mediaBusy_.store(false, std::memory_order_release);
+        }
+    });
+    return true;
+}
+
+// Separates every clip in turn. Each finished clip stores its own result and
+// becomes previewable immediately, so the user can audition clip 1 while clip
+// 2 is still running.
+bool HTDemucsGpuFXAudioProcessor::beginBatchSeparation() {
+    if (getClipCount() <= 1) {
+        return beginSeparation();
+    }
+    if (mediaBusy_.load(std::memory_order_acquire)) {
+        setSeparationMessage(htfx::tr("status.waitForMediaOperation"));
+        return false;
+    }
+    if (batchThread_.joinable()) {
+        batchThread_.request_stop();
+        batchThread_.join();
+    }
+    storeActiveClipMixerState();
+    batchThread_ = std::jthread([this](std::stop_token stopToken) {
+        batchSeparationLoop(stopToken);
+    });
+    return true;
+}
+
+void HTDemucsGpuFXAudioProcessor::batchSeparationLoop(std::stop_token stopToken) {
+    const int total = getClipCount();
+    for (int index = 0; index < total; ++index) {
+        if (stopToken.stop_requested()) {
+            break;
+        }
+        {
+            const juce::ScopedLock lock(clipsLock_);
+            if (index >= static_cast<int>(clips_.size()) ||
+                clips_[static_cast<std::size_t>(index)].result != nullptr) {
+                continue;
+            }
+        }
+        // Route through the existing single-clip separation path by making the
+        // target clip active, then waiting for its result.
+        setActiveClip(index);
+        {
+            const juce::ScopedLock lock(clipsLock_);
+            if (index < static_cast<int>(clips_.size())) {
+                clips_[static_cast<std::size_t>(index)].status =
+                    htfx::tr("clip.statusSeparating");
+            }
+        }
+        if (!beginSeparation()) {
+            const juce::ScopedLock lock(clipsLock_);
+            if (index < static_cast<int>(clips_.size())) {
+                clips_[static_cast<std::size_t>(index)].status =
+                    htfx::tr("clip.statusFailed");
+            }
+            continue;
+        }
+        while (!stopToken.stop_requested()) {
+            const auto state = separationState_.load(std::memory_order_acquire);
+            if (state == SeparationState::previewReady ||
+                state == SeparationState::error ||
+                state == SeparationState::cancelled) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        const auto result = previewResult_.load(std::memory_order_acquire);
+        const juce::ScopedLock lock(clipsLock_);
+        if (index < static_cast<int>(clips_.size())) {
+            auto& clip = clips_[static_cast<std::size_t>(index)];
+            clip.result = result;
+            clip.status = result != nullptr ? htfx::tr("clip.statusDone")
+                                            : htfx::tr("clip.statusFailed");
+        }
+    }
+    setSeparationMessage(htfx::tr("clip.batchSeparationFinished"));
+}
+
 bool HTDemucsGpuFXAudioProcessor::beginMediaImport(const juce::File& mediaFile) {
     if (getOperatingMode() != OperatingMode::record) {
         setMediaMessage(htfx::tr("status.switchToRecordModeBeforeImport"));
@@ -4143,7 +4439,7 @@ private:
             computeBox_.getSelectedItemIndex() == 2 || processor_.resolvedToCpu();
         cpuWarning_.setText(
             shouldWarn
-                ? "CPU mode: separation is supported, but a full recording may take a long time."
+                ? htfx::tr("status.cpuModeWarning")
                 : "",
             juce::dontSendNotification);
     }

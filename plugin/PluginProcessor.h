@@ -184,6 +184,34 @@ public:
     void stopPreview() noexcept;
     void setPreviewPosition(double normalizedPosition) noexcept;
     bool beginMediaImport(const juce::File& mediaFile);
+
+    // ── Multi-clip support ────────────────────────────────────────────────
+    // Importing several files keeps one Clip per file; the "active" clip is
+    // the one wired to the preview transport and the mixer parameters, so the
+    // existing single-file behaviour is just the one-clip case.
+    struct ClipInfo {
+        juce::String name;
+        bool selected = true;
+        bool separated = false;
+        juce::String status;
+        double seconds = 0.0;
+    };
+
+    bool beginMultiMediaImport(const juce::Array<juce::File>& mediaFiles);
+    [[nodiscard]] int getClipCount() const;
+    [[nodiscard]] int getActiveClipIndex() const noexcept {
+        return activeClipIndex_.load(std::memory_order_acquire);
+    }
+    [[nodiscard]] ClipInfo getClipInfo(int index) const;
+    void setActiveClip(int index);
+    void setClipSelected(int index, bool selected);
+    [[nodiscard]] int getSelectedClipCount() const;
+    // Runs separation over every clip in turn (already-separated clips are
+    // skipped); each finished clip becomes previewable immediately.
+    bool beginBatchSeparation();
+    // Exports every selected clip into `folder`, separating any clip that has
+    // no result yet, applying that clip's own mixer settings.
+    bool beginBatchExport(const juce::File& folder, QuickExportKind kind);
     bool beginStemExport(
         const juce::File& outputDirectory,
         std::vector<int> sourceIndices);
@@ -372,6 +400,33 @@ private:
     std::atomic<std::shared_ptr<const SeparationResult>> previewResult_;
     std::vector<float> recordedLeft_;
     std::vector<float> recordedRight_;
+
+    struct Clip {
+        juce::File sourceFile;
+        juce::String name;
+        std::vector<float> left;
+        std::vector<float> right;
+        std::shared_ptr<const SeparationResult> result;
+        bool selected = true;
+        bool fromVideo = false;
+        juce::String status;
+        // Per-clip mixer state: each clip remembers its own fader positions.
+        std::array<float, kMaxSources> stemGains{};
+        float outputTrim = 0.0f;
+    };
+    mutable juce::CriticalSection clipsLock_;
+    std::vector<Clip> clips_;
+    std::atomic<int> activeClipIndex_{-1};
+    std::jthread batchThread_;
+
+    void storeActiveClipMixerState();
+    void applyClipMixerState(const Clip& clip);
+    void activateClipLocked(int index);
+    void batchSeparationLoop(std::stop_token stopToken);
+    void batchExportLoop(
+        std::stop_token stopToken, juce::File folder, QuickExportKind kind);
+    bool separateClipBlocking(
+        std::stop_token stopToken, Clip& clip, juce::String& error);
     mutable std::mutex runtimeControlMutex_;
     RuntimeConfiguration activeRuntimeConfiguration_{};
     mutable std::mutex roformerMutex_;

@@ -115,7 +115,12 @@ void waitForRoformerPreview(HTDemucsGpuFXAudioProcessor& processor) {
                            HTDemucsGpuFXAudioProcessor::SeparationState::previewReady ||
                        state == HTDemucsGpuFXAudioProcessor::SeparationState::error;
             },
-            std::chrono::seconds(60)),
+            // Cold-start cost is dominated by the worker process: python +
+            // torch import + a ~913 MB checkpoint load + CUDA init runs to
+            // ~70 s on a cold file cache, while the separation itself takes
+            // ~2.5 s. 60 s was tight enough to fail whenever the OS file
+            // cache had been evicted.
+            std::chrono::seconds(240)),
         "RoFormer C++ route timed out");
     require(processor.hasPreview(), "RoFormer C++ route produced no preview");
 }
@@ -623,9 +628,15 @@ int run() {
     }
 
     compute->setSelectedItemIndex(2, juce::sendNotificationSync);
+    // Re-collect the component tree on every poll: the editor rebuilds parts
+    // of its hierarchy as modes/languages change, so a list captured earlier
+    // can hold dangling pointers by the time we get here (dynamic_cast on a
+    // freed object surfaces as "Access violation - no RTTI data!").
     require(waitUntil(
-                [&components] {
-                    return hasLabelText(components, "CPU mode: separation is supported");
+                [&editor] {
+                    std::vector<juce::Component*> fresh;
+                    collectComponents(*editor, fresh);
+                    return hasLabelText(fresh, htfx::tr("status.cpuModeWarning"));
                 },
                 std::chrono::seconds(3)),
             "CPU slow-mode warning was not displayed");
