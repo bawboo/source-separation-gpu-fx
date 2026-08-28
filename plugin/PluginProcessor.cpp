@@ -2338,6 +2338,110 @@ void HTDemucsGpuFXAudioProcessor::batchSeparationLoop(std::stop_token stopToken)
     setSeparationMessage(htfx::tr("clip.batchSeparationFinished"));
 }
 
+// Exports every ticked clip into `folder`. Clips with no separation result
+// yet are separated first, so import -> export works without pressing
+// Separate. Each clip is exported with its own mixer settings.
+bool HTDemucsGpuFXAudioProcessor::beginBatchExport(
+    const juce::File& folder, QuickExportKind kind) {
+    if (getSelectedClipCount() == 0) {
+        setMediaMessage(htfx::tr("clip.noneSelected"));
+        return false;
+    }
+    if (batchThread_.joinable()) {
+        batchThread_.request_stop();
+        batchThread_.join();
+    }
+    storeActiveClipMixerState();
+    batchThread_ = std::jthread(
+        [this, folder, kind](std::stop_token stopToken) {
+            batchExportLoop(stopToken, folder, kind);
+        });
+    return true;
+}
+
+void HTDemucsGpuFXAudioProcessor::batchExportLoop(
+    std::stop_token stopToken, juce::File folder, QuickExportKind kind) {
+    folder.createDirectory();
+    const int total = getClipCount();
+    int exported = 0;
+    for (int index = 0; index < total; ++index) {
+        if (stopToken.stop_requested()) {
+            break;
+        }
+        juce::String baseName;
+        bool selected = false;
+        bool hasResult = false;
+        {
+            const juce::ScopedLock lock(clipsLock_);
+            if (index >= static_cast<int>(clips_.size())) {
+                break;
+            }
+            const auto& clip = clips_[static_cast<std::size_t>(index)];
+            selected = clip.selected;
+            hasResult = clip.result != nullptr;
+            baseName = clip.sourceFile.getFileNameWithoutExtension();
+        }
+        if (!selected) {
+            continue;
+        }
+        setMediaMessage(
+            htfx::tr("clip.exportingPrefix") + baseName + " (" +
+            juce::String(index + 1) + "/" + juce::String(total) + ")");
+
+        // Make this clip active so the existing single-clip export path, which
+        // reads previewResult_ plus the live mixer parameters, operates on it.
+        setActiveClip(index);
+
+        if (!hasResult) {
+            if (!beginSeparation()) {
+                continue;
+            }
+            while (!stopToken.stop_requested()) {
+                const auto state = separationState_.load(std::memory_order_acquire);
+                if (state == SeparationState::previewReady ||
+                    state == SeparationState::error ||
+                    state == SeparationState::cancelled) {
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            const auto produced = previewResult_.load(std::memory_order_acquire);
+            {
+                const juce::ScopedLock lock(clipsLock_);
+                if (index < static_cast<int>(clips_.size())) {
+                    auto& clip = clips_[static_cast<std::size_t>(index)];
+                    clip.result = produced;
+                    clip.status = produced != nullptr
+                                      ? htfx::tr("clip.statusDone")
+                                      : htfx::tr("clip.statusFailed");
+                }
+            }
+            if (produced == nullptr) {
+                continue;
+            }
+        }
+
+        const juce::String suffix =
+            kind == QuickExportKind::vocals ? "_vocals" : "_accompany";
+        const auto outputFile = folder.getChildFile(baseName + suffix + ".wav");
+        if (!beginQuickExport(outputFile, kind)) {
+            continue;
+        }
+        // beginQuickExport runs on the media thread; wait for it so the files
+        // are written one at a time and in order.
+        while (!stopToken.stop_requested() &&
+               mediaBusy_.load(std::memory_order_acquire)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (outputFile.existsAsFile()) {
+            ++exported;
+        }
+    }
+    setMediaMessage(
+        htfx::tr("clip.exportFinishedPrefix") + juce::String(exported) +
+        htfx::tr("clip.exportFinishedSuffix"));
+}
+
 bool HTDemucsGpuFXAudioProcessor::beginMediaImport(const juce::File& mediaFile) {
     if (getOperatingMode() != OperatingMode::record) {
         setMediaMessage(htfx::tr("status.switchToRecordModeBeforeImport"));
@@ -3451,6 +3555,61 @@ private:
     std::unique_ptr<juce::FileChooser> chooser_;
 };
 
+// One row of the clip list: a tick box (multi-file only), the file name and
+// a short status. Clicking the row makes that clip active, which swaps the
+// preview transport and the mixer faders over to it.
+class ClipRow : public juce::Component {
+public:
+    ClipRow() {
+        selectBox_.setName("clipSelect");
+        addAndMakeVisible(selectBox_);
+        nameLabel_.setInterceptsMouseClicks(false, false);
+        addAndMakeVisible(nameLabel_);
+        statusLabel_.setInterceptsMouseClicks(false, false);
+        statusLabel_.setJustificationType(juce::Justification::centredRight);
+        addAndMakeVisible(statusLabel_);
+    }
+
+    void update(const juce::String& name, const juce::String& status,
+                bool selected, bool active, bool showTickBox) {
+        nameLabel_.setText(name, juce::dontSendNotification);
+        statusLabel_.setText(status, juce::dontSendNotification);
+        selectBox_.setToggleState(selected, juce::dontSendNotification);
+        selectBox_.setVisible(showTickBox);
+        active_ = active;
+        repaint();
+    }
+
+    void paint(juce::Graphics& g) override {
+        if (active_) {
+            g.setColour(juce::Colour(0xff2f4f6f));
+            g.fillRoundedRectangle(getLocalBounds().toFloat(), 3.0f);
+        }
+    }
+
+    void resized() override {
+        auto area = getLocalBounds().reduced(2);
+        selectBox_.setBounds(area.removeFromLeft(24));
+        statusLabel_.setBounds(area.removeFromRight(90));
+        nameLabel_.setBounds(area);
+    }
+
+    void mouseDown(const juce::MouseEvent&) override {
+        if (onRowClicked != nullptr) {
+            onRowClicked();
+        }
+    }
+
+    std::function<void()> onRowClicked;
+    juce::ToggleButton& tickBox() { return selectBox_; }
+
+private:
+    juce::ToggleButton selectBox_;
+    juce::Label nameLabel_;
+    juce::Label statusLabel_;
+    bool active_ = false;
+};
+
 class HTDemucsGpuFXEditor final : public juce::AudioProcessorEditor,
                                   private juce::Timer {
 public:
@@ -3485,11 +3644,23 @@ public:
         addAndMakeVisible(simpleFile_);
         vocalsOnlyButton_.setButtonText(htfx::tr("button.exportVocalsOnly"));
         vocalsOnlyButton_.onClick = [this] {
+            // Multi-file: pick a destination folder and export every ticked
+            // clip into it; single file keeps the familiar save dialog.
+            if (processor_.getClipCount() > 1) {
+                chooseBatchExportFolder(
+                    HTDemucsGpuFXAudioProcessor::QuickExportKind::vocals);
+                return;
+            }
             chooseQuickExportFile(
                 HTDemucsGpuFXAudioProcessor::QuickExportKind::vocals);
         };
         accompanyOnlyButton_.setButtonText(htfx::tr("button.exportAccompanyOnly"));
         accompanyOnlyButton_.onClick = [this] {
+            if (processor_.getClipCount() > 1) {
+                chooseBatchExportFolder(
+                    HTDemucsGpuFXAudioProcessor::QuickExportKind::accompaniment);
+                return;
+            }
             chooseQuickExportFile(
                 HTDemucsGpuFXAudioProcessor::QuickExportKind::accompaniment);
         };
@@ -3586,7 +3757,7 @@ public:
         importButton_.onClick = [this] { chooseMediaFile(); };
         addAndMakeVisible(importButton_);
 
-        separateButton_.onClick = [this] { processor_.beginSeparation(); };
+        separateButton_.onClick = [this] { processor_.beginBatchSeparation(); };
         addAndMakeVisible(separateButton_);
         exportButton_.setButtonText(htfx::tr("button.export"));
         exportButton_.onClick = [this] { showExportDialog(); };
@@ -3782,6 +3953,9 @@ public:
             exports.removeFromLeft(12);
             accompanyOnlyButton_.setBounds(exports);
             area.removeFromTop(10);
+            for (auto& row : clipRows_) {
+                row->setBounds(area.removeFromTop(22).reduced(0, 1));
+            }
             progressBar_.setBounds(area.removeFromTop(18));
             area.removeFromTop(5);
             status_.setBounds(area.removeFromTop(38));
@@ -3825,6 +3999,9 @@ public:
         exportButton_.setBounds(transport.removeFromLeft(86));
         transport.removeFromLeft(5);
         cancelButton_.setBounds(transport.removeFromLeft(80));
+        for (auto& row : clipRows_) {
+            row->setBounds(area.removeFromTop(22).reduced(0, 1));
+        }
         progressBar_.setBounds(area.removeFromTop(18).reduced(0, 1));
         area.removeFromTop(4);
 
@@ -3950,6 +4127,29 @@ private:
         updateFullScreenButtonText();
     }
 
+    // Multi-file quick export: one destination folder, every ticked clip is
+    // separated (if needed) and written there.
+    void chooseBatchExportFolder(
+        HTDemucsGpuFXAudioProcessor::QuickExportKind kind) {
+        mediaChooser_ = std::make_unique<juce::FileChooser>(
+            htfx::tr("clip.chooseExportFolder"),
+            juce::File::getSpecialLocation(juce::File::userMusicDirectory));
+        juce::Component::SafePointer<HTDemucsGpuFXEditor> safeThis(this);
+        mediaChooser_->launchAsync(
+            juce::FileBrowserComponent::openMode |
+                juce::FileBrowserComponent::canSelectDirectories,
+            [safeThis, kind](const juce::FileChooser& chooser) {
+                if (safeThis == nullptr) {
+                    return;
+                }
+                const auto folder = chooser.getResult();
+                if (folder != juce::File{}) {
+                    safeThis->processor_.beginBatchExport(folder, kind);
+                }
+                safeThis->mediaChooser_.reset();
+            });
+    }
+
     void chooseMediaFile() {
         mediaChooser_ = std::make_unique<juce::FileChooser>(
             htfx::tr("filechooser.importMediaTitle"),
@@ -3958,14 +4158,17 @@ private:
         juce::Component::SafePointer<HTDemucsGpuFXEditor> safeThis(this);
         mediaChooser_->launchAsync(
             juce::FileBrowserComponent::openMode |
-                juce::FileBrowserComponent::canSelectFiles,
+                juce::FileBrowserComponent::canSelectFiles |
+                juce::FileBrowserComponent::canSelectMultipleItems,
             [safeThis](const juce::FileChooser& chooser) {
                 if (safeThis == nullptr) {
                     return;
                 }
-                const auto media = chooser.getResult();
-                if (media != juce::File{}) {
-                    safeThis->processor_.beginMediaImport(media);
+                const auto results = chooser.getResults();
+                if (results.size() > 1) {
+                    safeThis->processor_.beginMultiMediaImport(results);
+                } else if (results.size() == 1) {
+                    safeThis->processor_.beginMediaImport(results.getReference(0));
                 }
                 safeThis->mediaChooser_.reset();
             });
@@ -4462,6 +4665,39 @@ private:
         return {"Target", "Residual"};
     }
 
+    // Rebuilds the clip rows when the number of imported files changes, and
+    // refreshes their text/state on every timer tick.
+    void refreshClipRows() {
+        const int count = processor_.getClipCount();
+        if (count != shownClipCount_) {
+            clipRows_.clear();
+            for (int index = 0; index < count; ++index) {
+                auto row = std::make_unique<ClipRow>();
+                row->onRowClicked = [this, index] {
+                    processor_.setActiveClip(index);
+                    updateSixSourceControls();
+                };
+                row->tickBox().onClick = [this, index] {
+                    processor_.setClipSelected(
+                        index,
+                        clipRows_[static_cast<std::size_t>(index)]
+                            ->tickBox()
+                            .getToggleState());
+                };
+                scaledContent_.addAndMakeVisible(*row);
+                clipRows_.push_back(std::move(row));
+            }
+            shownClipCount_ = count;
+            resized();
+        }
+        const int active = processor_.getActiveClipIndex();
+        for (int index = 0; index < static_cast<int>(clipRows_.size()); ++index) {
+            const auto info = processor_.getClipInfo(index);
+            clipRows_[static_cast<std::size_t>(index)]->update(
+                info.name, info.status, info.selected, index == active, count > 1);
+        }
+    }
+
     void updateSixSourceControls() {
         const bool modeChosen = separationModeBox_.getSelectedItemIndex() >= 0;
         const bool roformerMode = roformerModeSelected();
@@ -4554,6 +4790,7 @@ private:
     }
 
     void timerCallback() override {
+        refreshClipRows();
         const bool recordMode = modeBox_.getSelectedItemIndex() == 0;
         const auto separationState = processor_.getSeparationState();
         const bool separationBusy =
@@ -4701,6 +4938,10 @@ private:
     juce::Label separationModeLabel_;
     juce::ComboBox separationModeBox_;
     juce::StringArray separationModeCategories_;
+    // Clip list (multi-file): one row per imported file, rebuilt whenever the
+    // processor reports a different clip count.
+    std::vector<std::unique_ptr<ClipRow>> clipRows_;
+    int shownClipCount_ = -1;
     juce::Label modeLabel_;
     juce::ComboBox modeBox_;
     juce::TextButton fullScreenButton_;

@@ -50,6 +50,7 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"clip.noneSelected", StringPair{u8"沒有勾選任何檔案", "No files selected"}},
         {"clip.exportingPrefix", StringPair{u8"正在匯出 ", "Exporting "}},
         {"status.cpuModeWarning", StringPair{u8"CPU 模式：可以進行分離，但完整錄音可能需要很長時間。", "CPU mode: separation is supported, but a full recording may take a long time."}},
+        {"clip.chooseExportFolder", StringPair{u8"選擇匯出資料夾", "Choose export folder"}},
         {"button.import", StringPair{u8"匯入音訊／影片", "Import audio/video"}},
         {"button.export", StringPair{u8"匯出", "Export"}},
         {"button.scaleUi", StringPair{u8"縮放介面", "Scale UI"}},
