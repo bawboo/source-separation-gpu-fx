@@ -1154,7 +1154,12 @@ bool HTDemucsGpuFXAudioProcessor::beginSeparation() {
         return false;
     }
     const auto configuration = currentRuntimeConfiguration();
-    if (!isModelInstalled(configuration.modelName)) {
+    // RoFormer checkpoints are fetched on demand by the worker itself (it
+    // downloads, verifies the SHA-256 and manages the rolling cache), so an
+    // uninstalled RoFormer model must NOT block the run — only HTDemucs
+    // checkpoints, which have no download path in this code path, do.
+    if (!isRoformerModelName(juce::String::fromUTF8(configuration.modelName.c_str())) &&
+        !isModelInstalled(configuration.modelName)) {
         separationState_.store(SeparationState::error, std::memory_order_release);
         setSeparationMessage(
             htfx::tr("status.modelNotInstalledPrefix") +
@@ -2270,7 +2275,11 @@ bool HTDemucsGpuFXAudioProcessor::beginQuickExport(
         setMediaMessage(htfx::tr("status.separateBeforeQuickExport"));
         return false;
     }
-    if (result->modelName != "htdemucs" || result->sourceCount < 4) {
+    // Quick export supports HTDemucs (4/6-stem: vocals = source 3, accompany =
+    // the rest) and any RoFormer 2-stem result (target/residual pair).
+    if (result->sourceCount == 2) {
+        // ok: RoFormer two-stem
+    } else if (result->sourceCount < 4) {
         setMediaMessage(htfx::tr("status.quickExportRequiresHtdemucs"));
         return false;
     }
@@ -2323,8 +2332,25 @@ void HTDemucsGpuFXAudioProcessor::quickExportLoop(
         const auto sampleCount = static_cast<std::size_t>(result->sampleCount);
         std::vector<float> outputLeft(sampleCount, 0.0f);
         std::vector<float> outputRight(sampleCount, 0.0f);
-        constexpr int vocalsSource = 3;
         constexpr std::size_t cancellationBlock = 1u << 18;
+        // Two-stem (RoFormer) results carry a target/residual pair; prefer the
+        // stem actually labelled "vocals", else treat stem 0 as the target.
+        const bool twoStem = result->sourceCount == 2;
+        int vocalsSource = 3;
+        int residualSource = -1;
+        if (twoStem) {
+            vocalsSource = 0;
+            residualSource = 1;
+            for (std::size_t index = 0; index < result->stemLabels.size() && index < 2;
+                 ++index) {
+                if (juce::String(result->stemLabels[index].c_str())
+                        .equalsIgnoreCase("vocals")) {
+                    vocalsSource = static_cast<int>(index);
+                    residualSource = vocalsSource == 0 ? 1 : 0;
+                    break;
+                }
+            }
+        }
 
         for (std::size_t sample = 0; sample < sampleCount; ++sample) {
             if (sample % cancellationBlock == 0) {
@@ -2348,6 +2374,13 @@ void HTDemucsGpuFXAudioProcessor::quickExportLoop(
                 continue;
             }
 
+            if (twoStem) {
+                const auto leftPlane = static_cast<std::size_t>(residualSource) * 2;
+                const auto rightPlane = leftPlane + 1;
+                outputLeft[sample] = result->stems[leftPlane * sampleCount + sample];
+                outputRight[sample] = result->stems[rightPlane * sampleCount + sample];
+                continue;
+            }
             for (int source = 0; source < 4; ++source) {
                 if (source == vocalsSource) {
                     continue;
