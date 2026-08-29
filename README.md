@@ -1,152 +1,113 @@
 # HTDemucs GPU FX
 
-HTDemucs GPU FX 是以 JUCE 製作的 Windows standalone / VST3 原型。完整
-HTDemucs 模型在獨立的 Python/PyTorch worker 中執行，前端透過 shared-memory
-IPC 傳送 stereo audio，避免在 audio callback 直接執行模型推論。
+以 JUCE 製作的音源分離應用（Windows standalone／VST3，macOS 支援建置中）。
+分離推論在獨立的 Python/PyTorch worker 中執行，不在 audio callback 內跑模型。
 
-目前公開發佈的主要形式是 Windows Web Installer：安裝器偵測 CUDA GPU，讓有
-可用 CUDA 的電腦選擇 CUDA 或純 CPU runtime；沒有可用 CUDA 時自動安裝 CPU
-runtime。預設 `htdemucs` 權重會在安裝時由 Meta 官方伺服器下載並驗證 SHA-256，
-其他模型由應用程式按需下載。
+支援兩個模型家族：
+
+- **HTDemucs** — 4 軌（鼓／貝斯／其他／人聲）與 6 軌（再加吉他／鋼琴）
+- **MelBand RoFormer** — 99 個模型，涵蓋人聲、伴奏、卡拉 OK、吉他、去混響、
+  去噪、群聲、氣音等 10 個類別（57 個經逐一端到端驗證，其餘標註 experimental）
 
 ## 功能
 
-- 預設一般面板只需匯入音訊／影片，再按 `Export Vocals only` 或
-  `Export Accompany only`；程式會以預設 `htdemucs` 模型自動分離並詢問輸出位置。
-- 一般面板輸出為 32-bit float WAV，預設檔名是
-  `<原檔名>_vocals.wav` 與 `<原檔名>_accompany.wav`；伴奏為
-  drums、bass、other 的原始音量總和。
-- 匯入音訊或影片並分離 drums、bass、other、vocals。
-- 匯出個別 stem、全部 stems，或依介面比例混音後匯出。
-- 影片輸入可只匯出音訊，或把混音後音訊替換回 MP4。
-- Record mode、超高延遲 realtime preview、CPU/CUDA 選擇與 GPU index。
-- 全螢幕、UI 縮放與可調整視窗大小。
-- 可切換到進階面板使用錄音、即時模式、預覽、stem 比例、完整匯出與模型設定。
+- **模式優先介面**：先選「要分什麼」（12 種分離模式），每個模式帶預設模型並可
+  換同類替代；選定後拉桿才啟用，且拉桿名稱隨模式改變（人聲／伴奏、吉他／殘餘…）
+- **多檔批次**：一次匯入多個檔案，每個檔案一列（勾選框＋檔名＋狀態）；點某列即
+  切換到該檔的調音介面，**每個檔案獨立記住自己的拉桿設定**；分離時逐一推論，先
+  完成的可先預覽；匯出時只處理勾選的檔案，選一個資料夾即全部輸出
+- **按需下載**：選用的 RoFormer 模型自動下載並驗證 SHA-256，滾動快取上限 3 個
+- **雙語介面**：預設繁體中文，可即時切換英文，選擇會被記住
+- **啟動預設**：預選「人聲分離」模式，上次使用的模式與模型於下次啟動還原
+- 匯入音訊或影片、預覽、逐軌音量、匯出 WAV 或回填 MP4 音軌
 
-## Repository 與 Release 的分工
+匯出一律為 44.1 kHz／立體聲／32-bit float WAV，長度與來源一致。
 
-Repository 的 Git history 只放原始碼、建置腳本、模型 metadata、圖示、測試與
-授權文件，不放 build output、runtime、安裝檔或 `.th` 權重。
+## 系統需求
 
-GitHub Release 放可供安裝器下載的二進位資產：
+| | Windows | macOS |
+|---|---|---|
+| 系統 | Windows 10 22H2 以上（x64） | macOS 12 以上（Intel／Apple Silicon） |
+| 建置工具 | Visual Studio 2022 Build Tools（C++ x64） | Xcode Command Line Tools |
+| GPU | NVIDIA CUDA（選配，無則用 CPU） | Apple Metal (MPS)（選配） |
+| Python | 僅 RoFormer 需要（見下） | 同左 |
+| FFmpeg | `C:\ffmpeg-master\bin\ffmpeg.exe` 或內建 sidecar | `brew install ffmpeg` 或內建 sidecar |
 
-- `runtime-win-x64-cpu-<version>.zip`
-- `runtime-win-x64-cuda-core-<version>.zip`
-- `runtime-win-x64-cuda-libraries-<version>.zip`
-- `HTDemucs_GPU_FX_Setup_x64.exe`
-- runtime JSON、`release-manifest.json` 與 `SHA256SUMS.txt`
+## 建置
 
-CUDA runtime 分成兩個 ZIP，是因為 GitHub Release 的單一 asset 必須小於
-2 GiB。安裝器會自動下載並解壓兩個分包，使用者不需手動處理。
+### Windows
 
-完整發佈步驟見 [`docs/RELEASING_WINDOWS.md`](docs/RELEASING_WINDOWS.md)。
-
-## Clone 與建置前置
-
-```powershell
-git clone --recurse-submodules https://github.com/OWNER/REPOSITORY.git
-cd REPOSITORY
+```bat
+tools\build_windows_installed.cmd
 ```
 
-需要：
+產物：`build\windows-installed\HTDemucsGpuFX_artefacts\Release\Standalone\HTDemucs GPU FX.exe`
 
-- Windows 10 22H2 或更新版本（x64）
-- Visual Studio 2022 Build Tools（Desktop development with C++）
-- CMake 3.22+
-- Python / PyTorch 環境（CPU 與 CUDA runtime 分別建置）
-- Inno Setup 6.7+
-- FFmpeg distribution
+> 本機注意：`SpscRing` 具現化較大，若遇到 `C1060 編譯器堆積空間不足`，請確認
+> 使用 64 位元工具鏈（`/p:PreferredToolArchitecture=x64`）。
 
-JUCE 固定在 `third_party/JUCE`，Demucs source 固定在
-`third_party/demucs`。若 clone 時未帶 submodule：
+### macOS（Intel ＋ Apple Silicon 通用二進位）
 
-```powershell
-git submodule update --init --recursive
-powershell -ExecutionPolicy Bypass -File .\tools\apply_dependency_patches.ps1
+```bash
+tools/build_macos.sh
 ```
 
-JUCE 以 submodule 固定官方版本；專案需要的 MME 與 portable settings 變更保存在
-`patches/juce-8.0.13-htfx.patch`。Windows build script 會以可重複方式自動套用。
+產物：`build/macos/HTDemucsGpuFX_artefacts/Release/HTDemucs GPU FX.app`
+（`lipo -info` 可確認同時包含 `x86_64` 與 `arm64`）
 
-## Windows 建置順序
+### RoFormer 推論環境（兩個平台皆需）
 
-```powershell
-.\tools\build_windows_installed.cmd
-
-powershell -ExecutionPolicy Bypass -File .\tools\build_standalone_runtime.ps1 `
-  -Flavor cpu -Python C:\path\to\cpu-python.exe
-powershell -ExecutionPolicy Bypass -File .\tools\build_standalone_runtime.ps1 `
-  -Flavor cuda -Python C:\path\to\cuda-python.exe
-
-powershell -ExecutionPolicy Bypass -File .\tools\package_windows_runtime.ps1 `
-  -Flavor cpu -Ffmpeg C:\path\to\ffmpeg.exe
-powershell -ExecutionPolicy Bypass -File .\tools\package_windows_runtime.ps1 `
-  -Flavor cuda -Ffmpeg C:\path\to\ffmpeg.exe
-
-powershell -ExecutionPolicy Bypass -File .\tools\package_windows_installer_payload.ps1
-powershell -ExecutionPolicy Bypass -File .\tools\verify_windows_web_packages.ps1
+```bash
+conda create -n htfx-roformer python=3.11 -y
+conda activate htfx-roformer
+pip install torch            # macOS 用預設 wheel；Windows CUDA 版見下行
+# Windows CUDA: pip install torch --index-url https://download.pytorch.org/whl/cu126
+pip install -r requirements-htfx-roformer.txt
 ```
 
-Runtime ZIP 不是讓使用者自己解壓的 portable 包；它們是 Web Installer 的
-下載來源。最終 Setup 必須以實際 GitHub Release 的固定 tag URL 編譯：
+## 執行
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\build_windows_web_installer.ps1 `
-  -ReleaseBaseUrl https://github.com/OWNER/REPOSITORY/releases/download/v0.1.0
+啟動時**工作目錄必須是專案根目錄**，程式才找得到 `assets/models/roformer-manifest.json`
+與 `worker/roformer_worker.py`；否則模式清單會退化成只有 HTDemucs 4/6 軌。發行的
+可攜包已附啟動器處理好這件事。
+
+可用環境變數覆寫路徑：
+
+| 變數 | 用途 |
+|---|---|
+| `HTFX_ROFORMER_PYTHON` | RoFormer 推論用的 python 執行檔 |
+| `HTFX_ROFORMER_WORKER` | `roformer_worker.py` 路徑 |
+| `HTFX_ROFORMER_MANIFEST` | 模型清單 JSON |
+| `HTFX_ROFORMER_MODELS_DIR` | 模型快取目錄 |
+| `HTFX_ROFORMER_OUTPUT_DIR` | RoFormer 中間輸出目錄 |
+| `HTFX_UI_LANGUAGE_FILE` / `HTFX_UI_STARTUP_FILE` | 介面語言／啟動選擇的設定檔 |
+
+使用者設定存放於 `%LOCALAPPDATA%\HTDemucs GPU FX\`（macOS：
+`~/Library/Application Support/HTDemucs GPU FX/`）。
+
+## 測試
+
+```bat
+.loop\checks\full.cmd                                   :: 四個 smoke tests
+build\...\htdemucs_goal_check.exe "<某首歌.wav>"          :: 四種分離模式端到端驗收
 ```
 
-## 模型與授權
+`htdemucs_goal_check` 會對一首真實歌曲跑完 HTDemucs 4/6 軌與兩個 RoFormer 類別的
+「匯入→分離→匯出人聲→匯出伴奏」，每種模式各印一行結果。
 
-Repository 與 runtime ZIP 都不包含預訓練 `.th` 權重。安裝器只保存官方 URL、
-檔案大小與 SHA-256，並在使用者安裝時直接從官方來源取得預設模型。
+## 專案結構
 
-本專案的 JUCE 開源路線採 AGPL-3.0-or-later；第三方元件與發佈注意事項見
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。模型權重與模型訓練資料的
-權利不因本專案授權而改變。
+```
+plugin/          JUCE 前端與音訊處理（PluginProcessor、Localization、SpscRing）
+cpp/             HTDemucs frozen worker 的 shared-memory IPC client
+worker/          Python worker（HTDemucs IPC、RoFormer 推論與快取管理）
+tests/           smoke tests 與端到端驗收工具
+tools/           建置、封裝、驗證腳本
+assets/models/   模型 metadata 與 RoFormer 清單（權重不入版控）
+third_party/     vendored JUCE 8.0.13（已套用 patches/）與 Demucs
+```
 
-目前 Windows runtime 使用 GPLv3-enabled FFmpeg build。公開二進位 Release 前，
-仍需附上該 build 對應的 source/build 資訊，或改成不隨 runtime 散布 FFmpeg。
+## 授權與限制
 
-## MelBand RoFormer 模型（進階面板）
-
-除了預設的 HTDemucs 之外，進階面板提供一個分類式 model browser，收錄
-[openmirlab/melband-roformer-infer](https://github.com/openmirlab/melband-roformer-infer)
-（MIT）的全部 99 個 MelBand RoFormer 分離模型。清單、URL、檔案大小與
-SHA-256 記錄在 `assets/models/roformer-manifest.json`；推論由獨立的
-Python/PyTorch worker（`worker/roformer_worker.py`）執行，透過與 HTDemucs
-相同的 shared-memory IPC 與外掛溝通，audio callback 本身不做任何模型運算。
-
-**分類與稽核狀態**
-
-- 模型依用途分成 10 個類別：`vocals`、`instrumental`、`instvoc`、
-  `karaoke`、`dereverb`、`denoise`、`crowd`、`aspiration`、`guitar`、
-  `general`。Model browser 可依類別瀏覽，也可用文字搜尋模型名稱。
-- 99 個模型中，57 個已由本專案端到端稽核（下載＋SHA-256 驗證→對測試音檔
-  分離→輸出格式驗證：時長不變、stereo、32-bit float、樣本值有限）；其餘
-  42 個尚未逐一稽核，UI 上會標註 **experimental**，代表尚未保證每個模型都
-  能穩定產生可用輸出，使用前請自行核對結果。
-
-**按需下載與快取**
-
-- 模型權重不隨安裝檔或 Repository 一起發佈；使用者在 model browser 選擇
-  尚未安裝的模型時才會觸發下載，並顯示下載狀態（下載中／已安裝／失敗）。
-- 下載完成後以 manifest 記錄的 SHA-256 驗證雜湊值，驗證失敗會重新下載，
-  持續失敗則中止並回報錯誤，不會使用損毀的權重進行推論。
-- 本機快取採滾動上限：最多同時保留 3 個已下載模型，超過上限時依最後使用
-  時間淘汰最舊的一個（`worker/roformer_cache.py`）。使用者不需手動清理，
-  但重新選用先前被淘汰的模型會重新觸發下載。
-
-**輸出命名**
-
-- 每個模型依其類別產生對應命名的 stem（例如 vocals 類別輸出
-  `<原檔名>_vocals.wav` 與 `<原檔名>_instrumental.wav`），檔名由該模型
-  worker 實際輸出的 stem id 推導，不假設固定的 HTDemucs 輸出順序。
-- 匯出檔案的取樣率固定為外掛內部處理率（44,100 Hz），與來源媒體的原始取
-  樣率無關；時長則與來源保持一致。
-
-## 已知限制
-
-- Demucs 推論固定為 44,100 Hz stereo。
-- 完整模型的 realtime 模式有顯著延遲，不等同一般低延遲效果器。
-- GPU 版目前固定為 CUDA 12.1 / PyTorch build；公開發佈前應在乾淨 Windows
-  Sandbox 或 VM 驗證安裝、解除安裝與模型下載。
+第三方授權見 `THIRD_PARTY_NOTICES.md`。預訓練模型權重與打包好的 runtime 屬私人
+資產，不隨版控散布；公開發佈前須先處理該文件所列的模型權重與 FFmpeg 未決事項。

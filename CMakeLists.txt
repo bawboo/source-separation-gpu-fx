@@ -7,6 +7,17 @@ if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
+# macOS: build a universal binary so one .app runs on both Intel and Apple
+# Silicon. Set before any target is declared so every target inherits it.
+if(APPLE AND NOT DEFINED CMAKE_OSX_ARCHITECTURES)
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING
+        "macOS architectures (universal by default)" FORCE)
+endif()
+if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING
+        "Minimum macOS version" FORCE)
+endif()
+
 option(HTFX_BUILD_PLUGIN "Build the JUCE VST3 prototype" ON)
 option(HTFX_STANDALONE_ONLY "Build only the portable Standalone application" OFF)
 option(HTFX_PORTABLE_STANDALONE_SETTINGS
@@ -133,12 +144,16 @@ if(HTFX_BUILD_PLUGIN)
     target_sources(HTDemucsGpuFX PRIVATE
         plugin/Localization.cpp
         plugin/Localization.h
-        plugin/MmeAudioIODevice.cpp
-        plugin/MmeAudioIODevice.h
         plugin/PluginProcessor.cpp
         plugin/PluginProcessor.h
         plugin/SpscRing.h
     )
+    if(WIN32)
+        target_sources(HTDemucsGpuFX PRIVATE
+            plugin/MmeAudioIODevice.cpp
+            plugin/MmeAudioIODevice.h
+        )
+    endif()
     target_include_directories(HTDemucsGpuFX PRIVATE plugin cpp)
     target_compile_features(HTDemucsGpuFX PRIVATE cxx_std_20)
     if(MSVC)

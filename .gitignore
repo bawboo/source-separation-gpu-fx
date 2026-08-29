@@ -49,3 +49,13 @@ ffmpeg-path.txt
 
 # operator loop archives (bookkeeping, never source-controlled)
 /.loop-archive-*/
+
+# macOS build output and platform cruft
+/build-macos/
+/build/macos/
+.DS_Store
+*.dSYM/
+*.app/
+
+# Release staging
+/release/
