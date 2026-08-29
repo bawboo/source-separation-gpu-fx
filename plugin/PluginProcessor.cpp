@@ -219,7 +219,11 @@ juce::File configuredRoformerManifest() {
 }
 
 bool isRoformerModelName(const juce::String& modelName) {
-    return modelName.startsWith("melband-roformer-");
+    // The catalog uses two id prefixes; matching only the first one made every
+    // "roformer-model-*" checkpoint (the majority of the 99) look like an
+    // HTDemucs model, so separation was refused with "model not installed".
+    return modelName.startsWith("melband-roformer-") ||
+           modelName.startsWith("roformer-model-");
 }
 
 juce::File configuredRoformerPython() {
@@ -4184,7 +4188,10 @@ private:
                 htfx::tr("alert.importMediaFirstMessage"));
             return;
         }
-        if (!processor_.isModelInstalled("htdemucs")) {
+        // RoFormer checkpoints are fetched on demand by the worker, so only a
+        // missing HTDemucs checkpoint is a hard stop here.
+        const auto roformerModel = processor_.getSelectedRoformerModel();
+        if (roformerModel.isEmpty() && !processor_.isModelInstalled("htdemucs")) {
             juce::AlertWindow::showMessageBoxAsync(
                 juce::MessageBoxIconType::WarningIcon,
                 htfx::tr("alert.defaultModelMissingTitle"),
@@ -4231,13 +4238,16 @@ private:
             return;
         }
 
+        // Quick export honours whatever separation mode/model the user picked
+        // (this used to force the model back to htdemucs, which silently
+        // fought the mode-first UI and made the general panel unusable for
+        // every RoFormer mode). Only the operating mode has to be Record.
         modeBox_.setSelectedItemIndex(0, juce::dontSendNotification);
-        modelBox_.setSelectedItemIndex(0, juce::dontSendNotification);
         setChoice("operatingMode", 0);
-        setChoice("model", 0);
         processor_.applyUserConfiguration();
 
-        if (processor_.previewUsesModel("htdemucs")) {
+        // Already separated with the current model? Export straight away.
+        if (processor_.hasPreview()) {
             const auto pending = *pendingQuickExport_;
             if (processor_.beginQuickExport(pending.outputFile, pending.kind)) {
                 pendingQuickExport_.reset();
@@ -4245,6 +4255,8 @@ private:
             return;
         }
 
+        // Otherwise separate first; the timer picks the export back up when
+        // the preview becomes ready.
         if (!processor_.beginSeparation()) {
             pendingQuickExport_.reset();
         }
@@ -4882,7 +4894,7 @@ private:
         if (pendingQuickExport_.has_value()) {
             if (separationState ==
                     HTDemucsGpuFXAudioProcessor::SeparationState::previewReady &&
-                processor_.previewUsesModel("htdemucs") && !mediaBusy) {
+                processor_.hasPreview() && !mediaBusy) {
                 const auto pending = *pendingQuickExport_;
                 if (processor_.beginQuickExport(pending.outputFile, pending.kind)) {
                     pendingQuickExport_.reset();

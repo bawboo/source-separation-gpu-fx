@@ -294,6 +294,17 @@ if(HTFX_BUILD_PLUGIN)
         juce::juce_audio_utils
     )
 
+    add_executable(htdemucs_goal_check tests/goal_check.cpp)
+    target_include_directories(htdemucs_goal_check PRIVATE plugin)
+    target_compile_features(htdemucs_goal_check PRIVATE cxx_std_20)
+    if(MSVC)
+        target_compile_options(htdemucs_goal_check PRIVATE /utf-8)
+    endif()
+    target_link_libraries(htdemucs_goal_check PRIVATE
+        HTDemucsGpuFX
+        juce::juce_audio_utils
+    )
+
     add_executable(htdemucs_transport_epoch_smoke tests/transport_epoch_smoke.cpp)
     target_include_directories(htdemucs_transport_epoch_smoke PRIVATE plugin)
     target_compile_features(htdemucs_transport_epoch_smoke PRIVATE cxx_std_20)

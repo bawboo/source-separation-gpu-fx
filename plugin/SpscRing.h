@@ -55,7 +55,13 @@ public:
     }
 
 private:
-    std::array<Item, Capacity> storage_{};
+    // Deliberately NOT value-initialised: Item is trivially copyable (see the
+    // static_assert above) and a slot is only ever read after it has been
+    // written, so zeroing is pointless. With Capacity = 2^19 the "{}" form
+    // made the compiler materialise ~25 MB of zero-init per ring (three rings
+    // per processor), which exhausted the compiler heap (C1060) and cost
+    // startup time zeroing pages the ring never reads.
+    std::array<Item, Capacity> storage_;
     alignas(64) std::atomic<std::uint64_t> writeIndex_{0};
     alignas(64) std::atomic<std::uint64_t> readIndex_{0};
 };
