@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <type_traits>
 
 namespace htfx {
@@ -15,6 +16,8 @@ class SpscRing {
     static_assert(std::is_trivially_copyable_v<Item>);
 
 public:
+    SpscRing() noexcept { std::memset(storage_.data(), 0, sizeof(storage_)); }
+
     bool tryPush(const Item& item) noexcept {
         const auto write = writeIndex_.load(std::memory_order_relaxed);
         const auto read = readIndex_.load(std::memory_order_acquire);
@@ -55,12 +58,11 @@ public:
     }
 
 private:
-    // Deliberately NOT value-initialised: Item is trivially copyable (see the
-    // static_assert above) and a slot is only ever read after it has been
-    // written, so zeroing is pointless. With Capacity = 2^19 the "{}" form
-    // made the compiler materialise ~25 MB of zero-init per ring (three rings
-    // per processor), which exhausted the compiler heap (C1060) and cost
-    // startup time zeroing pages the ring never reads.
+    // Zeroed at run time by the constructor rather than with "{}": at
+    // Capacity = 2^19 the value-initialised form made the compiler
+    // materialise ~25 MB of zero-init per ring (three rings per processor)
+    // and exhausted the compiler heap (C1060). A single memset keeps the
+    // original semantics without the compile-time blowup.
     std::array<Item, Capacity> storage_;
     alignas(64) std::atomic<std::uint64_t> writeIndex_{0};
     alignas(64) std::atomic<std::uint64_t> readIndex_{0};
