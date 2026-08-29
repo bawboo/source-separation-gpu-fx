@@ -38,3 +38,7 @@
 - SIGN (2026-08-29, operator): 本機建置必須用 64 位元編譯器工具鏈——`cmake --build ... -- /p:PreferredToolArchitecture=x64`。預設的 32 位元 cl.exe 在重編 `SpscRing<RecordFrame,524288>` 那個 TU 時會 C1060「編譯器堆積空間不足」（即使系統有 22GB 空閒）；平時增量建置不重編該 TU 所以碰不到，一改 PluginProcessor.h 就會踩到。
 - SIGN (2026-08-29, operator): 跑 smoke 測試時絕對不能同時開著 App（含 verify\play 的可攜版）——兩者會搶同一份 roformer-cache 與輸出目錄，症狀是 `ui_configuration_smoke fatal: Access violation - no RTTI data!`，且與程式碼改動無關（極易誤判為自己改壞）。
 - SIGN (2026-08-29, operator): RoFormer worker 的冷啟動成本約 67 秒（python + torch import + 913MB checkpoint 載入 + CUDA init），實際推論僅約 2.5 秒。大量檔案複製（例如打包 4GB 可攜包）會洗掉 OS 檔案快取，使冷啟動成本浮現。ui_configuration_smoke 的 RoFormer 等待上限已從 60 秒放寬至 240 秒。
+- SIGN (2026-08-30, operator): `isRoformerModelName()` 必須同時認 `melband-roformer-` 與 `roformer-model-` 兩種 id 前綴——manifest 的 99 個模型裡有 74 個是後者，只比對前者會讓四分之三的模型在 C++ 端被當成 HTDemucs 模型、以「模型尚未安裝」拒絕分離。
+- SIGN (2026-08-30, operator): 快速匯出（一般面板的「僅匯出人聲／伴奏」）不可強制切換模型——舊碼會 `modelBox_.setSelectedItemIndex(0)` 把模型改回 htdemucs 並只認 `previewUsesModel("htdemucs")`，與模式優先 UI 直接衝突，使用者在任何 RoFormer 模式按匯出都會永遠等不到結果。
+- SIGN (2026-08-30, operator): `SpscRing` 的 `std::array<Item, 2^19> storage_{}` 值初始化會讓編譯器 C1060（堆積不足）；改成建構式 memset。**不可直接移除歸零**——那會讓 ring 帶著未定值，ui_configuration_smoke 會 segfault。
+- SIGN (2026-08-30, operator): 驗收工具 `tests/goal_check.cpp`（target `htdemucs_goal_check`）用真實歌曲跑 HTDemucs 4/6-stem 與兩個 RoFormer 類別的完整流程；命令列取路徑必須用 `CommandLineToArgvW(GetCommandLineW())`，argv 的 ANSI 視圖會把中文路徑變亂碼。
