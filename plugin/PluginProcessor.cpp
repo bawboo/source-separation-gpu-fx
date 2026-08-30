@@ -253,27 +253,41 @@ juce::File configuredRoformerWorker() {
                      .getChildFile("roformer_worker.py");
 }
 
+// Downloaded RoFormer checkpoints and the worker's scratch space must live
+// somewhere writable by the user. The development tree keeps them beside the
+// checkout; an installed or portable copy would otherwise resolve them relative
+// to the working directory, landing somewhere that does not exist (and, under
+// Program Files, is not writable), which made every RoFormer mode fail.
 juce::File configuredRoformerModelsDirectory() {
     const auto environment = juce::SystemStats::getEnvironmentVariable(
         "HTFX_ROFORMER_MODELS_DIR", {}).trim();
-    return environment.isNotEmpty()
-               ? juce::File(environment)
-               : juce::File::getCurrentWorkingDirectory()
-                     .getParentDirectory()
-                     .getChildFile("verify")
-                     .getChildFile("roformer-cache");
+    if (environment.isNotEmpty()) {
+        return juce::File(environment);
+    }
+    const auto developmentCache = juce::File::getCurrentWorkingDirectory()
+                                      .getParentDirectory()
+                                      .getChildFile("verify")
+                                      .getChildFile("roformer-cache");
+    if (developmentCache.isDirectory()) {
+        return developmentCache;
+    }
+    return installedDataDirectory().getChildFile("RoformerModels");
 }
 
 juce::File configuredRoformerOutputDirectory() {
     const auto environment = juce::SystemStats::getEnvironmentVariable(
         "HTFX_ROFORMER_OUTPUT_DIR", {}).trim();
-    return environment.isNotEmpty()
-               ? juce::File(environment)
-               : juce::File::getCurrentWorkingDirectory()
-                     .getParentDirectory()
-                     .getChildFile("verify")
-                     .getChildFile("output")
-                     .getChildFile("roformer-runtime");
+    if (environment.isNotEmpty()) {
+        return juce::File(environment);
+    }
+    const auto developmentOutput = juce::File::getCurrentWorkingDirectory()
+                                       .getParentDirectory()
+                                       .getChildFile("verify")
+                                       .getChildFile("output");
+    if (developmentOutput.isDirectory()) {
+        return developmentOutput.getChildFile("roformer-runtime");
+    }
+    return installedDataDirectory().getChildFile("RoformerWork");
 }
 
 std::filesystem::path configuredWorkerExecutable() {
@@ -1296,7 +1310,8 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
             const auto outputDirectory = workingDirectory.getChildFile("stems");
             if ((!useFrozen &&
                  (!python.existsAsFile() || !workerScript.existsAsFile())) ||
-                !modelsDirectory.isDirectory() ||
+                !(modelsDirectory.isDirectory() ||
+                  modelsDirectory.createDirectory().wasOk()) ||
                 !workingDirectory.createDirectory() ||
                 !outputDirectory.createDirectory()) {
                 separationState_.store(SeparationState::error, std::memory_order_release);

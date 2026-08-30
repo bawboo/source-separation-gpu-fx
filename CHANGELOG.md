@@ -50,6 +50,16 @@ CPU 版含了 RoFormer 反而更小（新的 CPU PyTorch wheel 較精簡）；CU
   `--collect-submodules numpy.core`。此問題只有在實際跑 frozen runtime 時才會
   出現，走開發用 Python 環境的測試一律看不到
 
+- **安裝版的所有 RoFormer 模式都會失效**：模型快取與工作目錄的預設值是開發樹的
+  相對路徑（`cwd/../verify/...`），安裝或免安裝執行時該處不存在、在 Program Files
+  下也不可寫，`beginSeparation()` 因此直接判定路徑不可用。改為解析到
+  `%LOCALAPPDATA%\Music SSP FX\` 之下，並在首次使用時建立
+- **安裝包遺漏 `roformer-manifest.json`**：沒有它，模式清單退化成只剩 HTDemucs
+  4／6 軌，99 個 RoFormer 模型全部不出現
+- **frozen runtime 內含建置機器的路徑**：pip 的 `direct_url.json` 會記錄本地或
+  VCS 安裝來源。建置腳本現在會刪除它，並掃描整個 runtime，發現任何機器路徑就
+  讓建置失敗
+
 ### 合規
 
 - `THIRD_PARTY_NOTICES.md` 的模型權重再散布一項結案：Demucs 與 99 個 RoFormer

@@ -206,6 +206,20 @@ foreach ($relative in @('_internal\xformers', '_internal\torch\bin')) {
     }
 }
 
+# pip records where a package was installed from in direct_url.json, which
+# for a locally or VCS-installed dependency contains the builder machine's
+# own path. No runtime code reads it, so drop it before anything ships.
+Get-ChildItem -LiteralPath $runtimeRoot -Recurse -File -Filter 'direct_url.json' |
+    Remove-Item -Force
+
+$identifyingText = Get-ChildItem -LiteralPath $runtimeRoot -Recurse -File |
+    Where-Object { $_.Extension -in @('.json', '.txt', '.md', '.xml', '.yaml') } |
+    Select-String -Pattern '(?i)C:[\\/]+Users[\\/]|/Users/' -List
+if ($identifyingText) {
+    $details = ($identifyingText | ForEach-Object Path) -join [Environment]::NewLine
+    throw "Runtime contains machine-identifying text:`n$details"
+}
+
 $helpOutput = & $workerExecutable --help 2>&1
 if ($LASTEXITCODE -ne 0 -or ($helpOutput -join "`n") -notmatch '--models-dir') {
     throw "Self-contained worker import/startup check failed:`n$($helpOutput -join "`n")"

@@ -71,8 +71,15 @@ foreach ($tree in $trees) {
 
 $modelMetadata = Join-Path $sidecarRoot 'models'
 New-Item -ItemType Directory -Path $modelMetadata -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $projectRoot 'assets\models\model-manifest.json') `
-    -Destination $modelMetadata
+# Both manifests are required: without roformer-manifest.json the mode list
+# degrades to HTDemucs 4/6-stem only and all 99 RoFormer models disappear.
+foreach ($manifest in @('model-manifest.json', 'roformer-manifest.json')) {
+    $source = Join-Path $projectRoot "assets\models\$manifest"
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "Required model manifest is missing: $source"
+    }
+    Copy-Item -LiteralPath $source -Destination $modelMetadata
+}
 Get-ChildItem -LiteralPath (Join-Path $projectRoot 'assets\models') -Filter '*.yaml' -File |
     Copy-Item -Destination $modelMetadata
 
