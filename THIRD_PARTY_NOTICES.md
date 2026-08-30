@@ -44,7 +44,18 @@ build. It is an engineering compliance inventory, not legal advice.
    required for a source-only repo, and is deliberately deferred for the
    current releases - unsigned builds show a SmartScreen warning on first run.
 
-5. **AGPL corresponding source.** Every binary release must be traceable to
+5. **NVIDIA redistributables in the GPU package - review before a
+   commercial release.** The CUDA package embeds NVIDIA CUDA and cuDNN
+   libraries exactly as the official PyTorch wheel publishes them, which is the
+   same thing every PyInstaller-packaged PyTorch application does. Their
+   redistribution is governed by NVIDIA's CUDA EULA (Attachment A) and cuDNN
+   SLA rather than by this project's licence; `Licenses/NVIDIA-CUDA-NOTICE.txt`
+   lists the exact files and points at both. This is recorded as knowledge, not
+   as legal clearance - if this project is ever distributed commercially or
+   rebundled outside a PyTorch wheel, confirm the current NVIDIA terms first.
+   The CPU package is unaffected.
+
+6. **AGPL corresponding source.** Every binary release must be traceable to
    the exact public commit that produced it. Tag each release and keep the
    repository public for as long as the binaries are distributed.
 
@@ -112,7 +123,7 @@ redistribution or commercial rights from the Demucs source-code licence.
 | einops 0.8.2 (CPU) / 0.8.1 (CUDA) | Python source copied into the sidecar and/or embedded worker | MIT. Preserve the exact installed distribution licence. |
 | julius 0.2.7 | Python source copied into the sidecar | MIT. Preserve `JULIUS-LICENSE.txt`. |
 | imageio-ffmpeg 0.6.0 | macOS build-time provider for the bundled FFmpeg executable | BSD-2-Clause for the Python project; the included FFmpeg binary retains FFmpeg's separate terms. Preserve both notices. |
-| NVIDIA CUDA runtime/driver | Windows PyTorch CUDA libraries are embedded; the NVIDIA display driver is supplied by the user's system | Audit the exact PyTorch wheel's bundled NVIDIA components and notices before publication. The portable package does not install a driver or a separate CUDA toolkit. |
+| NVIDIA CUDA / cuDNN redistributables | ~2.4 GiB of NVIDIA libraries (cuBLAS, cuDNN, cuFFT, cuSPARSE, cuSOLVER, cuRAND, NVRTC) ship inside the CUDA runtime package, taken unmodified from the official `torch 2.8.0+cu126` wheel | Covered by NVIDIA's own terms, not by this project's AGPL or PyTorch's BSD licence: the [CUDA Toolkit EULA](https://docs.nvidia.com/cuda/eula/index.html) (redistribution under Attachment A) and the [cuDNN SLA](https://docs.nvidia.com/deeplearning/cudnn/sla/index.html). The exact file list ships as `Licenses/NVIDIA-CUDA-NOTICE.txt`. The CPU package contains none of them, and neither package installs a driver or a separate CUDA toolkit. |
 | Apple Metal / MPS | Uses macOS system frameworks; no Apple framework is copied | Available only when the host OS and Apple Silicon hardware support it. |
 | FFmpeg | A separate executable is bundled for media decode and MP4 muxing | The Windows packages ship an LGPLv3 shared build (`--enable-version3`, no `--enable-gpl`/`--enable-nonfree`); see "LGPL components". The macOS builder still captures the shipped imageio-ffmpeg binary's own `-L` output and that binary must be audited separately before a macOS binary release. Preserve `ffmpeg -L` output, re-audit the build configuration whenever the binary is replaced, and review codec-patent requirements. See [FFmpeg legal/compliance page](https://ffmpeg.org/legal.html). |
 

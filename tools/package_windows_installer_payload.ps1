@@ -105,7 +105,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 $staticNotices = @(
     @{ Source = (Join-Path $projectRoot 'third_party\JUCE\LICENSE.md'); Name = 'JUCE-LICENSE.md' },
-    @{ Source = (Join-Path $projectRoot 'third_party\demucs\LICENSE'); Name = 'DEMUCS-LICENSE.txt' }
+    @{ Source = (Join-Path $projectRoot 'third_party\demucs\LICENSE'); Name = 'DEMUCS-LICENSE.txt' },
+    @{ Source = (Join-Path $projectRoot 'packaging\NVIDIA-CUDA-NOTICE.txt'); Name = 'NVIDIA-CUDA-NOTICE.txt' }
 )
 foreach ($notice in $staticNotices) {
     if (-not (Test-Path -LiteralPath $notice.Source -PathType Leaf)) {

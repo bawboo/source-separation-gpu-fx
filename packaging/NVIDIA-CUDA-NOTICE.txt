@@ -1,0 +1,44 @@
+NVIDIA components redistributed inside the CUDA runtime package
+==============================================================
+
+These files come from the official PyTorch CUDA wheel
+(torch 2.8.0+cu126) exactly as published on pypi.org; none of them is
+modified, renamed, or recompiled by this project. They are NVIDIA CUDA
+and cuDNN redistributable libraries, covered by NVIDIA's own terms, not
+by this project's AGPL licence and not by PyTorch's BSD licence.
+
+Applicable terms:
+  CUDA Toolkit EULA   https://docs.nvidia.com/cuda/eula/index.html
+                      (redistribution is governed by Attachment A)
+  cuDNN SLA           https://docs.nvidia.com/deeplearning/cudnn/sla/index.html
+
+By installing or using the GPU runtime you also accept those terms.
+The CPU runtime contains none of these files.
+
+Files (22, 2.46 GiB):
+
+  cublas64_12.dll                                 100.0 MiB
+  cublasLt64_12.dll                               507.2 MiB
+  cudart64_12.dll                                   0.5 MiB
+  cudnn64_9.dll                                     0.3 MiB
+  cudnn_adv64_9.dll                               269.4 MiB
+  cudnn_cnn64_9.dll                                 4.4 MiB
+  cudnn_engines_precompiled64_9.dll               490.1 MiB
+  cudnn_engines_runtime_compiled64_9.dll           19.3 MiB
+  cudnn_graph64_9.dll                               2.3 MiB
+  cudnn_heuristic64_9.dll                          54.2 MiB
+  cudnn_ops64_9.dll                               120.6 MiB
+  cufft64_11.dll                                  264.5 MiB
+  cufftw64_11.dll                                   0.2 MiB
+  cupti64_2024.3.2.dll                              4.5 MiB
+  curand64_10.dll                                  60.3 MiB
+  cusolver64_11.dll                               131.9 MiB
+  cusolverMg64_11.dll                              80.7 MiB
+  cusparse64_12.dll                               274.3 MiB
+  nvJitLink_120_0.dll                              37.4 MiB
+  nvrtc-builtins64_126.dll                          5.1 MiB
+  nvrtc64_120_0.alt.dll                            43.8 MiB
+  nvrtc64_120_0.dll                                43.7 MiB
+
+NVIDIA and CUDA are trademarks of NVIDIA Corporation. This project is
+not affiliated with, endorsed by, or sponsored by NVIDIA.
