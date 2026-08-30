@@ -1,6 +1,6 @@
 # Music SSP FX - third-party notices and release gates
 
-Audit date: 2026-07-21
+Audit date: 2026-08-30
 
 This document records the dependencies used by the current local engineering
 build. It is an engineering compliance inventory, not legal advice.
@@ -25,16 +25,28 @@ build. It is an engineering compliance inventory, not legal advice.
    [upstream issue #327](https://github.com/facebookresearch/demucs/issues/327)
    and the [MUSDB18 dataset terms](https://sigsep.github.io/datasets/musdb.html)
    for the Demucs side.
-3. **FFmpeg corresponding source/build information remains a binary-release
-   gate.** The selected Windows FFmpeg build reports GPLv3-enabled options. Before
-   publishing runtime ZIPs, identify its exact upstream source/version and satisfy
-   the corresponding-source and notice requirements, or remove FFmpeg from the
-   distributed runtime and require a separately installed copy.
-4. **Publisher metadata is still generic.** The product name is now
-   `Music SSP FX`; replace the placeholder support contact before a polished
-   public binary release. Code signing is strongly recommended for Windows but
-   is not required for a source-only repo, and is deliberately deferred for the
+3. **FFmpeg switched to an LGPL build - gate closed for the Windows
+   packages.** The app only ever shells out to FFmpeg to decode an input file
+   into PCM (`-vn -ac 2 -ar 44100 -c:a pcm_f32le`), so no GPL-only encoder is
+   needed. The Windows packages therefore ship
+   `ffmpeg-master-latest-win64-lgpl-shared` from
+   [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds), whose
+   configuration carries `--enable-version3` and neither `--enable-gpl` nor
+   `--enable-nonfree`. The exact version and the source archive's SHA-256 are
+   recorded in `build/ffmpeg-lgpl/BUILD_INFO.txt` and shipped as
+   `Licenses/FFMPEG-BUILD_INFO.txt`. The remaining LGPL duties are covered
+   under "LGPL components" below. Re-audit whenever the binary is replaced;
+   a GPL-configured build would reopen this gate.
+4. **Publisher metadata.** The installer declares `AppPublisher`,
+   `AppPublisherURL`, and `AppSupportURL` pointing at the public repository,
+   which also serves as the AGPL corresponding-source location for the binary
+   releases. Code signing is strongly recommended for Windows but is not
+   required for a source-only repo, and is deliberately deferred for the
    current releases - unsigned builds show a SmartScreen warning on first run.
+
+5. **AGPL corresponding source.** Every binary release must be traceable to
+   the exact public commit that produced it. Tag each release and keep the
+   repository public for as long as the binaries are distributed.
 
 ## Open source is not automatically research use
 
@@ -89,19 +101,38 @@ redistribution or commercial rights from the Demucs source-code licence.
 | MelBand RoFormer inference package (`mel-band-roformer-infer`) | Python package embedded in the shared frozen worker | MIT. See [openmirlab/melband-roformer-infer](https://github.com/openmirlab/melband-roformer-infer). Preserve the exact distribution licence file. |
 | MelBand RoFormer checkpoints (99 models) | Never shipped. Downloaded on first use from each model's own pinned URL and verified against a pinned SHA-256; rolling per-user cache | Terms vary per checkpoint author. The project distributes none of them, so no redistribution licence is exercised. Do not add any checkpoint to a Release asset. |
 | librosa / soundfile / ml_collections / beartype / rotary-embedding-torch | Embedded worker dependencies pulled in by the RoFormer back-end | ISC (librosa), BSD-3-Clause (soundfile, plus libsndfile's LGPL notice), Apache-2.0 (ml_collections), MIT (beartype, rotary-embedding-torch). Preserve each exact distribution licence file. |
+| scipy / numba / llvmlite / audioread / pooch / joblib / lazy_loader / msgpack / decorator / platformdirs / requests / urllib3 / certifi / charset-normalizer / idna | Transitive dependencies of librosa, embedded in the frozen worker | BSD-3-Clause, BSD-2-Clause, MIT, MPL-2.0 (certifi), Apache-2.0 (requests). All permissive and AGPL-compatible. The exact distribution licence files are collected automatically by `tools/collect_runtime_licenses.py`. |
 | Demucs pretrained weights | Not included in Git, Setup, or runtime ZIPs; downloaded by the installed app/installer from the pinned official URL | **Resolved by never redistributing (see gate 2).** Do not add the weights to repository or Release assets without separate clearance. See [upstream issue #327](https://github.com/facebookresearch/demucs/issues/327), the [training/data notes](https://github.com/facebookresearch/demucs/blob/main/docs/training.md), and the [MUSDB18 dataset terms](https://sigsep.github.io/datasets/musdb.html). |
-| CPython 3.10/3.11 | Embedded in the CPU/CUDA PyInstaller workers | PSF licence. Preserve the Python licence from the exact interpreter used to freeze each worker. |
-| PyInstaller 6.16.0 | Freezes the worker and Python runtime into a portable onedir application | GPLv2-or-later with the upstream exception for distributing bundled applications. Preserve the exact PyInstaller licensing terms; the exception does not change licences of bundled dependencies. |
-| PyTorch 2.13.0+cpu / 2.1.2+cu121 | Embedded in the Windows CPU/CUDA workers | BSD-style licence plus bundled third-party notices. Preserve the full licence/notice file from each exact wheel. |
-| NumPy 1.26.4 | Embedded worker dependency | BSD-3-Clause plus its bundled third-party notices. Preserve the exact distribution licence file. |
-| PyYAML 6.0.1 | Embedded worker dependency | MIT. Preserve the exact distribution licence file. |
-| tqdm 4.65.0 | Embedded worker dependency | MIT/MPL dual-licensing terms. Preserve the exact distribution licence file. |
-| einops 0.7.0 (macOS) / 0.8.2 (current Windows build) | Python source copied into the sidecar and/or embedded worker | MIT. Preserve the exact installed distribution licence. |
-| julius 0.2.8 | Python source copied into the sidecar | MIT. Preserve `JULIUS-LICENSE.txt`. |
+| CPython 3.11.16 (CPU) / 3.13.5 (CUDA) | Embedded in the CPU/CUDA PyInstaller workers | PSF licence. Preserve the Python licence from the exact interpreter used to freeze each worker. |
+| PyInstaller 6.22.2 | Freezes the worker and Python runtime into a portable onedir application | GPLv2-or-later with the upstream exception for distributing bundled applications. Preserve the exact PyInstaller licensing terms; the exception does not change licences of bundled dependencies. |
+| PyTorch 2.13.0+cpu / 2.8.0+cu126 | Embedded in the Windows CPU/CUDA workers | BSD-style licence plus bundled third-party notices. Preserve the full licence/notice file from each exact wheel. |
+| NumPy 2.4.6 (CPU) / 2.1.3 (CUDA) | Embedded worker dependency | BSD-3-Clause plus its bundled third-party notices. Preserve the exact distribution licence file. |
+| PyYAML 6.0.2 | Embedded worker dependency | MIT. Preserve the exact distribution licence file. |
+| tqdm 4.67.1 | Embedded worker dependency | MIT/MPL dual-licensing terms. Preserve the exact distribution licence file. |
+| einops 0.8.2 (CPU) / 0.8.1 (CUDA) | Python source copied into the sidecar and/or embedded worker | MIT. Preserve the exact installed distribution licence. |
+| julius 0.2.7 | Python source copied into the sidecar | MIT. Preserve `JULIUS-LICENSE.txt`. |
 | imageio-ffmpeg 0.6.0 | macOS build-time provider for the bundled FFmpeg executable | BSD-2-Clause for the Python project; the included FFmpeg binary retains FFmpeg's separate terms. Preserve both notices. |
 | NVIDIA CUDA runtime/driver | Windows PyTorch CUDA libraries are embedded; the NVIDIA display driver is supplied by the user's system | Audit the exact PyTorch wheel's bundled NVIDIA components and notices before publication. The portable package does not install a driver or a separate CUDA toolkit. |
 | Apple Metal / MPS | Uses macOS system frameworks; no Apple framework is copied | Available only when the host OS and Apple Silicon hardware support it. |
-| FFmpeg | A separate executable is bundled for media decode and MP4 muxing | Preserve `ffmpeg -L` output and audit the exact binary's build configuration. The current Windows test binary reports `--enable-gpl --enable-version3`; do not describe it as LGPL-only. The macOS builder captures the shipped imageio-ffmpeg binary's own `-L` output. Follow the corresponding-source and notice obligations of each exact binary and review codec-patent requirements. See [FFmpeg legal/compliance page](https://ffmpeg.org/legal.html). |
+| FFmpeg | A separate executable is bundled for media decode and MP4 muxing | The Windows packages ship an LGPLv3 shared build (`--enable-version3`, no `--enable-gpl`/`--enable-nonfree`); see "LGPL components". The macOS builder still captures the shipped imageio-ffmpeg binary's own `-L` output and that binary must be audited separately before a macOS binary release. Preserve `ffmpeg -L` output, re-audit the build configuration whenever the binary is replaced, and review codec-patent requirements. See [FFmpeg legal/compliance page](https://ffmpeg.org/legal.html). |
+
+## LGPL components
+
+Three shipped components are LGPL rather than permissive. All three are loaded
+dynamically (a DLL, a `.pyd`, and a separate executable), so a user can replace
+any of them with their own build - which is what the LGPL requires - and none
+of them causes the application's own AGPL terms to change.
+
+| Component | Form in the package | Licence | Source |
+|---|---|---|---|
+| FFmpeg (LGPL shared build) | `Resources/sidecar/Runtime/ffmpeg/bin/*.dll` plus `ffmpeg.exe` | LGPLv3 (`--enable-version3`, no `--enable-gpl`) | [FFmpeg](https://ffmpeg.org/download.html); build recipe at [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds). Exact version and archive hash in `Licenses/FFMPEG-BUILD_INFO.txt`. |
+| libsndfile (via `soundfile`) | `_internal/_soundfile_data/libsndfile_x64.dll` | LGPL-2.1-or-later | [libsndfile](https://github.com/libsndfile/libsndfile) |
+| libsoxr (via `soxr`) | `_internal/soxr/soxr_ext.pyd` | LGPL-2.1-or-later | [libsoxr](https://sourceforge.net/projects/soxr/); Python wrapper at [python-soxr](https://github.com/dofuuz/python-soxr) |
+
+To satisfy the LGPL when distributing the binaries, keep the notice files in
+`Licenses/`, keep this table's upstream links accurate for the exact versions
+shipped, and do not statically link or otherwise prevent replacement of these
+three components.
 
 ## FFmpeg boundary in the portable builds
 
@@ -128,12 +159,13 @@ H.264 encoder.
 The `Licenses` folder created by the packaging scripts contains:
 
 - this notice (`THIRD_PARTY_NOTICES.md`);
-- `JUCE-LICENSE.md`;
-- `DEMUCS-LICENSE.txt`;
-- licences/notices for the exact bundled Python, PyTorch, NumPy, PyYAML, tqdm,
-  einops, julius, and PyInstaller distributions; and
-- the exact bundled FFmpeg binary's licence output (plus imageio-ffmpeg's
-  licence in the macOS package).
+- `JUCE-LICENSE.md` and `DEMUCS-LICENSE.txt`;
+- `python-packages/<name>-<version>/` for every Python distribution frozen into
+  the runtime, collected by `tools/collect_runtime_licenses.py` from the very
+  interpreter that froze it, so the versions cannot drift from the shipped
+  wheels the way a hand-maintained list does; and
+- `FFMPEG-LICENSE.txt` plus `FFMPEG-BUILD_INFO.txt` for the exact bundled
+  FFmpeg binary (plus imageio-ffmpeg's licence in the macOS package).
 
 The Windows and macOS filenames differ slightly because the Windows packager
 uses fixed uppercase names while the macOS builder derives names from Python

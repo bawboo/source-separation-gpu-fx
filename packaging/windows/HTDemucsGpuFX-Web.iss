@@ -38,6 +38,10 @@ AppId={{E73B2AB8-B8D1-4AD7-B2B9-1BDFEC57E77C}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Music SSP FX contributors
+; Also the AGPL corresponding-source location for these binaries.
+AppPublisherURL=https://github.com/bawboo/source-separation-gpu-fx
+AppSupportURL=https://github.com/bawboo/source-separation-gpu-fx/issues
+AppUpdatesURL=https://github.com/bawboo/source-separation-gpu-fx/releases
 DefaultDirName={localappdata}\Programs\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes

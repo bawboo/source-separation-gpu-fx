@@ -9,7 +9,7 @@ Project: HTDemucs GPU FX (JUCE Windows standalone) — goal: integrate all 99
 MelBand RoFormer source-separation models (repo:
 https://github.com/openmirlab/melband-roformer-infer) per `.loop/LOOP_PLAN.md`.
 Windows notes: use `python` (anaconda), never bare `python3`; conda is at
-`C:\Users\<user>\anaconda3\Scripts\conda.exe`; builds go through
+the full path to `conda.exe` in the local Anaconda install; builds go through
 `.loop\checks\*.cmd` (VsDevCmd inside). 回報與 journal 敘述用繁體中文；JSON keys、
 status 值與 LOOP STATUS 行保持英文。
 

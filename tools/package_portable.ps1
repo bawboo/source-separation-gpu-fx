@@ -2,7 +2,10 @@
     [ValidateSet('cuda', 'cpu')]
     [string]$Flavor = 'cuda',
     [string]$Version = '0.0.2',
-    [string]$Ffmpeg = 'C:\ffmpeg-master\bin\ffmpeg.exe',
+    # The app only shells out to FFmpeg to decode into PCM, so the LGPL build
+    # covers every use and keeps binary releases clear of the GPL
+    # corresponding-source obligation. See build/ffmpeg-lgpl/BUILD_INFO.txt.
+    [string]$Ffmpeg = '',
     # GitHub caps a single release asset at 2 GiB, so a package larger than this
     # is split into volumes that all extract into the same folder.
     [long]$MaxArchiveBytes = 1782579200
@@ -14,6 +17,9 @@
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+if ([string]::IsNullOrWhiteSpace($Ffmpeg)) {
+    $Ffmpeg = Join-Path $projectRoot 'build\ffmpeg-lgpl\bin\ffmpeg.exe'
+}
 $payloadRoot = Join-Path $projectRoot 'build\windows-web\payload'
 $runtimeDist = if ($Flavor -eq 'cuda') {
     Join-Path $projectRoot 'build\standalone-runtime-dist\htdemucs-worker'

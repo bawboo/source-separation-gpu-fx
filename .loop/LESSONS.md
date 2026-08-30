@@ -1,7 +1,7 @@
 # LESSONS — append-only signs; every iteration must obey all of these
 
 - SIGN (wiring): cmake 不在 PATH——建置一律走 `.loop\checks\cheap.cmd`／`full.cmd`（內含 VsDevCmd），或先 call VsDevCmd.bat。CMake target 名稱先查 CMakeLists.txt。
-- SIGN (wiring): conda 完整路徑 `C:\Users\<user>\anaconda3\Scripts\conda.exe`；anaconda base python=3.13.5 torch 2.8.0+cu126（cuda 可用）。套件只裝進 `htfx-roformer` env。
+- SIGN (wiring): conda 完整路徑 `conda.exe` 的完整路徑；anaconda base python=3.13.5 torch 2.8.0+cu126（cuda 可用）。套件只裝進 `htfx-roformer` env。
 - SIGN (wiring): ffmpeg=`C:\ffmpeg-master\bin\ffmpeg.exe`（media_io_smoke 硬編碼此路徑）；測試 fixtures 在 `C:\CodexProjects\SourceSeparation_GPU_FX\verify\fixtures\`（test_48k_2s.wav）。
 - SIGN (wiring): RoFormer 模型快取固定 `C:\CodexProjects\SourceSeparation_GPU_FX\verify\roformer-cache\`，同時最多 3 個權重，驗證完即刪最舊的；絕不下載到 C: 其他位置（磁碟只剩約 55 GB）。
 - SIGN (wiring): 所有 `.loop/` JSON 讀寫必須 `encoding="utf-8"`；state/record 寫入一律 tmp+rename 原子操作。
@@ -16,7 +16,7 @@
 - SIGN (iter 12): 任何新腳本若直接 import 並呼叫 `worker/roformer_worker.py` 的 `separate_file()`（繞過它的 CLI `main()`），都必須自己先呼叫 `configure_utf8_stream(sys.stdout)` 與 `configure_utf8_stream(sys.stderr)`（從 `roformer_worker` import 同一組函式），否則會在 Windows cp950 主控台上重現 iter 3 已修過的 `UnicodeEncodeError`（upstream 進度輸出含 emoji，例如 U+1F504 🔄）。這個初始化不是 CLI 專屬裝飾，是每個呼叫 `separate_file()` 的路徑都要做的前置條件。
 - SIGN (iter 13): 快取一律用絕對路徑 `C:\CodexProjects\SourceSeparation_GPU_FX\verify\roformer-cache\`——絕不在移交樹內建立相對 `verify/`（會觸發 scope 違規鎖機）。移交樹內殘留的 `verify/` 目錄應在下次 iteration 開頭清掉（此為快取例外，可刪）。
 - SIGN (iter 13): 一個 iteration 絕不可在背景工作未完成時結束 turn——同步等待或縮小批次（例如每輪 2–3 個 audited 模型）；提前結束＝沒有 record、沒有 commit、留下孤兒程序。
-- SIGN (iter 13): 呼叫 `worker/roformer_worker.py` 相關腳本（含 `tools/roformer_batch_verify.py`）一律直接用 `htfx-roformer` env 的 python.exe 絕對路徑（`C:\Users\<user>\anaconda3\envs\htfx-roformer\python.exe`）執行，不要包一層 `conda run -n htfx-roformer python ...`——即使子行程自己已呼叫 `configure_utf8_stream` 把自己的 stdout/stderr 轉成 utf-8，`conda run` 包裝器仍會用**它自己**綁在 Windows cp950 主控台的 `sys.stdout` 去 `print()` 捕捉到的子行程輸出，一樣對 emoji 拋 `UnicodeEncodeError`；這是 `conda run` 轉印層本身的問題，子行程端無法修。
+- SIGN (iter 13): 呼叫 `worker/roformer_worker.py` 相關腳本（含 `tools/roformer_batch_verify.py`）一律直接用 `htfx-roformer` env 的 python.exe 絕對路徑（該 env 的 `python.exe` 絕對路徑）執行，不要包一層 `conda run -n htfx-roformer python ...`——即使子行程自己已呼叫 `configure_utf8_stream` 把自己的 stdout/stderr 轉成 utf-8，`conda run` 包裝器仍會用**它自己**綁在 Windows cp950 主控台的 `sys.stdout` 去 `print()` 捕捉到的子行程輸出，一樣對 emoji 拋 `UnicodeEncodeError`；這是 `conda run` 轉印層本身的問題，子行程端無法修。
 - SIGN (iter 13): `tests/ui_configuration_smoke.cpp` 的 RoFormer C++ 路由測試硬編碼選用 `melband-roformer-kim-vocals`，且 `plugin/PluginProcessor.cpp::beginSeparation()` 只檢查 `isModelInstalled()`、不會自動下載未安裝模型——若模型不在 `verify/roformer-cache/` 就直接回傳 false（"Model ... is not installed"）。快取是共用的滾動快取（`max_cached=3`，LRU by mtime），任何一輪批次驗證其他 M-item 模型都可能把 `melband-roformer-kim-vocals` 擠出快取。任何批次處理 M-item 後、執行 cheap/full tier 前，必須確認 `melband-roformer-kim-vocals` 仍在快取內（不在則用 `python worker/roformer_cache.py --model melband-roformer-kim-vocals --cache-dir <絕對路徑>` 重新觸碰，使其成為最近使用而不被下一輪擠出）。
 - SIGN (iter 14): headless `-p` 模式**沒有**背景喚醒機制——Bash run_in_background、Monitor、`&`、「等背景工作完成」在 iteration 內一律絕對禁止；結束訊息＝一切孤兒化。所有下載/驗證/建置必須在本輪內同步完成，批次太大就縮小（每輪 2–4 個 audited）。
 - SIGN (iter 14): 經 Bash 工具傳遞 Windows 絕對路徑必須用單引號包住或改用正斜線——未加引號的反斜線會被 MSYS 吃掉，在 repo 內產生畸形目錄（例：`CodexProjectsSourceSeparation_GPU_FXverifyroformer-cache/`），觸發 scope 鎖機。iter-14 的畸形目錄已由 operator 搬移隔離至 `C:\CodexProjects\SourceSeparation_GPU_FX\verify\quarantine\iter14-mangled-cache\`（未刪除）。

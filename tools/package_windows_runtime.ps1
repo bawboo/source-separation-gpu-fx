@@ -3,11 +3,17 @@
     [ValidateSet('cuda', 'cpu')]
     [string]$Flavor,
     [string]$Version = '0.1.0',
-    [string]$Ffmpeg = 'C:\ffmpeg-master\bin\ffmpeg.exe'
+    # The app only shells out to FFmpeg to decode into PCM, so the LGPL build
+    # covers every use and keeps binary releases clear of the GPL
+    # corresponding-source obligation. See build/ffmpeg-lgpl/BUILD_INFO.txt.
+    [string]$Ffmpeg = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+if ([string]::IsNullOrWhiteSpace($Ffmpeg)) {
+    $Ffmpeg = Join-Path $projectRoot 'build\ffmpeg-lgpl\bin\ffmpeg.exe'
+}
 $buildRoot = Join-Path $projectRoot 'build\windows-web'
 $distRoot = Join-Path $projectRoot 'dist\windows-web'
 $runtimeBuildName = if ($Flavor -eq 'cuda') {

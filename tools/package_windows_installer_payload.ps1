@@ -3,11 +3,17 @@
     [string]$BuildDirectory = '',
     # python.exe of the environment used to freeze the runtime being shipped.
     [string]$LicenseCollectorPython = '',
-    [string]$Ffmpeg = 'C:\ffmpeg-master\bin\ffmpeg.exe'
+    # The app only shells out to FFmpeg to decode into PCM, so the LGPL build
+    # covers every use and keeps binary releases clear of the GPL
+    # corresponding-source obligation. See build/ffmpeg-lgpl/BUILD_INFO.txt.
+    [string]$Ffmpeg = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+if ([string]::IsNullOrWhiteSpace($Ffmpeg)) {
+    $Ffmpeg = Join-Path $projectRoot 'build\ffmpeg-lgpl\bin\ffmpeg.exe'
+}
 if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
     $BuildDirectory = Join-Path $projectRoot 'build\windows-installed'
 }
@@ -108,12 +114,17 @@ foreach ($notice in $staticNotices) {
     Copy-Item -LiteralPath $notice.Source `
         -Destination (Join-Path $licensesDestination $notice.Name) -Force
 }
-$ffmpegLicense = Join-Path (Split-Path -Parent (Split-Path -Parent $Ffmpeg)) 'LICENSE.txt'
-if (Test-Path -LiteralPath $ffmpegLicense -PathType Leaf) {
-    Copy-Item -LiteralPath $ffmpegLicense `
-        -Destination (Join-Path $licensesDestination 'FFMPEG-LICENSE.txt') -Force
-} else {
-    throw "FFmpeg licence not found next to the bundled binary: $ffmpegLicense"
+# The LGPL requires naming where the exact binary came from, so its licence and
+# build record both ship next to the notices.
+$ffmpegRoot = Split-Path -Parent (Split-Path -Parent $Ffmpeg)
+foreach ($pair in @(
+    @{ File = 'LICENSE.txt';    Name = 'FFMPEG-LICENSE.txt' },
+    @{ File = 'BUILD_INFO.txt'; Name = 'FFMPEG-BUILD_INFO.txt' })) {
+    $source = Join-Path $ffmpegRoot $pair.File
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "FFmpeg $($pair.File) not found next to the bundled binary: $source"
+    }
+    Copy-Item -LiteralPath $source -Destination (Join-Path $licensesDestination $pair.Name) -Force
 }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'THIRD_PARTY_NOTICES.md') `
     -Destination (Join-Path $licensesDestination 'THIRD_PARTY_NOTICES.md') -Force

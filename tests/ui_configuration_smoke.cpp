@@ -130,7 +130,7 @@ int run() {
     const auto verifyRoot = repository.getParentDirectory().getChildFile("verify");
     const auto fixture = verifyRoot.getChildFile("fixtures").getChildFile("test_48k_2s.wav");
     const auto roformerPython = juce::File{
-        R"(C:\Users\<user>\anaconda3\envs\htfx-roformer\python.exe)"};
+        juce::SystemStats::getEnvironmentVariable("HTFX_PYTHON", {})};
     const auto roformerWorker = repository.getChildFile("worker").getChildFile("roformer_worker.py");
     const auto roformerCache = verifyRoot.getChildFile("roformer-cache");
     const auto roformerOutput = verifyRoot.getChildFile("output").getChildFile("roformer-cpp-integration");
