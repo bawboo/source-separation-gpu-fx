@@ -2,7 +2,7 @@
 set -u
 
 portable_root="$(cd "$(dirname "$0")" && pwd)"
-app="$portable_root/HTDemucs GPU FX.app"
+app="$portable_root/Music SSP FX.app"
 sidecar="$app/Contents/Resources/sidecar"
 worker="$sidecar/Runtime/htdemucs-worker/htdemucs-worker"
 ffmpeg="$sidecar/Runtime/ffmpeg/bin/ffmpeg"
@@ -17,7 +17,7 @@ backend="cpu"
 [[ "$architecture" == "arm64" ]] && backend="mps"
 
 exec > >(tee "$log") 2>&1
-echo "HTDemucs GPU FX portable verification"
+echo "Music SSP FX portable verification"
 echo "Package: $architecture"
 echo "Host: $(uname -m), macOS $(sw_vers -productVersion)"
 rm -f "$result"
@@ -63,7 +63,7 @@ for matrix_case in "${matrix_cases[@]}"; do
 done
 
 clean_home="$(mktemp -d "${TMPDIR:-/tmp}/htfx-verify.XXXXXX")"
-app_binary="$app/Contents/MacOS/HTDemucs GPU FX"
+app_binary="$app/Contents/MacOS/Music SSP FX"
 HOME="$clean_home" TMPDIR="$clean_home" HTFX_REQUIRE_BUNDLED_SIDECAR=1 \
     HTFX_USE_FAKE_WORKER=1 \
     "$app_binary" >/dev/null 2>&1 &

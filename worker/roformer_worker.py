@@ -123,6 +123,18 @@ def _ensure_model_cached(model_name: str, models_dir: Path, manifest_path: Path,
         raise RuntimeError(f"RoFormer cache verification failed for {model_name}: {exc}") from exc
 
 
+def _default_manifest() -> Path:
+    """Locate the model manifest for both the source tree and the frozen build.
+
+    Frozen, this module lives inside the PyInstaller bundle, so ``__file__`` no
+    longer points anywhere useful; the manifest ships in the sidecar next to the
+    runtime directory instead.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parents[2] / "models" / "roformer-manifest.json"
+    return Path(__file__).resolve().parents[1] / "assets" / "models" / "roformer-manifest.json"
+
+
 def main() -> int:
     configure_utf8_stream(sys.stdout)
     configure_utf8_stream(sys.stderr)
@@ -132,11 +144,7 @@ def main() -> int:
     parser.add_argument("--model", default="melband-roformer-kim-vocals")
     parser.add_argument("--models-dir", type=Path, required=True)
     parser.add_argument("--device", default="auto")
-    parser.add_argument(
-        "--manifest",
-        type=Path,
-        default=Path(__file__).resolve().parents[1] / "assets" / "models" / "roformer-manifest.json",
-    )
+    parser.add_argument("--manifest", type=Path, default=_default_manifest())
     parser.add_argument("--max-cached", type=int, default=3)
     args = parser.parse_args()
 

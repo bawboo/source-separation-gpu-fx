@@ -29,7 +29,7 @@ else
     deployment_target="10.15"
     expected_backend="cpu"
 fi
-portable_root="$dist_root/HTDemucs GPU FX Portable $platform_name"
+portable_root="$dist_root/Music SSP FX Portable $platform_name"
 zip_path="$dist_root/HTDemucs_GPU_FX_Standalone_${architecture}.zip"
 
 bootstrap_command=("$bootstrap_python")
@@ -207,15 +207,15 @@ cmake -S "$project_root" -B "$build_root/plugin" -G Xcode \
 cmake --build "$build_root/plugin" --config Release \
     --target HTDemucsGpuFX_Standalone htdemucs_worker_registry_smoke
 
-app_source="$build_root/plugin/HTDemucsGpuFX_artefacts/Release/Standalone/HTDemucs GPU FX.app"
+app_source="$build_root/plugin/HTDemucsGpuFX_artefacts/Release/Standalone/Music SSP FX.app"
 [[ -d "$app_source" ]] || { echo "Standalone app was not created: $app_source" >&2; exit 7; }
 smoke_source="$(find "$build_root/plugin" -type f -name htdemucs_worker_registry_smoke -perm -111 -print -quit)"
 [[ -n "$smoke_source" ]] || { echo "Registry smoke executable was not created" >&2; exit 7; }
 
 case "$portable_root" in "$dist_root"/*) rm -rf "$portable_root" ;; *) echo "Unsafe portable path" >&2; exit 8 ;; esac
 mkdir -p "$portable_root/PortableData" "$portable_root/Tools" "$portable_root/Licenses"
-/usr/bin/ditto "$app_source" "$portable_root/HTDemucs GPU FX.app"
-app="$portable_root/HTDemucs GPU FX.app"
+/usr/bin/ditto "$app_source" "$portable_root/Music SSP FX.app"
+app="$portable_root/Music SSP FX.app"
 sidecar="$app/Contents/Resources/sidecar"
 mkdir -p "$sidecar/Runtime/htdemucs-worker" "$sidecar/Runtime/ffmpeg/bin" \
     "$sidecar/worker" "$sidecar/src/htdemucs_gpu_fx" "$sidecar/models" \
@@ -241,8 +241,8 @@ cp "$ffmpeg_source" "$sidecar/Runtime/ffmpeg/bin/ffmpeg"
 chmod 755 "$sidecar/Runtime/ffmpeg/bin/ffmpeg" "$sidecar/Runtime/htdemucs-worker/htdemucs-worker"
 cp "$smoke_source" "$portable_root/Tools/htdemucs_worker_registry_smoke"
 chmod 755 "$portable_root/Tools/htdemucs_worker_registry_smoke"
-cp "$project_root/tools/macos/verify_portable.command" "$portable_root/Verify HTDemucs GPU FX.command"
-chmod 755 "$portable_root/Verify HTDemucs GPU FX.command"
+cp "$project_root/tools/macos/verify_portable.command" "$portable_root/Verify Music SSP FX.command"
+chmod 755 "$portable_root/Verify Music SSP FX.command"
 cp "$project_root/packaging/MACOS_PORTABLE_README.txt" "$portable_root/README.txt"
 printf '%s\n' "$architecture" > "$portable_root/package-architecture.txt"
 
@@ -288,7 +288,7 @@ cp "$python_license" "$portable_root/Licenses/PYTHON-LICENSE.txt"
 
 worker_packaged="$sidecar/Runtime/htdemucs-worker/htdemucs-worker"
 ffmpeg_packaged="$sidecar/Runtime/ffmpeg/bin/ffmpeg"
-app_executable="$app/Contents/MacOS/HTDemucs GPU FX"
+app_executable="$app/Contents/MacOS/Music SSP FX"
 for binary in "$worker_packaged" "$ffmpeg_packaged" "$app_executable"; do
     /usr/bin/lipo -archs "$binary" | tr ' ' '\n' | grep -qx "$architecture" || {
         echo "Wrong architecture in $binary: $(/usr/bin/lipo -archs "$binary")" >&2
@@ -338,7 +338,7 @@ export HTFX_MANIFEST_BACKEND="$expected_backend"
 import datetime, hashlib, json, os, pathlib, platform, torch
 
 root = pathlib.Path(os.environ['HTFX_MANIFEST_PORTABLE'])
-app = root / 'HTDemucs GPU FX.app'
+app = root / 'Music SSP FX.app'
 sidecar = app / 'Contents/Resources/sidecar'
 models = json.loads((sidecar / 'models/model-manifest.json').read_text())
 def sha(path):
@@ -361,15 +361,15 @@ for filename, expected in models['sha256'].items():
             f'model checksum mismatch for {filename}: {actual} != {expected}'
         )
 manifest = {
-    'product': 'HTDemucs GPU FX Portable Standalone',
+    'product': 'Music SSP FX Portable Standalone',
     'version': '0.1.0-local-test',
     'platform': os.environ['HTFX_MANIFEST_PLATFORM'],
     'architecture': os.environ['HTFX_MANIFEST_ARCH'],
-    'app_bundle': 'HTDemucs GPU FX.app',
-    'app_executable_sha256': sha(app / 'Contents/MacOS/HTDemucs GPU FX'),
-    'worker_runtime': 'HTDemucs GPU FX.app/Contents/Resources/sidecar/Runtime/htdemucs-worker/htdemucs-worker',
+    'app_bundle': 'Music SSP FX.app',
+    'app_executable_sha256': sha(app / 'Contents/MacOS/Music SSP FX'),
+    'worker_runtime': 'Music SSP FX.app/Contents/Resources/sidecar/Runtime/htdemucs-worker/htdemucs-worker',
     'worker_sha256': sha(sidecar / 'Runtime/htdemucs-worker/htdemucs-worker'),
-    'ffmpeg_runtime': 'HTDemucs GPU FX.app/Contents/Resources/sidecar/Runtime/ffmpeg/bin/ffmpeg',
+    'ffmpeg_runtime': 'Music SSP FX.app/Contents/Resources/sidecar/Runtime/ffmpeg/bin/ffmpeg',
     'ffmpeg_sha256': sha(sidecar / 'Runtime/ffmpeg/bin/ffmpeg'),
     'python_bundled': True,
     'external_python_required': False,
@@ -392,7 +392,7 @@ manifest = {
     'default_model': models['default_model'],
     'ffmpeg_bundled': True,
     'settings_directory': 'PortableData',
-    'sidecar_directory': 'HTDemucs GPU FX.app/Contents/Resources/sidecar',
+    'sidecar_directory': 'Music SSP FX.app/Contents/Resources/sidecar',
     'media_import': ['audio', 'video'],
     'media_export': ['32-bit-float-original-volume-stems', 'interface-mix-wav', 'video-with-replaced-mix-mp4'],
     'compute_backends': ['Auto', 'NVIDIA CUDA', 'CPU', 'Apple MPS'],
@@ -449,4 +449,4 @@ rm -f "$zip_path"
 /usr/bin/shasum -a 256 "$zip_path"
 echo "portable=$portable_root"
 echo "zip=$zip_path"
-echo "Run: $portable_root/Verify HTDemucs GPU FX.command"
+echo "Run: $portable_root/Verify Music SSP FX.command"

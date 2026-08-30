@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$source = 'C:\HTFXProject\dist\HTDemucs GPU FX Portable'
+$source = 'C:\HTFXProject\dist\Music SSP FX Portable'
 $destination = 'C:\HTFXPortable'
 $resultPath = 'C:\HTFXResults\sandbox-result.txt'
 
@@ -19,7 +19,7 @@ try {
 
     $worker = Join-Path $destination 'Resources\sidecar\Runtime\htdemucs-worker\htdemucs-worker.exe'
     $ffmpeg = Join-Path $destination 'Resources\sidecar\Runtime\ffmpeg\bin\ffmpeg.exe'
-    $app = Join-Path $destination 'HTDemucs GPU FX.exe'
+    $app = Join-Path $destination 'Music SSP FX.exe'
     $workerHelp = & $worker --help 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0 -or $workerHelp -notmatch '--models-dir') {
         throw 'Bundled worker failed to start in Windows Sandbox.'

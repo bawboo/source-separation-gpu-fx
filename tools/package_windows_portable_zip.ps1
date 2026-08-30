@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $distRoot = (Resolve-Path (Join-Path $projectRoot 'dist')).Path
-$portableRoot = Join-Path $distRoot 'HTDemucs GPU FX Portable'
+$portableRoot = Join-Path $distRoot 'Music SSP FX Portable'
 $destination = Join-Path $distRoot 'HTDemucs_GPU_FX_Standalone_SelfContained_Windows_x64.zip'
 $temporary = Join-Path $distRoot 'HTDemucs_GPU_FX_Standalone_SelfContained_Windows_x64.partial.zip'
 
@@ -31,7 +31,7 @@ if (Test-Path -LiteralPath $temporary) {
 Push-Location $distRoot
 try {
     & "$env:SystemRoot\System32\tar.exe" --format zip -c -f $temporary `
-        'HTDemucs GPU FX Portable'
+        'Music SSP FX Portable'
     if ($LASTEXITCODE -ne 0) {
         throw "tar.exe failed with exit code $LASTEXITCODE"
     }

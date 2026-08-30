@@ -11,14 +11,14 @@ $processPath = [Environment]::GetEnvironmentVariable('Path', 'Process')
 [Environment]::SetEnvironmentVariable('Path', $processPath, 'Process')
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrWhiteSpace($PortableRoot)) {
-    $PortableRoot = Join-Path $projectRoot 'dist\HTDemucs GPU FX Portable'
+    $PortableRoot = Join-Path $projectRoot 'dist\Music SSP FX Portable'
 }
 if ([string]::IsNullOrWhiteSpace($SmokeTest)) {
     $SmokeTest = Join-Path $projectRoot 'build\plugin\Release\htdemucs_standalone_portable_gpu_smoke.exe'
 }
 $PortableRoot = (Resolve-Path -LiteralPath $PortableRoot).Path
 $SmokeTest = (Resolve-Path -LiteralPath $SmokeTest).Path
-$portableExecutable = Join-Path $PortableRoot 'HTDemucs GPU FX.exe'
+$portableExecutable = Join-Path $PortableRoot 'Music SSP FX.exe'
 $workerExecutable = Join-Path $PortableRoot 'Resources\sidecar\Runtime\htdemucs-worker\htdemucs-worker.exe'
 $ffmpegExecutable = Join-Path $PortableRoot 'Resources\sidecar\Runtime\ffmpeg\bin\ffmpeg.exe'
 $smokeDestination = Join-Path $PortableRoot 'htdemucs_standalone_portable_gpu_smoke.exe'

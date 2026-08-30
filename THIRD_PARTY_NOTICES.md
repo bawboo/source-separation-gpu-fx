@@ -1,4 +1,4 @@
-# HTDemucs GPU FX - third-party notices and release gates
+# Music SSP FX - third-party notices and release gates
 
 Audit date: 2026-07-21
 
@@ -11,20 +11,30 @@ build. It is an engineering compliance inventory, not legal advice.
    under AGPL-3.0-or-later and includes the complete licence text. A publisher
    using a JUCE commercial licence may choose a different route only if they
    have the rights to relicense all project contributions.
-2. **Demucs weights are not redistributed.** The Demucs source
-   repository is MIT-licensed, but the repository does not expressly state that
-   the pretrained `.th` weight files are licensed under the same MIT terms. The
-   web installer therefore downloads the default weight directly from Meta's
-   official host after installation and verifies its pinned size and SHA-256.
-   Neither Git history nor the runtime Release assets contain `.th` weights.
+2. **Model weights are never redistributed - settled by design.** The Demucs
+   source repository is MIT-licensed, but it does not expressly state that the
+   pretrained `.th` weight files carry the same MIT terms, and the 99 MelBand
+   RoFormer checkpoints come from many separate authors with their own terms.
+   The project therefore *never* ships a weight file: every checkpoint is
+   fetched at first use from its own pinned upstream URL and verified against a
+   pinned SHA-256, into a per-user cache. Git history, the source archive, the
+   runtime ZIPs, and the Release assets contain no weights, so no
+   redistribution licence is required for any of them. This gate is closed for
+   as long as that rule holds; adding any weight to a distributed artefact
+   would reopen it and needs separate clearance per checkpoint. See
+   [upstream issue #327](https://github.com/facebookresearch/demucs/issues/327)
+   and the [MUSDB18 dataset terms](https://sigsep.github.io/datasets/musdb.html)
+   for the Demucs side.
 3. **FFmpeg corresponding source/build information remains a binary-release
    gate.** The selected Windows FFmpeg build reports GPLv3-enabled options. Before
    publishing runtime ZIPs, identify its exact upstream source/version and satisfy
    the corresponding-source and notice requirements, or remove FFmpeg from the
    distributed runtime and require a separately installed copy.
-4. **Publisher metadata is still generic.** Replace the placeholder publisher
-   name/support contact before a polished public binary release. Code signing is
-   strongly recommended for Windows but is not required for a source-only repo.
+4. **Publisher metadata is still generic.** The product name is now
+   `Music SSP FX`; replace the placeholder support contact before a polished
+   public binary release. Code signing is strongly recommended for Windows but
+   is not required for a source-only repo, and is deliberately deferred for the
+   current releases - unsigned builds show a SmartScreen warning on first run.
 
 ## Open source is not automatically research use
 
@@ -76,7 +86,10 @@ redistribution or commercial rights from the Demucs source-code licence.
 | JUCE 8 | Statically compiled into the Standalone and VST3 binaries | AGPLv3 or JUCE commercial licence; preserve the JUCE notice. See [JUCE licence](https://github.com/juce-framework/JUCE/blob/master/LICENSE.md). |
 | Steinberg VST3 SDK | VST3 interfaces compiled through JUCE | Current VST3 SDK is MIT-licensed. Preserve `VST3-SDK-LICENSE.txt`. Do not use Steinberg/VST logos or trademarks in a way that implies endorsement. See [VST3 SDK](https://github.com/steinbergmedia/vst3sdk). |
 | Demucs source | Python source copied into the sidecar | MIT. Preserve `DEMUCS-LICENSE.txt`. See [Demucs repository](https://github.com/facebookresearch/demucs). |
-| Demucs pretrained weights | Not included in Git, Setup, or runtime ZIPs; downloaded by the installed app/installer from the pinned official URL | **Unresolved redistribution status.** Do not add the weights to repository or Release assets without separate clearance. See [upstream issue #327](https://github.com/facebookresearch/demucs/issues/327), the [training/data notes](https://github.com/facebookresearch/demucs/blob/main/docs/training.md), and the [MUSDB18 dataset terms](https://sigsep.github.io/datasets/musdb.html). |
+| MelBand RoFormer inference package (`mel-band-roformer-infer`) | Python package embedded in the shared frozen worker | MIT. See [openmirlab/melband-roformer-infer](https://github.com/openmirlab/melband-roformer-infer). Preserve the exact distribution licence file. |
+| MelBand RoFormer checkpoints (99 models) | Never shipped. Downloaded on first use from each model's own pinned URL and verified against a pinned SHA-256; rolling per-user cache | Terms vary per checkpoint author. The project distributes none of them, so no redistribution licence is exercised. Do not add any checkpoint to a Release asset. |
+| librosa / soundfile / ml_collections / beartype / rotary-embedding-torch | Embedded worker dependencies pulled in by the RoFormer back-end | ISC (librosa), BSD-3-Clause (soundfile, plus libsndfile's LGPL notice), Apache-2.0 (ml_collections), MIT (beartype, rotary-embedding-torch). Preserve each exact distribution licence file. |
+| Demucs pretrained weights | Not included in Git, Setup, or runtime ZIPs; downloaded by the installed app/installer from the pinned official URL | **Resolved by never redistributing (see gate 2).** Do not add the weights to repository or Release assets without separate clearance. See [upstream issue #327](https://github.com/facebookresearch/demucs/issues/327), the [training/data notes](https://github.com/facebookresearch/demucs/blob/main/docs/training.md), and the [MUSDB18 dataset terms](https://sigsep.github.io/datasets/musdb.html). |
 | CPython 3.10/3.11 | Embedded in the CPU/CUDA PyInstaller workers | PSF licence. Preserve the Python licence from the exact interpreter used to freeze each worker. |
 | PyInstaller 6.16.0 | Freezes the worker and Python runtime into a portable onedir application | GPLv2-or-later with the upstream exception for distributing bundled applications. Preserve the exact PyInstaller licensing terms; the exception does not change licences of bundled dependencies. |
 | PyTorch 2.13.0+cpu / 2.1.2+cu121 | Embedded in the Windows CPU/CUDA workers | BSD-style licence plus bundled third-party notices. Preserve the full licence/notice file from each exact wheel. |

@@ -122,13 +122,13 @@ if(HTFX_BUILD_PLUGIN)
         set(HTFX_PLUGIN_FORMATS VST3 Standalone)
     endif()
     juce_add_plugin(HTDemucsGpuFX
-        COMPANY_NAME "HTFX Prototype"
+        COMPANY_NAME "Music SSP FX"
         COMPANY_WEBSITE "https://localhost.invalid"
-        BUNDLE_ID "local.htfx.htdemucsgpufx"
+        BUNDLE_ID "local.musicsspfx.app"
         PLUGIN_MANUFACTURER_CODE Htfx
         PLUGIN_CODE Htdm
         FORMATS ${HTFX_PLUGIN_FORMATS}
-        PRODUCT_NAME "HTDemucs GPU FX"
+        PRODUCT_NAME "Music SSP FX"
         DESCRIPTION "Full HTDemucs GPU streaming FX prototype"
         ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/htdemucs-gpu-fx-icon.png"
         ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/htdemucs-gpu-fx-icon.png"

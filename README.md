@@ -1,7 +1,23 @@
-# HTDemucs GPU FX
+# Music SSP FX — Music Source Separation FX
 
-以 JUCE 製作的音源分離應用（Windows standalone／VST3，macOS 支援建置中）。
-分離推論在獨立的 Python/PyTorch worker 中執行，不在 audio callback 內跑模型。
+**伴奏分離｜人聲分離｜樂器分離｜伴奏提取｜去人聲｜卡拉 OK 製作｜吉他分離｜
+去混響｜去噪｜AI 音源分離｜vocal removal｜instrumental extraction｜stem separation**
+
+以 JUCE 製作的 GPU 加速音源分離應用（Windows standalone／VST3，支援 macOS 建置）。
+把一首歌拆成人聲、伴奏、鼓、貝斯、吉他、鋼琴等音軌——做卡拉 OK 伴奏、抽人聲取樣、
+單獨練某個樂器、或把錄音裡的殘響與噪音去掉。分離推論在獨立的 Python/PyTorch
+worker 中執行，不在 audio callback 內跑模型。
+
+## 能做什麼
+
+| 需求 | 用哪個模式 |
+|---|---|
+| 做卡拉 OK 伴奏（去人聲） | 人聲分離 → 匯出伴奏，或卡拉 OK 模式 |
+| 抽出乾淨人聲（取樣、翻唱參考） | 人聲分離 → 匯出人聲 |
+| 只留吉他／單獨練樂器 | 吉他分離，或 6 軌分離 |
+| 完整拆成鼓／貝斯／其他／人聲 | 4 軌分離（HTDemucs） |
+| 再拆出吉他與鋼琴 | 6 軌分離（HTDemucs 6-stem） |
+| 錄音有殘響、噪音、觀眾聲 | 去混響／去噪／群聲分離 |
 
 支援兩個模型家族：
 
@@ -30,7 +46,7 @@
 | 系統 | Windows 10 22H2 以上（x64） | macOS 12 以上（Intel／Apple Silicon） |
 | 建置工具 | Visual Studio 2022 Build Tools（C++ x64） | Xcode Command Line Tools |
 | GPU | NVIDIA CUDA（選配，無則用 CPU） | Apple Metal (MPS)（選配） |
-| Python | 僅 RoFormer 需要（見下） | 同左 |
+| Python | **不需要**（發行包內建 runtime；僅從原始碼開發時需要） | 同左 |
 | FFmpeg | `C:\ffmpeg-master\bin\ffmpeg.exe` 或內建 sidecar | `brew install ffmpeg` 或內建 sidecar |
 
 ## 建置
@@ -41,7 +57,7 @@
 tools\build_windows_installed.cmd
 ```
 
-產物：`build\windows-installed\HTDemucsGpuFX_artefacts\Release\Standalone\HTDemucs GPU FX.exe`
+產物：`build\windows-installed\HTDemucsGpuFX_artefacts\Release\Standalone\Music SSP FX.exe`
 
 > 本機注意：`SpscRing` 具現化較大，若遇到 `C1060 編譯器堆積空間不足`，請確認
 > 使用 64 位元工具鏈（`/p:PreferredToolArchitecture=x64`）。
@@ -52,10 +68,14 @@ tools\build_windows_installed.cmd
 tools/build_macos.sh
 ```
 
-產物：`build/macos/HTDemucsGpuFX_artefacts/Release/HTDemucs GPU FX.app`
+產物：`build/macos/HTDemucsGpuFX_artefacts/Release/Music SSP FX.app`
 （`lipo -info` 可確認同時包含 `x86_64` 與 `arm64`）
 
-### RoFormer 推論環境（兩個平台皆需）
+### 推論環境（只有從原始碼開發時才需要）
+
+發行包內建的 frozen runtime 已同時包含 HTDemucs 與 RoFormer 兩個後端（共用同一份
+PyTorch，不是兩份），使用者不需要安裝 Python。以下只給要從原始碼跑 worker 的開發者：
+
 
 ```bash
 conda create -n htfx-roformer python=3.11 -y
@@ -67,7 +87,10 @@ pip install -r requirements-htfx-roformer.txt
 
 ## 執行
 
-啟動時**工作目錄必須是專案根目錄**，程式才找得到 `assets/models/roformer-manifest.json`
+發行包解壓即可執行，不需要安裝 Python 或 CUDA toolkit（CUDA 版只需要 NVIDIA 顯示
+卡驅動）。模型權重不隨包散布，第一次用到某個模型時才自動下載並驗證 SHA-256。
+
+從原始碼執行時，啟動的**工作目錄必須是專案根目錄**，程式才找得到 `assets/models/roformer-manifest.json`
 與 `worker/roformer_worker.py`；否則模式清單會退化成只有 HTDemucs 4/6 軌。發行的
 可攜包已附啟動器處理好這件事。
 
@@ -75,15 +98,16 @@ pip install -r requirements-htfx-roformer.txt
 
 | 變數 | 用途 |
 |---|---|
-| `HTFX_ROFORMER_PYTHON` | RoFormer 推論用的 python 執行檔 |
-| `HTFX_ROFORMER_WORKER` | `roformer_worker.py` 路徑 |
+| `HTFX_WORKER_EXECUTABLE` | frozen worker（同時服務 HTDemucs 與 RoFormer） |
+| `HTFX_ROFORMER_PYTHON` | 開發用：沒有 frozen worker 時的 python 執行檔 |
+| `HTFX_ROFORMER_WORKER` | 開發用：`roformer_worker.py` 路徑 |
 | `HTFX_ROFORMER_MANIFEST` | 模型清單 JSON |
 | `HTFX_ROFORMER_MODELS_DIR` | 模型快取目錄 |
 | `HTFX_ROFORMER_OUTPUT_DIR` | RoFormer 中間輸出目錄 |
 | `HTFX_UI_LANGUAGE_FILE` / `HTFX_UI_STARTUP_FILE` | 介面語言／啟動選擇的設定檔 |
 
-使用者設定存放於 `%LOCALAPPDATA%\HTDemucs GPU FX\`（macOS：
-`~/Library/Application Support/HTDemucs GPU FX/`）。
+使用者設定存放於 `%LOCALAPPDATA%\Music SSP FX\`（macOS：
+`~/Library/Application Support/Music SSP FX/`）。
 
 ## 測試
 
@@ -100,7 +124,7 @@ build\...\htdemucs_goal_check.exe "<某首歌.wav>"          :: 四種分離模�
 ```
 plugin/          JUCE 前端與音訊處理（PluginProcessor、Localization、SpscRing）
 cpp/             HTDemucs frozen worker 的 shared-memory IPC client
-worker/          Python worker（HTDemucs IPC、RoFormer 推論與快取管理）
+worker/          Python worker（worker_main 分派器、HTDemucs IPC、RoFormer 推論與快取）
 tests/           smoke tests 與端到端驗收工具
 tools/           建置、封裝、驗證腳本
 assets/models/   模型 metadata 與 RoFormer 清單（權重不入版控）

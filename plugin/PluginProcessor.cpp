@@ -77,12 +77,14 @@ std::vector<juce::File> sidecarRootsForCurrentProcess() {
     const auto localAppData =
         juce::SystemStats::getEnvironmentVariable("LOCALAPPDATA", {}).trim();
     if (localAppData.isNotEmpty()) {
-        roots.push_back(
-            juce::File(localAppData)
-                .getChildFile("Programs")
-                .getChildFile("HTDemucs GPU FX")
-                .getChildFile("Resources")
-                .getChildFile("sidecar"));
+        for (const auto* product : {"Music SSP FX", "HTDemucs GPU FX"}) {
+            roots.push_back(
+                juce::File(localAppData)
+                    .getChildFile("Programs")
+                    .getChildFile(product)
+                    .getChildFile("Resources")
+                    .getChildFile("sidecar"));
+        }
     }
 #endif
     return roots;
@@ -120,11 +122,18 @@ juce::File installedDataDirectory() {
     const auto localAppData =
         juce::SystemStats::getEnvironmentVariable("LOCALAPPDATA", {}).trim();
     if (localAppData.isNotEmpty()) {
-        return juce::File(localAppData).getChildFile("HTDemucs GPU FX");
+        const auto current = juce::File(localAppData).getChildFile("Music SSP FX");
+        if (current.isDirectory()) {
+            return current;
+        }
+        // Renamed product: fall back to the pre-rename folder if it still holds
+        // the installed data (models downloaded by the old installer).
+        const auto legacy = juce::File(localAppData).getChildFile("HTDemucs GPU FX");
+        return legacy.isDirectory() ? legacy : current;
     }
 #endif
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("HTDemucs GPU FX");
+        .getChildFile("Music SSP FX");
 }
 
 std::filesystem::path configuredPythonPath() {
@@ -1270,6 +1279,12 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
         }
 
         if (isRoformerModelName(juce::String::fromUTF8(configuration.modelName.c_str()))) {
+            // The frozen runtime bundles the RoFormer back-end behind a
+            // "roformer" subcommand, sharing its PyTorch with HTDemucs. When it
+            // is installed the user needs no Python at all; otherwise fall back
+            // to the interpreter + script route used during development.
+            const auto frozenWorker = configuredWorkerExecutable();
+            const bool useFrozen = !frozenWorker.empty();
             const auto python = configuredRoformerPython();
             const auto workerScript = configuredRoformerWorker();
             const auto modelsDirectory = configuredRoformerModelsDirectory();
@@ -1279,7 +1294,8 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                                             {}, false);
             const auto inputFile = workingDirectory.getChildFile("input.wav");
             const auto outputDirectory = workingDirectory.getChildFile("stems");
-            if (!python.existsAsFile() || !workerScript.existsAsFile() ||
+            if ((!useFrozen &&
+                 (!python.existsAsFile() || !workerScript.existsAsFile())) ||
                 !modelsDirectory.isDirectory() ||
                 !workingDirectory.createDirectory() ||
                 !outputDirectory.createDirectory()) {
@@ -1305,14 +1321,21 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                           : configuration.backend == 1
                                 ? "cuda:" + juce::String(configuration.gpuIndex)
                                 : "auto";
-            const juce::StringArray command{
-                python.getFullPathName(),
-                workerScript.getFullPathName(),
+            juce::StringArray command;
+            if (useFrozen) {
+                command.add(displayPath(frozenWorker));
+                command.add("roformer");
+            } else {
+                command.add(python.getFullPathName());
+                command.add(workerScript.getFullPathName());
+            }
+            command.addArray(juce::StringArray{
                 "--input", inputFile.getFullPathName(),
                 "--output-dir", outputDirectory.getFullPathName(),
                 "--model", juce::String::fromUTF8(configuration.modelName.c_str()),
                 "--models-dir", modelsDirectory.getFullPathName(),
-                "--device", device};
+                "--manifest", configuredRoformerManifest().getFullPathName(),
+                "--device", device});
             juce::ChildProcess process;
             setSeparationMessage(
                 htfx::tr("status.loadingRoformerPrefix") +

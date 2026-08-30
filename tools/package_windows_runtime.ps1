@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('cuda', 'cpu')]
     [string]$Flavor,
@@ -61,32 +61,54 @@ if ($Flavor -eq 'cpu') {
         }
     )
 } else {
-    # GitHub Release assets must each remain below 2 GiB. Keep the three
-    # largest CUDA DLLs in a second archive while preserving their paths so
-    # Inno Setup can extract both archives into the same application folder.
-    $cudaLibraryNames = @(
-        'torch_cuda.dll',
-        'cudnn_cnn_infer64_8.dll',
-        'cublasLt64_12.dll'
-    )
-    $allFiles = @(Get-ChildItem -LiteralPath $stageRoot -File -Recurse)
-    $libraryFiles = @($allFiles | Where-Object { $_.Name -in $cudaLibraryNames })
-    if ($libraryFiles.Count -ne $cudaLibraryNames.Count) {
-        throw 'The expected large CUDA runtime libraries were not found.'
-    }
-    $coreFiles = @($allFiles | Where-Object { $_.Name -notin $cudaLibraryNames })
-    $archiveSpecs = @(
-        [ordered]@{
-            name = "runtime-win-x64-cuda-core-$Version.zip"
-            role = 'core'
-            files = $coreFiles
-        },
-        [ordered]@{
-            name = "runtime-win-x64-cuda-libraries-$Version.zip"
-            role = 'cuda-libraries'
-            files = $libraryFiles
+    # GitHub Release assets must each stay below 2 GiB. Splitting on hard-coded
+    # DLL names breaks whenever the CUDA/cuDNN major version changes, so pack
+    # greedily by size instead: largest first into buckets capped well under the
+    # limit (uncompressed, so the resulting ZIP is always smaller). Paths are
+    # preserved in every archive, so Inno Setup extracts them all into the same
+    # application folder.
+    $bucketLimit = 1.7GB
+    $allFiles = @(Get-ChildItem -LiteralPath $stageRoot -File -Recurse |
+        Sort-Object Length -Descending)
+    $buckets = New-Object System.Collections.ArrayList
+    $bucketBytes = New-Object System.Collections.ArrayList
+    foreach ($file in $allFiles) {
+        $placed = $false
+        for ($i = 0; $i -lt $buckets.Count; $i++) {
+            if ($bucketBytes[$i] + $file.Length -le $bucketLimit) {
+                [void]$buckets[$i].Add($file)
+                $bucketBytes[$i] = $bucketBytes[$i] + $file.Length
+                $placed = $true
+                break
+            }
         }
-    )
+        if (-not $placed) {
+            if ($file.Length -gt $bucketLimit) {
+                throw "A single runtime file exceeds the archive limit: $($file.FullName)"
+            }
+            $new = New-Object System.Collections.ArrayList
+            [void]$new.Add($file)
+            [void]$buckets.Add($new)
+            [void]$bucketBytes.Add([int64]$file.Length)
+        }
+    }
+    $archiveSpecs = @()
+    for ($i = 0; $i -lt $buckets.Count; $i++) {
+        if ($i -eq 0) {
+            $role = 'core'
+            $name = "runtime-win-x64-cuda-core-$Version.zip"
+        } else {
+            $role = if ($i -eq 1) { 'cuda-libraries' } else { "cuda-libraries-$i" }
+            $suffix = if ($i -eq 1) { '' } else { "-$i" }
+            $name = "runtime-win-x64-cuda-libraries$suffix-$Version.zip"
+        }
+        $archiveSpecs += [ordered]@{
+            name = $name
+            role = $role
+            files = @($buckets[$i])
+        }
+    }
+    Write-Host ("CUDA runtime split into {0} archive(s)." -f $archiveSpecs.Count)
 }
 
 $archiveManifests = @()

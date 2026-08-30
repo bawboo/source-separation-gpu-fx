@@ -93,3 +93,21 @@ LOOP STATUS: running â€” iter-7 L2f export-flow dynamic-value setMediaMessage() 
 [driver] agent process exited rc=0
 [scope] OK ¡X 54 changed path(s) within policy
 [driver] iteration 8 launching  2026-08-25T21:40:17+0800
+Committed successfully. Iteration 8 complete: localized 6 remaining Editor-level AlertWindow/FileChooser dialog call sites (10 new string keys), verified with cheap tier PASS and scope check PASS, and recorded three new discovered backlog items (L2h/L2i/L2j) for the remaining harder batches that require synchronized test updates.
+
+LOOP STATUS: running â€” L2g Editor AlertWindow/FileChooser dialogs localized, cheap tier PASS, backlog_items_passing=8
+[driver] agent process exited rc=0
+[scope] OK ¡X 54 changed path(s) within policy
+[driver] iteration 9 launching  2026-08-25T21:50:58+0800
+You've hit your session limit Â· resets 11:20pm (Asia/Taipei)
+[driver] agent process exited rc=1
+[scope] OK ¡X 54 changed path(s) within policy
+[driver] WARNING: iteration counter did not advance (failed launch #1, rc=1)
+[driver] iteration 9 launching  2026-08-25T21:54:11+0800
+You've hit your session limit Â· resets 11:20pm (Asia/Taipei)
+[driver] agent process exited rc=1
+[scope] OK ¡X 54 changed path(s) within policy
+[driver] WARNING: iteration counter did not advance (failed launch #2, rc=1)
+[driver] state.json â†’ status=blocked stop_reason=stalled_no_state_update
+[driver] stop: two consecutive launches produced no state update â€” check agent auth/permissions
+[driver] done 2026-08-25T21:54:20+0800. Final: status=blocked stop_reason=stalled_no_state_update. See .loop/FINAL_REPORT.md and .loop/journal.md

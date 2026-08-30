@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build HTDemucs GPU FX on macOS as a universal binary (Intel + Apple Silicon).
+# Build Music SSP FX on macOS as a universal binary (Intel + Apple Silicon).
 #
 #   tools/build_macos.sh            # standalone app only (default)
 #   tools/build_macos.sh --plugin   # also build the VST3
@@ -50,11 +50,11 @@ echo "building..."
 cmake --build "$build_dir" --config Release \
     --target HTDemucsGpuFX_Standalone -- -j"$(sysctl -n hw.ncpu)"
 
-app="$build_dir/HTDemucsGpuFX_artefacts/Release/HTDemucs GPU FX.app"
+app="$build_dir/HTDemucsGpuFX_artefacts/Release/Music SSP FX.app"
 if [ -d "$app" ]; then
     echo
     echo "built: $app"
-    binary="$app/Contents/MacOS/HTDemucs GPU FX"
+    binary="$app/Contents/MacOS/Music SSP FX"
     [ -f "$binary" ] && lipo -info "$binary" || true
     echo
     echo "Run it with the repository as the working directory so the RoFormer"

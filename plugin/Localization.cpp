@@ -12,7 +12,7 @@ using StringPair = std::array<juce::String, 2>;
 const std::unordered_map<std::string, StringPair>& stringTable() {
     static const std::unordered_map<std::string, StringPair> table{
         // key                            { zh-TW,                          en }
-        {"editor.title", StringPair{u8"HTDemucs 快速分離", "HTDemucs Quick Separation"}},
+        {"editor.title", StringPair{u8"Music SSP FX — 音源分離", "Music SSP FX — Source Separation"}},
         {"label.separationMode", StringPair{u8"分離模式", "Separation mode"}},
         {"label.mode", StringPair{u8"模式", "Mode"}},
         {"label.outputTrim", StringPair{u8"輸出增益", "Output Trim"}},
@@ -356,16 +356,30 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
 // shared variable just to isolate a language-preference test would risk
 // side effects on unrelated model/worker path resolution. Tests that need
 // isolation set HTFX_UI_LANGUAGE_FILE instead (see settingsFile() below).
-juce::File settingsDirectory() {
+juce::File settingsRoot(const juce::String& productName) {
 #if JUCE_WINDOWS
     const auto localAppData =
         juce::SystemStats::getEnvironmentVariable("LOCALAPPDATA", {}).trim();
     if (localAppData.isNotEmpty()) {
-        return juce::File(localAppData).getChildFile("HTDemucs GPU FX");
+        return juce::File(localAppData).getChildFile(productName);
     }
 #endif
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("HTDemucs GPU FX");
+        .getChildFile(productName);
+}
+
+// The product was renamed from "HTDemucs GPU FX" to "Music SSP FX"; keep the
+// user's saved language/startup choices by migrating the old directory once.
+juce::File settingsDirectory() {
+    const auto current = settingsRoot("Music SSP FX");
+    if (!current.isDirectory()) {
+        const auto legacy = settingsRoot("HTDemucs GPU FX");
+        if (legacy.isDirectory()) {
+            current.getParentDirectory().createDirectory();
+            legacy.copyDirectoryTo(current);
+        }
+    }
+    return current;
 }
 
 Language languageFromTag(const juce::String& tag) {

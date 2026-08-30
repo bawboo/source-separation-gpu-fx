@@ -116,7 +116,7 @@ foreach ($relative in $keyRelativePaths) {
 }
 $payloadFiles = @(Get-ChildItem -LiteralPath $bundleRoot -Recurse -File)
 $sourceManifest = [ordered]@{
-    product = 'HTDemucs GPU FX macOS Builder Source'
+    product = 'Music SSP FX macOS Builder Source'
     version = '0.1.0-local-test'
     targets = @(
         [ordered]@{ architecture = 'arm64'; minimum_macos = '12.3'; default_compute = 'mps' },
@@ -144,7 +144,7 @@ $sourceManifest | ConvertTo-Json -Depth 8 |
         -Encoding utf8
 
 $instructions = @'
-HTDemucs GPU FX macOS builder source
+Music SSP FX macOS builder source
 =====================================
 
 1. Move this whole folder to the Mac; do not separate outputs and work.

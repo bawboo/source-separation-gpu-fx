@@ -1,6 +1,9 @@
-param(
+﻿param(
     [string]$Version = '0.1.0',
-    [string]$BuildDirectory = ''
+    [string]$BuildDirectory = '',
+    # python.exe of the environment used to freeze the runtime being shipped.
+    [string]$LicenseCollectorPython = '',
+    [string]$Ffmpeg = 'C:\ffmpeg-master\bin\ffmpeg.exe'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,9 +12,15 @@ if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
     $BuildDirectory = Join-Path $projectRoot 'build\windows-installed'
 }
 $standalone = Join-Path $BuildDirectory `
-    'HTDemucsGpuFX_artefacts\Release\Standalone\HTDemucs GPU FX.exe'
+    'HTDemucsGpuFX_artefacts\Release\Standalone\Music SSP FX.exe'
 $hardwareProbe = Join-Path $BuildDirectory 'Release\htfx_hardware_probe.exe'
-$installerIcon = Join-Path $projectRoot 'dist\HTDemucs GPU FX.vst3\Plugin.ico'
+# JUCE generates the application icon during the build; prefer it over the
+# packaged VST3 bundle, which only exists after a separate packaging step.
+$installerIcon = Join-Path $BuildDirectory `
+    'HTDemucsGpuFX_artefacts\JuceLibraryCode\icon.ico'
+if (-not (Test-Path -LiteralPath $installerIcon -PathType Leaf)) {
+    $installerIcon = Join-Path $projectRoot 'dist\Music SSP FX.vst3\Plugin.ico'
+}
 $payloadRoot = Join-Path $projectRoot 'build\windows-web\payload'
 $sidecarRoot = Join-Path $payloadRoot 'Resources\sidecar'
 
@@ -47,9 +56,9 @@ if (Test-Path -LiteralPath $payloadRoot) {
     Remove-Item -LiteralPath $resolvedPayload -Recurse -Force
 }
 New-Item -ItemType Directory -Path $sidecarRoot -Force | Out-Null
-Copy-Item -LiteralPath $standalone -Destination (Join-Path $payloadRoot 'HTDemucs GPU FX.exe')
+Copy-Item -LiteralPath $standalone -Destination (Join-Path $payloadRoot 'Music SSP FX.exe')
 Copy-Item -LiteralPath $hardwareProbe -Destination (Join-Path $payloadRoot 'htfx_hardware_probe.exe')
-Copy-Item -LiteralPath $installerIcon -Destination (Join-Path $payloadRoot 'HTDemucs GPU FX.ico')
+Copy-Item -LiteralPath $installerIcon -Destination (Join-Path $payloadRoot 'Music SSP FX.ico')
 
 $trees = @(
     @{ Source = (Join-Path $projectRoot 'worker'); Destination = (Join-Path $sidecarRoot 'worker') },
@@ -67,12 +76,38 @@ Copy-Item -LiteralPath (Join-Path $projectRoot 'assets\models\model-manifest.jso
 Get-ChildItem -LiteralPath (Join-Path $projectRoot 'assets\models') -Filter '*.yaml' -File |
     Copy-Item -Destination $modelMetadata
 
-$portableLicenses = Join-Path $projectRoot 'dist\HTDemucs GPU FX Portable\Licenses'
+# Notices must match the exact distributions frozen into the runtime, so they
+# are collected from the interpreter that froze it instead of copied from a
+# previously packaged tree with its own (possibly stale) versions.
 $licensesDestination = Join-Path $payloadRoot 'Licenses'
-if (-not (Test-Path -LiteralPath $portableLicenses -PathType Container)) {
-    throw "The verified licence bundle is missing: $portableLicenses"
+New-Item -ItemType Directory -Path $licensesDestination -Force | Out-Null
+if ([string]::IsNullOrWhiteSpace($LicenseCollectorPython)) {
+    throw 'Pass -LicenseCollectorPython <python.exe of the runtime environment>.'
 }
-Copy-FilteredTree -Source $portableLicenses -Destination $licensesDestination
+& $LicenseCollectorPython (Join-Path $projectRoot 'tools\collect_runtime_licenses.py') `
+    --destination (Join-Path $licensesDestination 'python-packages') `
+    --report (Join-Path $licensesDestination 'python-packages\collection-report.json')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Collecting the runtime package licences failed.'
+}
+$staticNotices = @(
+    @{ Source = (Join-Path $projectRoot 'third_party\JUCE\LICENSE.md'); Name = 'JUCE-LICENSE.md' },
+    @{ Source = (Join-Path $projectRoot 'third_party\demucs\LICENSE'); Name = 'DEMUCS-LICENSE.txt' }
+)
+foreach ($notice in $staticNotices) {
+    if (-not (Test-Path -LiteralPath $notice.Source -PathType Leaf)) {
+        throw "Required licence file is missing: $($notice.Source)"
+    }
+    Copy-Item -LiteralPath $notice.Source `
+        -Destination (Join-Path $licensesDestination $notice.Name) -Force
+}
+$ffmpegLicense = Join-Path (Split-Path -Parent (Split-Path -Parent $Ffmpeg)) 'LICENSE.txt'
+if (Test-Path -LiteralPath $ffmpegLicense -PathType Leaf) {
+    Copy-Item -LiteralPath $ffmpegLicense `
+        -Destination (Join-Path $licensesDestination 'FFMPEG-LICENSE.txt') -Force
+} else {
+    throw "FFmpeg licence not found next to the bundled binary: $ffmpegLicense"
+}
 Copy-Item -LiteralPath (Join-Path $projectRoot 'THIRD_PARTY_NOTICES.md') `
     -Destination (Join-Path $licensesDestination 'THIRD_PARTY_NOTICES.md') -Force
 Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE.md') `
@@ -93,13 +128,13 @@ if ($personalDataHits) {
 
 $manifest = [ordered]@{
     schema_version = 1
-    product = 'HTDemucs GPU FX'
+    product = 'Music SSP FX'
     version = $Version
     architecture = 'windows-x64'
     payload_kind = 'web-installer-base'
-    executable = 'HTDemucs GPU FX.exe'
+    executable = 'Music SSP FX.exe'
     executable_sha256 = (Get-FileHash -LiteralPath `
-        (Join-Path $payloadRoot 'HTDemucs GPU FX.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+        (Join-Path $payloadRoot 'Music SSP FX.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
     hardware_probe = 'htfx_hardware_probe.exe'
     hardware_probe_sha256 = (Get-FileHash -LiteralPath `
         (Join-Path $payloadRoot 'htfx_hardware_probe.exe') -Algorithm SHA256).Hash.ToLowerInvariant()

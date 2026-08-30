@@ -29,7 +29,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $standalone = Join-Path $BuildDirectory `
-    'HTDemucsGpuFX_artefacts\Release\Standalone\HTDemucs GPU FX.exe'
+    'HTDemucsGpuFX_artefacts\Release\Standalone\Music SSP FX.exe'
 $probe = Join-Path $BuildDirectory 'Release\htfx_hardware_probe.exe'
 foreach ($required in @($standalone, $probe)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {

@@ -34,7 +34,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 New-Item -ItemType Directory -Path $Vst3Directory -Force | Out-Null
-$destination = Join-Path $Vst3Directory 'HTDemucs GPU FX.vst3'
+$destination = Join-Path $Vst3Directory 'Music SSP FX.vst3'
 if (Test-Path -LiteralPath $destination) {
     Remove-Item -LiteralPath $destination -Recurse -Force
 }

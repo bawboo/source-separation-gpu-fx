@@ -4,7 +4,7 @@ $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $buildRoot = (Resolve-Path (Join-Path $projectRoot 'build')).Path
 $zipPath = Join-Path $projectRoot 'dist\HTDemucs_GPU_FX_Standalone_SelfContained_Windows_x64.zip'
 $extractRoot = Join-Path $buildRoot 'windows-portable-zip-verification'
-$portableRoot = Join-Path $extractRoot 'HTDemucs GPU FX Portable'
+$portableRoot = Join-Path $extractRoot 'Music SSP FX Portable'
 
 if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf)) {
     throw "Windows portable ZIP not found: $zipPath"

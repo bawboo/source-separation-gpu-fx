@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Python = '',
     [ValidateSet('cuda', 'cpu')]
     [string]$Flavor = 'cuda'
@@ -12,7 +12,7 @@ $suffix = if ($Flavor -eq 'cuda') { '' } else { '-cpu' }
 $distRoot = Join-Path $buildRoot "standalone-runtime${suffix}-dist"
 $workRoot = Join-Path $buildRoot "standalone-runtime${suffix}-work"
 $specRoot = Join-Path $buildRoot "standalone-runtime${suffix}-spec"
-$workerSource = Join-Path $projectRoot 'worker\gpu_ipc_worker.py'
+$workerSource = Join-Path $projectRoot 'worker\worker_main.py'
 $hookRoot = Join-Path $projectRoot 'tools\pyinstaller-hooks'
 $demucsRoot = Join-Path $projectRoot 'third_party\demucs'
 
@@ -30,8 +30,21 @@ if ([string]::IsNullOrWhiteSpace($Python)) {
 if (-not (Test-Path -LiteralPath $Python -PathType Leaf)) {
     throw "Python not found: $Python"
 }
+# PyInstaller is installed with `pip --target`, so its tree is tied to the
+# interpreter version that installed it. The CPU and CUDA runtimes are frozen by
+# different interpreters, so keep one tool directory per version.
+$pythonTag = (& $Python -c "import sys; print(f'py{sys.version_info.major}{sys.version_info.minor}')")
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($pythonTag)) {
+    throw "Unable to query the Python version of $Python"
+}
+$toolRoot = "$toolRoot-$pythonTag"
 if (-not (Test-Path -LiteralPath (Join-Path $toolRoot 'PyInstaller\__main__.py') -PathType Leaf)) {
-    throw "PyInstaller is missing from $toolRoot. Install it with pip --target before packaging."
+    Write-Host "Installing PyInstaller for $pythonTag into $toolRoot ..."
+    & $Python -m pip install --disable-pip-version-check --no-warn-script-location `
+        --target $toolRoot pyinstaller
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install PyInstaller into $toolRoot"
+    }
 }
 
 $runtimeCheck = if ($Flavor -eq 'cuda') {
@@ -85,14 +98,31 @@ try {
         '--hidden-import', 'demucs.states',
         '--hidden-import', 'demucs.apply',
         '--hidden-import', 'demucs.htdemucs',
+        '--hidden-import', 'gpu_ipc_worker',
+        # Checkpoints pickled against NumPy 1.x name numpy.core.*, which NumPy 2
+        # keeps only as a compatibility shim that static analysis never sees.
+        # Without it, torch.load fails with ModuleNotFoundError at unpickle time.
+        '--collect-submodules', 'numpy.core',
+        # MelBand RoFormer shares this bundle so torch is packaged once, not twice.
+        '--hidden-import', 'roformer_worker',
+        '--hidden-import', 'roformer_cache',
+        '--hidden-import', 'soundfile',
+        '--hidden-import', 'librosa',
+        '--hidden-import', 'ml_collections',
+        '--hidden-import', 'beartype',
+        '--hidden-import', 'packaging',
+        '--collect-submodules', 'mel_band_roformer',
+        '--collect-submodules', 'rotary_embedding_torch',
+        '--collect-data', 'mel_band_roformer',
         '--collect-submodules', 'einops',
         '--collect-submodules', 'julius',
+        '--exclude-module', 'mlx',
+        '--exclude-module', 'mlx_spectro',
         '--exclude-module', 'tensorflow',
         '--exclude-module', 'keras',
         '--exclude-module', 'matplotlib',
         '--exclude-module', 'pandas',
         '--exclude-module', 'sklearn',
-        '--exclude-module', 'scipy',
         '--exclude-module', 'pytest',
         '--exclude-module', 'setuptools',
         '--exclude-module', 'sphinx',
@@ -100,8 +130,6 @@ try {
         '--exclude-module', 'dask',
         '--exclude-module', 'distributed',
         '--exclude-module', 'pyarrow',
-        '--exclude-module', 'numba',
-        '--exclude-module', 'llvmlite',
         '--exclude-module', 'lxml',
         '--exclude-module', 'PIL',
         '--exclude-module', 'cv2',
@@ -119,8 +147,6 @@ try {
         '--exclude-module', 'rich',
         '--exclude-module', 'botocore',
         '--exclude-module', 'boto3',
-        '--exclude-module', 'librosa',
-        '--exclude-module', 'soundfile',
         '--exclude-module', 'torchvision',
         '--exclude-module', 'torchaudio',
         '--exclude-module', 'av',
@@ -139,9 +165,6 @@ try {
         '--exclude-module', 'cloudpickle',
         '--exclude-module', 'fsspec',
         '--exclude-module', 'lz4',
-        '--exclude-module', 'requests',
-        '--exclude-module', 'urllib3',
-        '--exclude-module', 'certifi',
         '--exclude-module', 'torch.utils.tensorboard',
         '--exclude-module', 'torch.onnx',
         '--exclude-module', 'torch._dynamo',
@@ -187,12 +210,16 @@ $helpOutput = & $workerExecutable --help 2>&1
 if ($LASTEXITCODE -ne 0 -or ($helpOutput -join "`n") -notmatch '--models-dir') {
     throw "Self-contained worker import/startup check failed:`n$($helpOutput -join "`n")"
 }
+$roformerHelp = & $workerExecutable roformer --help 2>&1
+if ($LASTEXITCODE -ne 0 -or ($roformerHelp -join "`n") -notmatch '--models-dir') {
+    throw "RoFormer dispatch check failed:`n$($roformerHelp -join "`n")"
+}
 
 $runtimeBytes = (Get-ChildItem -LiteralPath $runtimeRoot -Recurse -File |
     Measure-Object Length -Sum).Sum
 $env:PYTHONPATH = $buildPythonPath
 try {
-    $versions = & $Python -c "import json,sys,torch,numpy,demucs,einops; print(json.dumps({'python':sys.version.split()[0],'torch':torch.__version__,'cuda':torch.version.cuda,'numpy':numpy.__version__,'demucs':getattr(demucs,'__version__','bundled'),'einops':einops.__version__}))"
+    $versions = & $Python -c "import json,sys,torch,numpy,demucs,einops,mel_band_roformer; print(json.dumps({'python':sys.version.split()[0],'torch':torch.__version__,'cuda':torch.version.cuda,'numpy':numpy.__version__,'demucs':getattr(demucs,'__version__','bundled'),'einops':einops.__version__,'mel_band_roformer':getattr(mel_band_roformer,'__version__','unknown')}))"
     if ($LASTEXITCODE -ne 0) {
         throw "Unable to query the $Flavor runtime versions."
     }
@@ -203,6 +230,7 @@ $runtimeManifest = [ordered]@{
     format = 'PyInstaller onedir'
     flavor = $Flavor
     entrypoint = 'htdemucs-worker.exe'
+    backends = @('htdemucs', 'roformer')
     entrypoint_sha256 = (Get-FileHash -LiteralPath $workerExecutable -Algorithm SHA256).Hash.ToLowerInvariant()
     runtime_bytes = $runtimeBytes
     versions = $versions | ConvertFrom-Json
