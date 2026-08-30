@@ -62,6 +62,32 @@ CPU 版含了 RoFormer 反而更小（新的 CPU PyTorch wheel 較精簡）；CU
 
 ### 合規
 
+公開發行前把剩下的授權 gate 全部走完：
+
+- **FFmpeg 從 GPLv3 換成 LGPLv3 build**：原本用的是含 x264/x265 的 full build，
+  那會讓每次發行 binary 都必須附上完整對應原始碼。但本專案只拿 FFmpeg 把輸入
+  解碼成 PCM（`-vn -ac 2 -ar 44100 -c:a pcm_f32le`），匯出是 JUCE 自己寫 WAV，
+  沒有用到任何 GPL-only 元件。改用 BtbN 的
+  `ffmpeg-master-latest-win64-lgpl-shared`（有 `--enable-version3`，沒有
+  `--enable-gpl`／`--enable-nonfree`），義務降為 LGPL，發行包也再小 19 MiB
+- **NVIDIA redistributables 明確化**：GPU 版內嵌 2.46 GiB 的 cuBLAS／cuDNN／
+  cuFFT 等 22 個 NVIDIA 函式庫（取自官方 PyTorch wheel，未經修改）。這些適用
+  NVIDIA 自己的 CUDA EULA 與 cuDNN SLA，而非本專案的 AGPL 或 PyTorch 的 BSD ——
+  torch 的 LICENSE 只涵蓋 NVIDIA 貢獻給 PyTorch 的原始碼。新增
+  `NVIDIA-CUDA-NOTICE.txt` 列出確切檔案並指向兩份條款
+- **LGPL 元件的義務**：FFmpeg、libsndfile（經 soundfile）、libsoxr（經 soxr）
+  三者皆為 LGPL 且都是動態載入，使用者可自行替換，符合 LGPL 要求；notices
+  記錄其上游來源
+- **notices 重新稽核**：原稽核日期早於 RoFormer 整合，PyTorch／NumPy／PyYAML／
+  tqdm／einops／julius／PyInstaller／CPython 版本全部過時，且缺少 librosa 拉進
+  的十餘個相依。改由 `tools/collect_runtime_licenses.py` 從凍結該 runtime 的
+  直譯器動態收集，版本不可能再與實際出貨的 wheel 脫節
+- **安裝程式補上** `AppPublisherURL`／`AppSupportURL`／`AppUpdatesURL`，同時作為
+  binary 的 AGPL 對應原始碼位置
+- **移除建置機器的個人資訊**：使用者名稱與電腦名出現在 4 個受追蹤檔案與 12 個
+  commit 的歷史中，已於 HEAD 與整個 git 歷史清除；兩個測試檔改讀 `HTFX_PYTHON`
+  而非寫死只存在於單一機器的直譯器路徑
+
 - `THIRD_PARTY_NOTICES.md` 的模型權重再散布一項結案：Demucs 與 99 個 RoFormer
   checkpoint 一律不隨任何發行物散布，全部於首次使用時從各自上游下載並驗
   SHA-256，因此不涉及再散布授權
