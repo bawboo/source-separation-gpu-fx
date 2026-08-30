@@ -3,6 +3,27 @@
 本專案的版本紀錄。格式依循 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)，
 版本號依循 [語意化版本](https://semver.org/lang/zh-TW/)。
 
+## [0.0.3] - 2026-08-30
+
+### 變更
+
+- **缺少的 HTDemucs 模型改為按需下載**：在全新安裝上選「6 軌分離」會被擋下來，
+  訊息要你自己去「進階選項」下載模型；但選任何 RoFormer 模式卻是自動下載直接跑。
+  兩個模型家族的行為不一致，而 6 軌分離是 README 首頁就宣傳的功能，新使用者
+  第一次點就撞牆。下載器本來就存在也能用，只是沒有接到分離流程上——現在缺模型
+  會自動開始下載（一樣驗證固定的 SHA-256），下載完成後自動接著分離。若使用者
+  在下載期間換了模型，排隊中的分離會被放棄而不是突然開始；下載失敗則讓分離進入
+  錯誤狀態，不會無限等待
+
+### 修正
+
+- **`goal_check` 從未 pump 過 message queue**：它有 `ScopedJuceInitialiser_GUI`
+  但不跑 dispatch loop，所以任何依賴 `MessageManager::callAsync` 的行為在它裡面
+  完全測不到——本次改動的第一版正好踩中，看起來會動但實際上永遠不會續跑。
+  續跑改為直接在下載執行緒執行（`beginSeparation()` 不碰任何 UI），如此在沒有
+  dispatch loop 的 host 或工具中行為一致；`goal_check` 也改為會等待進行中的下載，
+  而不是把 `beginSeparation()` 回傳 false 直接判定失敗
+
 ## [0.0.2] - 2026-08-30
 
 更名為 **Music SSP FX**，並把 RoFormer 併進既有的 frozen runtime，讓使用者完全
