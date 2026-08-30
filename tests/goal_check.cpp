@@ -78,10 +78,35 @@ bool runMode(
 
     std::cout << "[" << mode.label << "] separating..." << std::endl;
     if (!processor.beginSeparation()) {
-        std::cout << "[" << mode.label
-                  << "] FAIL: separation did not start: "
-                  << processor.getRecordStatusText() << std::endl;
-        return false;
+        if (!processor.isModelDownloadBusy()) {
+            std::cout << "[" << mode.label
+                      << "] FAIL: separation did not start: "
+                      << processor.getRecordStatusText() << std::endl;
+            return false;
+        }
+        // The checkpoint is being fetched; the run resumes by itself.
+        std::cout << "[" << mode.label << "] downloading the model first..."
+                  << std::endl;
+        if (!waitUntil([&processor] { return !processor.isModelDownloadBusy(); },
+                       std::chrono::seconds(900))) {
+            std::cout << "[" << mode.label << "] FAIL: model download timed out"
+                      << std::endl;
+            return false;
+        }
+        // Give the queued resume a chance to start the run.
+        if (!waitUntil(
+                [&processor] {
+                    using State = HTDemucsGpuFXAudioProcessor::SeparationState;
+                    const auto state = processor.getSeparationState();
+                    return state == State::loading || state == State::separating ||
+                           state == State::previewReady || state == State::error;
+                },
+                std::chrono::seconds(30))) {
+            std::cout << "[" << mode.label
+                      << "] FAIL: separation did not resume after the download: "
+                      << processor.getRecordStatusText() << std::endl;
+            return false;
+        }
     }
     if (!waitUntil(
             [&processor] {

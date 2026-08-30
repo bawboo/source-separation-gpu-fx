@@ -301,6 +301,7 @@ private:
     void stopMediaThread();
     void stopModelDownloadThread();
     void modelDownloadLoop(std::stop_token stopToken, juce::String modelName);
+    void resumeSeparationAfterModelDownload(const juce::String& modelName);
     void importMediaLoop(std::stop_token stopToken, juce::File mediaFile);
     void stemExportLoop(
         std::stop_token stopToken,
@@ -393,6 +394,10 @@ private:
     std::atomic<double> mediaProgress_{0.0};
     std::atomic<bool> modelDownloadBusy_{false};
     std::atomic<double> modelDownloadProgress_{0.0};
+    // Set when a separation request triggered the download that is now
+    // running, so the run can resume by itself once the model lands.
+    mutable juce::CriticalSection pendingSeparationLock_;
+    juce::String separationPendingModel_;
     std::atomic<bool> importedVideo_{false};
     std::atomic<int> resolvedBackend_{0};
     std::atomic<int> activeSourceCount_{4};

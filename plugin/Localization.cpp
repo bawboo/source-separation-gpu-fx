@@ -204,6 +204,10 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"status.waitForMediaOperation",
          StringPair{u8"請等待媒體操作完成", "Wait for the media operation to finish"}},
         {"status.modelNotInstalledPrefix", StringPair{u8"模型 ", "Model "}},
+        {"status.downloadingModelPrefix", StringPair{u8"正在下載模型 ", "Downloading "}},
+        {"status.downloadingModelSuffix",
+         StringPair{u8"，下載完成後會自動開始分離。",
+                    " — separation starts automatically once it finishes."}},
         {"status.modelNotInstalledSuffix",
          StringPair{u8"尚未安裝。請開啟「進階選項」並下載此模型。",
                     " is not installed. Open Advanced options and download it "

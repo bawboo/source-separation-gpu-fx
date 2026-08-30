@@ -1187,10 +1187,30 @@ bool HTDemucsGpuFXAudioProcessor::beginSeparation() {
     // checkpoints, which have no download path in this code path, do.
     if (!isRoformerModelName(juce::String::fromUTF8(configuration.modelName.c_str())) &&
         !isModelInstalled(configuration.modelName)) {
+        // A missing RoFormer checkpoint never blocked the run - the worker
+        // fetches it - so a missing HTDemucs one should not either. Kick off
+        // the same downloader the advanced panel uses and let the run resume
+        // on its own when the file lands.
+        const auto modelName = juce::String(configuration.modelName);
+        if (modelDownloadBusy_.load(std::memory_order_acquire)) {
+            setSeparationMessage(
+                htfx::tr("status.downloadingModelPrefix") + modelName +
+                htfx::tr("status.downloadingModelSuffix"));
+            return false;
+        }
+        if (beginModelDownload(modelName)) {
+            {
+                const juce::ScopedLock lock(pendingSeparationLock_);
+                separationPendingModel_ = modelName;
+            }
+            setSeparationMessage(
+                htfx::tr("status.downloadingModelPrefix") + modelName +
+                htfx::tr("status.downloadingModelSuffix"));
+            return false;
+        }
         separationState_.store(SeparationState::error, std::memory_order_release);
         setSeparationMessage(
-            htfx::tr("status.modelNotInstalledPrefix") +
-            juce::String(configuration.modelName) +
+            htfx::tr("status.modelNotInstalledPrefix") + modelName +
             htfx::tr("status.modelNotInstalledSuffix"));
         return false;
     }
@@ -2069,6 +2089,9 @@ void HTDemucsGpuFXAudioProcessor::modelDownloadLoop(
     if (exitCode == 0 && isModelInstalled(modelName)) {
         modelDownloadProgress_.store(1.0, std::memory_order_release);
         setModelDownloadMessage(modelName + " installed and ready");
+        modelDownloadBusy_.store(false, std::memory_order_release);
+        resumeSeparationAfterModelDownload(modelName);
+        return;
     } else {
         auto diagnostics = juce::String::fromUTF8(
                                static_cast<const char*>(captured.getData()),
@@ -2080,8 +2103,39 @@ void HTDemucsGpuFXAudioProcessor::modelDownloadLoop(
         setModelDownloadMessage(
             "Model download failed (exit " + juce::String(exitCode) + ")" +
             (diagnostics.isNotEmpty() ? ": " + diagnostics : juce::String{}));
+        {
+            // Do not leave a separation waiting on a download that failed.
+            const juce::ScopedLock lock(pendingSeparationLock_);
+            if (separationPendingModel_ == modelName) {
+                separationPendingModel_.clear();
+                separationState_.store(
+                    SeparationState::error, std::memory_order_release);
+                setSeparationMessage(getModelDownloadStatusText());
+            }
+        }
     }
     modelDownloadBusy_.store(false, std::memory_order_release);
+}
+
+void HTDemucsGpuFXAudioProcessor::resumeSeparationAfterModelDownload(
+    const juce::String& modelName) {
+    {
+        const juce::ScopedLock lock(pendingSeparationLock_);
+        if (separationPendingModel_ != modelName) {
+            // Either nothing was waiting, or the user has since picked a
+            // different model - starting a run now would surprise them.
+            return;
+        }
+        separationPendingModel_.clear();
+    }
+    // Resume on this thread rather than posting to the message thread: the
+    // run does not touch any UI, and a host or tool without a running dispatch
+    // loop would otherwise never start it.
+    const auto configuration = currentRuntimeConfiguration();
+    if (juce::String(configuration.modelName) != modelName) {
+        return;
+    }
+    beginSeparation();
 }
 
 // == Multi-clip support ==================================================
