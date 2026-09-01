@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <limits>
 #include <optional>
@@ -610,6 +611,7 @@ HTDemucsGpuFXAudioProcessor::HTDemucsGpuFXAudioProcessor()
               .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters_(*this, nullptr, "HTDemucsGpuFXState", createParameterLayout()) {
     loadRoformerModels();
+    purgeStaleRoformerWorkingDirectories();
     for (std::size_t index = 0; index < stemGainParameters_.size(); ++index) {
         stemGainParameters_[index] = parameters_.getRawParameterValue(kStemParameterIds[index]);
         jassert(stemGainParameters_[index] != nullptr);
@@ -1328,6 +1330,14 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                                             {}, false);
             const auto inputFile = workingDirectory.getChildFile("input.wav");
             const auto outputDirectory = workingDirectory.getChildFile("stems");
+            // This directory holds a full copy of the input plus every stem -
+            // roughly 300 MB per run - and nothing reads it once the stems are
+            // in memory; failures are reported from the captured diagnostics,
+            // not from disk. Leaving them behind filled up a disk.
+            struct ScratchGuard {
+                juce::File directory;
+                ~ScratchGuard() { directory.deleteRecursively(); }
+            } scratchGuard{workingDirectory};
             if ((!useFrozen &&
                  (!python.existsAsFile() || !workerScript.existsAsFile())) ||
                 !(modelsDirectory.isDirectory() ||
@@ -1387,9 +1397,42 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
 
             const auto startedAt = juce::Time::getMillisecondCounterHiRes();
             juce::MemoryOutputStream diagnostics;
-            std::array<char, 4096> outputBuffer{};
+            // readProcessOutput busy-waits until it has filled the buffer it is
+            // given, so the buffer size sets the progress latency: at ~40 bytes
+            // per update, 4 KB would mean waiting for about a hundred of them -
+            // more than an entire run emits - and every update landing at once
+            // when the worker exits. This returns after a line or two.
+            std::array<char, 64> outputBuffer{};
             separationState_.store(SeparationState::separating, std::memory_order_release);
             separationProgress_.store(-1.0, std::memory_order_release);
+            roformerEstimatedSeconds_.store(0.0, std::memory_order_release);
+            setSeparationMessage(htfx::tr("status.roformerStartingEngine"));
+            // Split on raw bytes rather than decoded text: a read can end in
+            // the middle of a multi-byte character, and decoding that fragment
+            // would corrupt it. Line breaks are always single ASCII bytes, so
+            // splitting first and decoding whole lines is safe. Upstream ends
+            // its counter with a carriage return, so that counts as a break
+            // too - otherwise the entire run is one unterminated line.
+            std::string pendingLine;
+            const auto drain = [this, &pendingLine](bool flushTail) {
+                for (;;) {
+                    const auto cut = pendingLine.find_first_of("\r\n");
+                    if (cut == std::string::npos) {
+                        break;
+                    }
+                    consumeRoformerProgressLine(
+                        juce::String::fromUTF8(pendingLine.data(),
+                                               static_cast<int>(cut)));
+                    pendingLine.erase(0, cut + 1);
+                }
+                if (flushTail && !pendingLine.empty()) {
+                    consumeRoformerProgressLine(
+                        juce::String::fromUTF8(
+                            pendingLine.data(),
+                            static_cast<int>(pendingLine.size())));
+                    pendingLine.clear();
+                }
+            };
             while (process.isRunning()) {
                 if (stopToken.stop_requested()) {
                     process.kill();
@@ -1402,6 +1445,9 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                     outputBuffer.data(), static_cast<int>(outputBuffer.size()));
                 if (bytesRead > 0) {
                     diagnostics.write(outputBuffer.data(), static_cast<std::size_t>(bytesRead));
+                    pendingLine.append(outputBuffer.data(),
+                                       static_cast<std::size_t>(bytesRead));
+                    drain(false);
                 } else {
                     std::this_thread::sleep_for(std::chrono::milliseconds(20));
                 }
@@ -1413,7 +1459,11 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
                     break;
                 }
                 diagnostics.write(outputBuffer.data(), static_cast<std::size_t>(bytesRead));
+                pendingLine.append(outputBuffer.data(),
+                                   static_cast<std::size_t>(bytesRead));
+                drain(false);
             }
+            drain(true);
             if (process.getExitCode() != 0) {
                 auto message = juce::String::fromUTF8(
                     static_cast<const char*>(diagnostics.getData()),
@@ -1844,6 +1894,29 @@ bool HTDemucsGpuFXAudioProcessor::previewUsesModel(
            juce::String::fromUTF8(result->modelName.c_str()) == modelName;
 }
 
+void HTDemucsGpuFXAudioProcessor::purgeStaleRoformerWorkingDirectories() const {
+    // Runs before this fix - and any run killed mid-flight - left their scratch
+    // directories behind. Sweep them once at startup so the disk usage cannot
+    // keep growing across updates.
+    const auto root = configuredRoformerOutputDirectory();
+    if (!root.isDirectory()) {
+        return;
+    }
+    for (const auto& entry : juce::RangedDirectoryIterator(
+             root, false, "cpp-route-*", juce::File::findDirectories)) {
+        entry.getFile().deleteRecursively();
+    }
+}
+
+juce::String formatDurationForStatus(double seconds) {
+    const auto whole = juce::roundToInt(seconds);
+    if (whole < 60) {
+        return juce::String(whole) + htfx::tr("status.secondsSuffix");
+    }
+    return juce::String(whole / 60) + htfx::tr("status.minutesSuffix") +
+           juce::String(whole % 60) + htfx::tr("status.secondsSuffix");
+}
+
 void HTDemucsGpuFXAudioProcessor::setMediaMessage(const juce::String& message) {
     const juce::ScopedLock lock(mediaMessageLock_);
     mediaMessage_ = message;
@@ -2002,6 +2075,84 @@ bool HTDemucsGpuFXAudioProcessor::beginModelDownload(
             }
         });
     return true;
+}
+
+void HTDemucsGpuFXAudioProcessor::consumeRoformerProgressLine(
+    const juce::String& line) {
+    const auto trimmed = line.trim();
+    if (trimmed.isEmpty()) {
+        return;
+    }
+
+    // Structured markers the worker emits for the phases it controls.
+    if (trimmed.startsWith("HTFX_PROGRESS ")) {
+        const auto payload =
+            juce::JSON::parse(trimmed.fromFirstOccurrenceOf(" ", false, false));
+        const auto stage = payload.getProperty("stage", {}).toString();
+        const auto detail = payload.getProperty("message", {}).toString();
+        const auto fractionVar = payload.getProperty("fraction", {});
+
+        if (stage == "prepare") {
+            setSeparationMessage(htfx::tr("status.roformerPreparing"));
+            separationProgress_.store(-1.0, std::memory_order_release);
+        } else if (stage == "download") {
+            setSeparationMessage(
+                htfx::tr("status.roformerDownloading") + detail);
+            if (!fractionVar.isVoid()) {
+                separationProgress_.store(
+                    static_cast<double>(fractionVar), std::memory_order_release);
+            }
+        } else if (stage == "load") {
+            setSeparationMessage(htfx::tr("status.roformerLoadingModel") + detail);
+            separationProgress_.store(-1.0, std::memory_order_release);
+        } else if (stage == "infer") {
+            setSeparationMessage(htfx::tr("status.roformerSeparating"));
+            separationProgress_.store(0.0, std::memory_order_release);
+        } else if (stage == "verify") {
+            setSeparationMessage(htfx::tr("status.roformerVerifying"));
+            separationProgress_.store(1.0, std::memory_order_release);
+        }
+        return;
+    }
+
+    // The upstream separator prints its own estimate once per chunk. It is the
+    // only progress signal available during inference, which is by far the
+    // longest phase, so it drives the bar rather than being thrown away.
+    const auto readSeconds = [&trimmed](const char* prefix) -> double {
+        const auto index = trimmed.indexOf(prefix);
+        if (index < 0) {
+            return -1.0;
+        }
+        return trimmed.substring(index + static_cast<int>(std::strlen(prefix)))
+            .trim()
+            .upToFirstOccurrenceOf(" ", false, false)
+            .getDoubleValue();
+    };
+
+    const auto total = readSeconds("Estimated total processing time for this track:");
+    if (total > 0.0) {
+        roformerEstimatedSeconds_.store(total, std::memory_order_release);
+        setSeparationMessage(
+            htfx::tr("status.roformerSeparating") + " · " +
+            htfx::tr("status.roformerRemainingPrefix") +
+            formatDurationForStatus(total));
+        separationProgress_.store(0.0, std::memory_order_release);
+        return;
+    }
+
+    const auto remaining = readSeconds("Estimated time remaining:");
+    if (remaining >= 0.0) {
+        const auto estimate = roformerEstimatedSeconds_.load(std::memory_order_acquire);
+        if (estimate > 0.0) {
+            separationProgress_.store(
+                juce::jlimit(0.0, 1.0, 1.0 - (remaining / estimate)),
+                std::memory_order_release);
+        }
+        setSeparationMessage(
+            htfx::tr("status.roformerSeparating") + " · " +
+            htfx::tr("status.roformerRemainingPrefix") +
+            formatDurationForStatus(remaining));
+    }
 }
 
 void HTDemucsGpuFXAudioProcessor::modelDownloadLoop(

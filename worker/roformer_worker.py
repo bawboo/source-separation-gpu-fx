@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
@@ -12,11 +15,47 @@ import numpy as np
 import soundfile as sf
 
 
-def configure_utf8_stream(stream: Any) -> None:
-    """Make upstream Unicode progress output safe on Windows legacy consoles."""
-    reconfigure = getattr(stream, "reconfigure", None)
-    if reconfigure is not None:
-        reconfigure(encoding="utf-8")
+def configure_utf8_stream(stream: Any) -> Any:
+    """Make progress output safe to encode, and make it arrive while it matters.
+
+    Python block-buffers stdout when it is a pipe rather than a console, so the
+    separator's progress reached the host in 4 KB bursts and the bar jumped
+    instead of moving. Line buffering does not help either: upstream writes its
+    per-chunk estimate with a trailing carriage return, so a newline that would
+    trigger a flush never arrives. Only an unbuffered stream shows it live.
+    """
+    try:
+        unbuffered = io.TextIOWrapper(
+            open(stream.fileno(), "wb", buffering=0, closefd=False),
+            encoding="utf-8",
+            errors="replace",
+            write_through=True,
+        )
+    except (AttributeError, OSError, ValueError):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
+        return stream
+    return unbuffered
+
+
+PROGRESS_PREFIX = "HTFX_PROGRESS "
+
+
+def report(stage: str, message: str = "", fraction: float | None = None) -> None:
+    """Tell the host what this run is doing right now.
+
+    A separation spends most of its time inside one opaque upstream call, so
+    without these markers the UI cannot distinguish "still working" from
+    "hung". The host parses lines starting with PROGRESS_PREFIX; anything else
+    on the stream stays human-readable diagnostics.
+    """
+    payload = {"stage": stage}
+    if message:
+        payload["message"] = message
+    if fraction is not None:
+        payload["fraction"] = max(0.0, min(1.0, float(fraction)))
+    print(PROGRESS_PREFIX + json.dumps(payload, ensure_ascii=False), flush=True)
 
 
 def _output_contract(input_path: Path, output_path: Path) -> dict[str, Any]:
@@ -43,6 +82,21 @@ def _output_contract(input_path: Path, output_path: Path) -> dict[str, Any]:
     }
 
 
+def _stage_input(source: Path, destination: Path) -> None:
+    """Place `source` at `destination`, preferring a link over a copy.
+
+    The input is a full-length WAV, so hard-linking avoids copying hundreds of
+    megabytes per run. Links fail across volumes and on some filesystems, in
+    which case a copy is the correct fallback.
+    """
+    try:
+        destination.hardlink_to(source)
+        return
+    except (OSError, AttributeError, NotImplementedError):
+        pass
+    shutil.copy2(source, destination)
+
+
 def separate_file(
     input_path: str | Path,
     output_dir: str | Path,
@@ -64,17 +118,35 @@ def separate_file(
         session_factory = MelBandRoformerSession
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    with session_factory(
-        model_name=model_name,
-        models_dir=Path(models_dir),
-        device=device,
-        backend="torch",
-    ) as session:
-        manifest = session.infer(
-            input_path.parent,
-            store_dir=output_dir,
-            output_format="wav_float32",
-        )
+    report("load", model_name)
+    # infer() consumes a whole folder, so hand it one holding only this file.
+    # Any other WAV beside the input would otherwise be separated as well,
+    # doubling the runtime and tripping an upstream crash in the estimate
+    # printer once a second track starts.
+    with tempfile.TemporaryDirectory(prefix="htfx-rf-") as staging:
+        staged_input = Path(staging) / input_path.name
+        _stage_input(input_path, staged_input)
+        with session_factory(
+            model_name=model_name,
+            models_dir=Path(models_dir),
+            device=device,
+            backend="torch",
+        ) as session:
+            report("infer")
+            manifest = session.infer(
+                staging,
+                store_dir=output_dir,
+                output_format="wav_float32",
+            )
+        # Point the entries back at the caller's file so the contract check
+        # below compares against it rather than the staged copy.
+        staged_resolved = staged_input.resolve()
+        manifest = [
+            {**entry, "input_path": str(input_path)}
+            if Path(entry["input_path"]).resolve() == staged_resolved
+            else entry
+            for entry in manifest
+        ]
 
     entries = [
         entry for entry in manifest if Path(entry["input_path"]).resolve() == input_path
@@ -82,6 +154,7 @@ def separate_file(
     if not entries:
         raise RuntimeError(f"separator produced no output for {input_path}")
 
+    report("verify")
     contracts = []
     for entry in entries:
         output_path = Path(entry["output_path"]).resolve()
@@ -101,6 +174,26 @@ def separate_file(
     }
 
 
+def _download_reporter(name: str) -> Callable[[int, int], None]:
+    """Report download progress without flooding the host with one line per chunk."""
+    state = {"last": -1}
+
+    def on_progress(received: int, total: int) -> None:
+        if total <= 0:
+            return
+        percent = int(received * 100 / total)
+        if percent == state["last"]:
+            return
+        state["last"] = percent
+        report(
+            "download",
+            f"{name} {received / (1 << 20):.0f}/{total / (1 << 20):.0f} MB",
+            received / total,
+        )
+
+    return on_progress
+
+
 def _ensure_model_cached(model_name: str, models_dir: Path, manifest_path: Path, max_cached: int) -> None:
     """Best-effort cache priming: honors the rolling cap for manifest-listed models.
 
@@ -108,13 +201,16 @@ def _ensure_model_cached(model_name: str, models_dir: Path, manifest_path: Path,
     the upstream session's own on-demand download, unaffected by the cap.
     """
     from roformer_cache import CacheVerificationError, ensure_cached, http_downloader
+    import functools
 
+    downloader = functools.partial(
+        http_downloader, on_progress=_download_reporter(model_name))
     try:
         ensure_cached(
             model_name,
             cache_dir=models_dir,
             manifest_path=manifest_path,
-            downloader=http_downloader,
+            downloader=downloader,
             max_cached=max_cached,
         )
     except KeyError:
@@ -136,8 +232,10 @@ def _default_manifest() -> Path:
 
 
 def main() -> int:
-    configure_utf8_stream(sys.stdout)
-    configure_utf8_stream(sys.stderr)
+    # Rebind so everything downstream - including the upstream separator, which
+    # imports later - writes through the unbuffered wrappers.
+    sys.stdout = configure_utf8_stream(sys.stdout)
+    sys.stderr = configure_utf8_stream(sys.stderr)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -149,15 +247,18 @@ def main() -> int:
     args = parser.parse_args()
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+    report("prepare", args.model)
     _ensure_model_cached(args.model, args.models_dir, args.manifest, args.max_cached)
 
-    print(json.dumps(separate_file(
+    result = separate_file(
         args.input,
         args.output_dir,
         model_name=args.model,
         models_dir=args.models_dir,
         device=args.device,
-    ), ensure_ascii=False, indent=2))
+    )
+    report("done")
+    print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
 

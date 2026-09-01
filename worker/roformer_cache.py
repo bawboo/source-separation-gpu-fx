@@ -120,18 +120,32 @@ def ensure_cached(
     )
 
 
-def http_downloader(url: str, destination: Path) -> None:
-    """Stream `url` to `destination`; real network path used outside tests."""
+def http_downloader(
+    url: str,
+    destination: Path,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> None:
+    """Stream `url` to `destination`; real network path used outside tests.
+
+    `on_progress(received, total)` is called as bytes arrive so the caller can
+    show a real percentage instead of an unbounded wait.
+    """
     import requests
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     tmp = destination.with_suffix(destination.suffix + ".part")
     with requests.get(url, stream=True, timeout=60) as response:
         response.raise_for_status()
+        total = int(response.headers.get("Content-Length") or 0)
+        received = 0
         with open(tmp, "wb") as handle:
             for chunk in response.iter_content(chunk_size=1 << 20):
-                if chunk:
-                    handle.write(chunk)
+                if not chunk:
+                    continue
+                handle.write(chunk)
+                received += len(chunk)
+                if on_progress is not None:
+                    on_progress(received, total)
     tmp.replace(destination)
 
 

@@ -108,8 +108,22 @@ bool runMode(
             return false;
         }
     }
+    // Echo the status text as it changes: a run that goes silent for minutes
+    // is the failure mode being guarded against, so it has to be visible here.
+    juce::String lastStatus;
     if (!waitUntil(
-            [&processor] {
+            [&processor, &lastStatus, &mode] {
+                const auto status = processor.getRecordStatusText();
+                if (status != lastStatus) {
+                    lastStatus = status;
+                    const auto fraction = processor.getSeparationProgress();
+                    std::cout << "[" << mode.label << "]   " << status;
+                    if (fraction >= 0.0) {
+                        std::cout << "  (" << juce::roundToInt(fraction * 100.0)
+                                  << "%)";
+                    }
+                    std::cout << std::endl;
+                }
                 const auto state = processor.getSeparationState();
                 return state == HTDemucsGpuFXAudioProcessor::SeparationState::previewReady ||
                        state == HTDemucsGpuFXAudioProcessor::SeparationState::error;

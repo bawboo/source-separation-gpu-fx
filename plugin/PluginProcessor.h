@@ -301,6 +301,8 @@ private:
     void stopMediaThread();
     void stopModelDownloadThread();
     void modelDownloadLoop(std::stop_token stopToken, juce::String modelName);
+    void consumeRoformerProgressLine(const juce::String& line);
+    void purgeStaleRoformerWorkingDirectories() const;
     void resumeSeparationAfterModelDownload(const juce::String& modelName);
     void importMediaLoop(std::stop_token stopToken, juce::File mediaFile);
     void stemExportLoop(
@@ -398,6 +400,9 @@ private:
     // running, so the run can resume by itself once the model lands.
     mutable juce::CriticalSection pendingSeparationLock_;
     juce::String separationPendingModel_;
+    // Total seconds the separator estimated for the current track, used to
+    // turn its per-second countdown into a real progress fraction.
+    std::atomic<double> roformerEstimatedSeconds_{0.0};
     std::atomic<bool> importedVideo_{false};
     std::atomic<int> resolvedBackend_{0};
     std::atomic<int> activeSourceCount_{4};
