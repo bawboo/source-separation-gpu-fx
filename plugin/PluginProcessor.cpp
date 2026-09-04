@@ -38,8 +38,10 @@ constexpr std::array<const char*, HTDemucsGpuFXAudioProcessor::kMaxSources>
         "drumsGain", "bassGain", "otherGain", "vocalsGain", "guitarGain", "pianoGain"};
 
 constexpr std::array<double, 5> kSegmentSeconds{2.0, 3.0, 4.0, 5.0, 7.8};
-constexpr std::array<const char*, 4> kModelNames{
-    "htdemucs", "htdemucs_ft", "htdemucs_6s", "hdemucs_mmi"};
+// One representative per stem layout. htdemucs_ft and hdemucs_mmi are
+// quality tiers of the same separations, not different effects, and are no
+// longer offered.
+constexpr std::array<const char*, 2> kModelNames{"htdemucs", "htdemucs_6s"};
 
 juce::NormalisableRange<float> stemGainRange() {
     return {-60.0f, 6.0f, 0.01f, 0.35f};
@@ -259,6 +261,37 @@ juce::File configuredRoformerWorker() {
 // checkout; an installed or portable copy would otherwise resolve them relative
 // to the working directory, landing somewhere that does not exist (and, under
 // Program Files, is not writable), which made every RoFormer mode fail.
+// The curated catalog decides which manifest entries the app offers. It is
+// looked up beside the manifest so a custom manifest can carry its own.
+juce::File configuredRoformerCatalog() {
+    const auto environment = juce::SystemStats::getEnvironmentVariable(
+        "HTFX_ROFORMER_CATALOG", {}).trim();
+    if (environment.isNotEmpty()) {
+        return juce::File(environment);
+    }
+    return configuredRoformerManifest().getSiblingFile("roformer-catalog.json");
+}
+
+std::filesystem::path configuredWorkerExecutable();
+juce::String displayPath(const std::filesystem::path& path);
+
+// Every frozen runtime ships runtime-manifest.json beside its executable with
+// the flavour it was built as. Without a frozen runtime (source tree) there is
+// no flavour, and nothing is filtered.
+juce::String installedRuntimeFlavor() {
+    const auto worker = configuredWorkerExecutable();
+    if (worker.empty()) {
+        return {};
+    }
+    const auto manifest = juce::File(displayPath(worker))
+                              .getSiblingFile("runtime-manifest.json");
+    const auto parsed = juce::JSON::parse(manifest.loadFileAsString());
+    if (const auto* object = parsed.getDynamicObject()) {
+        return object->getProperty("flavor").toString().trim().toLowerCase();
+    }
+    return {};
+}
+
 juce::File configuredRoformerModelsDirectory() {
     const auto environment = juce::SystemStats::getEnvironmentVariable(
         "HTFX_ROFORMER_MODELS_DIR", {}).trim();
@@ -690,7 +723,7 @@ HTDemucsGpuFXAudioProcessor::createParameterLayout() {
     parameters.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"model", 1},
         "Model",
-        juce::StringArray{"htdemucs", "htdemucs_ft", "htdemucs_6s", "hdemucs_mmi"},
+        juce::StringArray{"htdemucs", "htdemucs_6s"},
         0));
     parameters.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"computeBackend", 1},
@@ -726,7 +759,7 @@ HTDemucsGpuFXAudioProcessor::currentRuntimeConfiguration() const {
         0,
         static_cast<int>(kModelNames.size()) - 1);
     configuration.modelName = kModelNames[static_cast<std::size_t>(modelIndex)];
-    configuration.sourceCount = modelIndex == 2 ? 6 : 4;
+    configuration.sourceCount = modelIndex == 1 ? 6 : 4;
     {
         const std::scoped_lock lock(roformerMutex_);
         if (selectedRoformerModel_.isNotEmpty()) {
@@ -778,8 +811,49 @@ void HTDemucsGpuFXAudioProcessor::loadRoformerModels() {
             }
         }
     }
+
+    // Offer only the curated catalog: one representative per category, plus
+    // the odd extra that is a different effect rather than a quality tier.
+    // On the CPU runtime, also drop models measured too slow to be usable.
+    // A missing catalog leaves the full manifest available, so a development
+    // checkout without one keeps working.
+    const auto catalogParsed =
+        juce::JSON::parse(configuredRoformerCatalog().loadFileAsString());
+    if (const auto* catalogRoot = catalogParsed.getDynamicObject()) {
+        if (const auto* entries = catalogRoot->getProperty("models").getArray()) {
+            const bool cpuRuntime = installedRuntimeFlavor() == "cpu";
+            std::vector<RoformerModel> curated;
+            for (const auto& entryValue : *entries) {
+                const auto* entry = entryValue.getDynamicObject();
+                if (entry == nullptr) {
+                    continue;
+                }
+                const auto id = entry->getProperty("id").toString();
+                const bool cpuCapable =
+                    !entry->hasProperty("cpu") ||
+                    static_cast<bool>(entry->getProperty("cpu"));
+                if (cpuRuntime && !cpuCapable) {
+                    continue;
+                }
+                for (const auto& model : loaded) {
+                    if (model.id == id) {
+                        auto kept = model;
+                        kept.cpuCapable = cpuCapable;
+                        curated.push_back(std::move(kept));
+                        break;
+                    }
+                }
+            }
+            loaded = std::move(curated);
+        }
+    }
+
     const std::scoped_lock lock(roformerMutex_);
     roformerModels_ = std::move(loaded);
+}
+
+juce::String HTDemucsGpuFXAudioProcessor::getRuntimeFlavor() const {
+    return installedRuntimeFlavor();
 }
 
 std::vector<HTDemucsGpuFXAudioProcessor::RoformerModel>
@@ -1902,9 +1976,15 @@ void HTDemucsGpuFXAudioProcessor::purgeStaleRoformerWorkingDirectories() const {
     if (!root.isDirectory()) {
         return;
     }
+    // Only directories nobody can still be using: a second instance of the
+    // app (or a test running beside it) may own a fresh one, and deleting it
+    // under that run would fail its separation.
+    const auto cutoff = juce::Time::getCurrentTime() - juce::RelativeTime::hours(1);
     for (const auto& entry : juce::RangedDirectoryIterator(
              root, false, "cpp-route-*", juce::File::findDirectories)) {
-        entry.getFile().deleteRecursively();
+        if (entry.getModificationTime() < cutoff) {
+            entry.getFile().deleteRecursively();
+        }
     }
 }
 
@@ -2527,6 +2607,7 @@ bool HTDemucsGpuFXAudioProcessor::beginBatchSeparation() {
         batchThread_.join();
     }
     storeActiveClipMixerState();
+    batchBusy_.store(true, std::memory_order_release);
     batchThread_ = std::jthread([this](std::stop_token stopToken) {
         batchSeparationLoop(stopToken);
     });
@@ -2534,6 +2615,12 @@ bool HTDemucsGpuFXAudioProcessor::beginBatchSeparation() {
 }
 
 void HTDemucsGpuFXAudioProcessor::batchSeparationLoop(std::stop_token stopToken) {
+    // Hold the batch flag for the whole loop, whichever way it exits.
+    struct BatchGuard {
+        std::atomic<bool>& flag;
+        explicit BatchGuard(std::atomic<bool>& f) : flag(f) { flag.store(true, std::memory_order_release); }
+        ~BatchGuard() { flag.store(false, std::memory_order_release); }
+    } batchGuard{batchBusy_};
     const int total = getClipCount();
     for (int index = 0; index < total; ++index) {
         if (stopToken.stop_requested()) {
@@ -2599,6 +2686,10 @@ bool HTDemucsGpuFXAudioProcessor::beginBatchExport(
         batchThread_.join();
     }
     storeActiveClipMixerState();
+    // Raise the flag here, not only inside the loop: the thread may not have
+    // started by the time this returns, and a caller polling isBatchBusy()
+    // immediately would otherwise conclude the batch already finished.
+    batchBusy_.store(true, std::memory_order_release);
     batchThread_ = std::jthread(
         [this, folder, kind](std::stop_token stopToken) {
             batchExportLoop(stopToken, folder, kind);
@@ -2608,6 +2699,12 @@ bool HTDemucsGpuFXAudioProcessor::beginBatchExport(
 
 void HTDemucsGpuFXAudioProcessor::batchExportLoop(
     std::stop_token stopToken, juce::File folder, QuickExportKind kind) {
+    // Hold the batch flag for the whole loop, whichever way it exits.
+    struct BatchGuard {
+        std::atomic<bool>& flag;
+        explicit BatchGuard(std::atomic<bool>& f) : flag(f) { flag.store(true, std::memory_order_release); }
+        ~BatchGuard() { flag.store(false, std::memory_order_release); }
+    } batchGuard{batchBusy_};
     folder.createDirectory();
     const int total = getClipCount();
     int exported = 0;
@@ -4062,9 +4159,7 @@ public:
         };
 
         modelBox_.addItem("htdemucs", 1);
-        modelBox_.addItem("htdemucs_ft", 2);
-        modelBox_.addItem("htdemucs_6s", 3);
-        modelBox_.addItem("hdemucs_mmi", 4);
+        modelBox_.addItem("htdemucs_6s", 2);
         modelBox_.setSelectedItemIndex(choiceIndex("model"), juce::dontSendNotification);
         modelBox_.onChange = [this] {
             setChoice("model", modelBox_.getSelectedItemIndex());
@@ -4858,7 +4953,7 @@ private:
         if (index == 0) {
             selectHtdemucsModel(0);  // 4-stem separation -> htdemucs
         } else if (index == 1) {
-            selectHtdemucsModel(2);  // 6-stem separation -> htdemucs_6s
+            selectHtdemucsModel(1);  // 6-stem separation -> htdemucs_6s
         } else if (index >= 2) {
             const auto categoryIndex = index - 2;
             if (categoryIndex >= 0 && categoryIndex < separationModeCategories_.size()) {
@@ -4956,7 +5051,7 @@ private:
     void updateSixSourceControls() {
         const bool modeChosen = separationModeBox_.getSelectedItemIndex() >= 0;
         const bool roformerMode = roformerModeSelected();
-        const bool sixSources = !roformerMode && modelBox_.getSelectedItemIndex() == 2;
+        const bool sixSources = !roformerMode && modelBox_.getSelectedItemIndex() == 1;
         constexpr std::array<const char*, HTDemucsGpuFXAudioProcessor::kMaxSources>
             defaultStemNames{"Drums", "Bass", "Other", "Vocals", "Guitar", "Piano"};
         if (roformerMode) {

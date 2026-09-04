@@ -14,6 +14,23 @@
 
 namespace {
 
+// The offered catalog is the curated list, not the whole manifest; read the
+// same file the processor does so the expectation cannot drift from it.
+int curatedCatalogCount() {
+    const auto env = juce::SystemStats::getEnvironmentVariable("HTFX_ROFORMER_CATALOG", {}).trim();
+    auto catalog = env.isNotEmpty()
+        ? juce::File(env)
+        : juce::File::getCurrentWorkingDirectory()
+              .getChildFile("assets/models/roformer-catalog.json");
+    const auto parsed = juce::JSON::parse(catalog.loadFileAsString());
+    if (const auto* root = parsed.getDynamicObject()) {
+        if (const auto* models = root->getProperty("models").getArray()) {
+            return models->size();
+        }
+    }
+    return -1;
+}
+
 void require(bool condition, const std::string& message) {
     if (!condition) {
         throw std::runtime_error(message);
@@ -133,11 +150,15 @@ int run() {
     processor->prepareToPlay(44'100.0, 256);
 
     const auto models = processor->getRoformerModels();
-    require(models.size() == 99, "RoFormer smoke: catalog count mismatch");
+    const int expectedCount = curatedCatalogCount();
+    require(expectedCount > 0, "RoFormer smoke: could not read roformer-catalog.json");
+    require(static_cast<int>(models.size()) == expectedCount,
+            "RoFormer smoke: catalog count mismatch");
+    // Every curated model is an audited one.
     require(
         std::count_if(
             models.begin(), models.end(),
-            [](const auto& model) { return model.audited; }) == 57,
+            [](const auto& model) { return model.audited; }) == expectedCount,
         "RoFormer smoke: audited count mismatch");
     require(
         !processor->selectRoformerModel("not-a-real-model"),

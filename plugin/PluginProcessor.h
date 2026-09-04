@@ -52,7 +52,13 @@ public:
         juce::String category;
         bool audited = false;
         bool experimental = true;
+        // False for models that take tens of minutes per song on CPU; the CPU
+        // runtime does not offer them at all.
+        bool cpuCapable = true;
     };
+
+    // "cuda", "cpu", or "" when no frozen runtime is installed (source tree).
+    [[nodiscard]] juce::String getRuntimeFlavor() const;
 
     HTDemucsGpuFXAudioProcessor();
     ~HTDemucsGpuFXAudioProcessor() override;
@@ -144,6 +150,12 @@ public:
     }
     [[nodiscard]] int getActiveLatencySamples() const noexcept {
         return activeLatencySamples_.load(std::memory_order_acquire);
+    }
+    // True while a batch separation or batch export is running. The media
+    // flag alone is not enough: a batch drives one media job per clip, so it
+    // reads as idle in the gaps between clips.
+    [[nodiscard]] bool isBatchBusy() const noexcept {
+        return batchBusy_.load(std::memory_order_acquire);
     }
     [[nodiscard]] bool isMediaBusy() const noexcept {
         return mediaBusy_.load(std::memory_order_acquire);
@@ -393,6 +405,7 @@ private:
     std::atomic<bool> previewPlaying_{false};
     std::atomic<double> playbackSampleRate_{static_cast<double>(kSampleRate)};
     std::atomic<bool> mediaBusy_{false};
+    std::atomic<bool> batchBusy_{false};
     std::atomic<double> mediaProgress_{0.0};
     std::atomic<bool> modelDownloadBusy_{false};
     std::atomic<double> modelDownloadProgress_{0.0};

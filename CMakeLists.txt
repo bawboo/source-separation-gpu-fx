@@ -292,6 +292,10 @@ if(HTFX_BUILD_PLUGIN)
     target_compile_features(htdemucs_ui_configuration_smoke PRIVATE cxx_std_20)
     if(MSVC)
         target_compile_options(htdemucs_ui_configuration_smoke PRIVATE /utf-8)
+        # Keep symbols for this smoke: its crash reporter walks the stack.
+        target_compile_options(htdemucs_ui_configuration_smoke PRIVATE /Zi)
+        target_compile_options(HTDemucsGpuFX PRIVATE /Zi)
+        target_link_options(htdemucs_ui_configuration_smoke PRIVATE /DEBUG)
     endif()
     target_link_libraries(htdemucs_ui_configuration_smoke PRIVATE
         HTDemucsGpuFX
@@ -316,6 +320,17 @@ if(HTFX_BUILD_PLUGIN)
         target_compile_options(htdemucs_goal_check PRIVATE /utf-8)
     endif()
     target_link_libraries(htdemucs_goal_check PRIVATE
+        HTDemucsGpuFX
+        juce::juce_audio_utils
+    )
+
+    add_executable(htdemucs_full_feature_check tests/full_feature_check.cpp)
+    target_include_directories(htdemucs_full_feature_check PRIVATE plugin)
+    target_compile_features(htdemucs_full_feature_check PRIVATE cxx_std_20)
+    if(MSVC)
+        target_compile_options(htdemucs_full_feature_check PRIVATE /utf-8)
+    endif()
+    target_link_libraries(htdemucs_full_feature_check PRIVATE
         HTDemucsGpuFX
         juce::juce_audio_utils
     )

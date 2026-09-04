@@ -3,6 +3,54 @@
 本專案的版本紀錄。格式依循 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)，
 版本號依循 [語意化版本](https://semver.org/lang/zh-TW/)。
 
+## [0.0.5] - 2026-09-04
+
+### 變更
+
+- **模型清單精簡為每種分離一個代表性權重**。RoFormer 從 99 個模型縮到 8 類 9 個
+  （`assets/models/roformer-catalog.json`）：每類保留一個 audited 代表，只有效果
+  確實不同時才多留一個（去噪類另保留「串音抑制」）；「general」與「instvoc」兩類
+  在效果上就是人聲／伴奏兩軌分離，整類移除。HTDemucs 只保留 4 軌（`htdemucs`）與
+  6 軌（`htdemucs_6s`），`htdemucs_ft`／`hdemucs_mmi` 屬品質分級而非不同效果，
+  不再列出。完整 manifest 保留不動，checkpoint 網址與 SHA-256 仍可驗證
+- **CPU 版只提供實測跑得動的模型**：目錄檔每個條目帶 `cpu` 旗標，主程式讀取
+  runtime 旁的 `runtime-manifest.json` 得知安裝的是 CPU 還是 CUDA runtime，CPU 版
+  不列出被標為 `cpu: false` 的模型。整首實測（CPU runtime，5 分鐘的歌）：HTDemucs
+  4／6 軌約 2 分鐘；45 MB 的 guitar 模型推論約 8 分鐘；456 MB 的 de-reverb 估計約
+  4 小時；913 MB 級更慢。因此 CPU 版的 RoFormer 只提供 guitar，其餘標為 GPU 專用；
+  CPU 上的人聲／伴奏分離由 HTDemucs 4／6 軌承擔
+
+### 修正
+
+- **全新安裝時 guitar／denoise／crowd 三個模型載入必定失敗**：快取器只預先下載並
+  驗證 checkpoint，config yaml 交給上游套件自己抓，而上游對這三個模型用的 config
+  網址已失效（404）。開發機能跑只因舊快取裡早就有 config。manifest 本來就記錄了
+  可用的 `config_url` 與 `config_sha256`，現在快取器連 config 一起下載並驗證，
+  上游看到檔案存在就不再嘗試自己的網址
+- **模型下載一遇連線重設就整個分離失敗**：下載 1.5 GB 的 checkpoint 途中被遠端
+  重設（10054）沒有任何重試。下載器改為以 HTTP Range 從已下載的部分續傳，並以
+  指數退避重試最多 6 次
+- **批次進行中沒有可查詢的狀態**：批次分離／匯出是逐檔驅動 media 執行緒，檔與檔
+  之間 `isMediaBusy()` 會短暫為 false，UI 或呼叫端據此判斷「已完成」會太早。
+  新增 `isBatchBusy()`，整個批次迴圈期間為 true（在啟動執行緒**之前**就設起，
+  否則呼叫端緊接著查詢仍會看到 false）
+- **啟動時清理暫存目錄會誤刪另一個實例正在用的目錄**：0.0.4 加入的啟動清理會刪掉
+  所有 `cpp-route-*`，若同時開著第二個實例（或測試與 App 並行），對方進行中的分離
+  會失敗。改為只清理修改時間超過一小時的目錄
+
+### 測試
+
+- 新增 `htdemucs_full_feature_check`：對一首真實歌曲跑完**所有**使用者功能——
+  匯入、每一種分離模式、人聲／伴奏快速匯出、逐軌匯出、混音匯出、中途取消、
+  影片匯入與 MP4 回填、雙檔批次匯入／分離／匯出——並檢查每個輸出都是 44.1 kHz
+  立體聲 float、長度與來源一致、非靜音。以 `--backend cpu|auto` 分別驗收兩份 runtime
+- 逾時改為「多久沒有任何進度」而非總時長：模型下載或慢速推論只要持續回報就不算
+  卡住。原本 20 分鐘的總時限會把「下載 800 MB ＋ 分離」誤判為失敗
+- smoke tests 的模型數量改由目錄檔推導，不再硬編碼 99 個模型
+- 修正 `ui_configuration_smoke` 間歇性的 Access violation：測試在開頭蒐集一次
+  元件指標，之後編輯器重建子元件時舊指標懸空。語言檢查前改為重新蒐集元件樹，
+  並加入 SEH 崩潰回報（帶符號的堆疊），日後同類問題可直接定位
+
 ## [0.0.4] - 2026-09-01
 
 ### 修正

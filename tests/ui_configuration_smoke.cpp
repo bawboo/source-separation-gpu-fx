@@ -4,6 +4,7 @@
 #include <juce_events/juce_events.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cmath>
 #include <chrono>
 #include <functional>
@@ -14,6 +15,23 @@
 #include <vector>
 
 namespace {
+
+// The offered catalog is the curated list, not the whole manifest; read the
+// same file the processor does so the expectation cannot drift from it.
+int curatedCatalogCount() {
+    const auto env = juce::SystemStats::getEnvironmentVariable("HTFX_ROFORMER_CATALOG", {}).trim();
+    auto catalog = env.isNotEmpty()
+        ? juce::File(env)
+        : juce::File::getCurrentWorkingDirectory()
+              .getChildFile("assets/models/roformer-catalog.json");
+    const auto parsed = juce::JSON::parse(catalog.loadFileAsString());
+    if (const auto* root = parsed.getDynamicObject()) {
+        if (const auto* models = root->getProperty("models").getArray()) {
+            return models->size();
+        }
+    }
+    return -1;
+}
 
 void collectComponents(juce::Component& parent, std::vector<juce::Component*>& result) {
     for (int index = 0; index < parent.getNumChildComponents(); ++index) {
@@ -165,12 +183,20 @@ int run() {
     processor->prepareToPlay(44'100.0, 256);
 
     const auto roformerModels = processor->getRoformerModels();
-    require(roformerModels.size() == 99, "RoFormer catalog count mismatch");
+    juce::StringArray roformerCategories;
+    for (const auto& model : roformerModels) {
+        roformerCategories.addIfNotAlreadyThere(model.category);
+    }
+    const int roformerCategoryCount = roformerCategories.size();
+    const int expectedCount = curatedCatalogCount();
+    require(expectedCount > 0, "could not read roformer-catalog.json");
+    require(static_cast<int>(roformerModels.size()) == expectedCount,
+            "RoFormer catalog count mismatch");
     require(
         std::count_if(
             roformerModels.begin(),
             roformerModels.end(),
-            [](const auto& model) { return model.audited; }) == 57,
+            [](const auto& model) { return model.audited; }) == expectedCount,
         "RoFormer audited count mismatch");
     require(
         !processor->selectRoformerModel("not-a-real-model"),
@@ -264,7 +290,7 @@ int run() {
     collectComponents(*editor, components);
     auto* mode = findCombo(components, htfx::tr("combo.modeRecord"), 2);
     auto* segment = findCombo(components, "2 seconds", 5);
-    auto* model = findCombo(components, "htdemucs", 4);
+    auto* model = findCombo(components, "htdemucs", 2);
 #if JUCE_MAC
     auto* compute = findCombo(components, "Auto (Apple MPS, otherwise CPU)", 4);
 #else
@@ -298,10 +324,12 @@ int run() {
     require(segment->getSelectedItemIndex() == 4 &&
                 segment->getItemText(4) == "7.8 seconds",
             "segment choices/default mismatch");
+    // Only the two representative HTDemucs layouts are offered; the quality
+    // tiers (htdemucs_ft, hdemucs_mmi) are no longer listed.
     require(model->getSelectedItemIndex() == 0 &&
-                model->getItemText(1) == "htdemucs_ft" &&
-                model->getItemText(2) == "htdemucs_6s" &&
-                model->getItemText(3) == "hdemucs_mmi",
+                model->getNumItems() == 2 &&
+                model->getItemText(0) == "htdemucs" &&
+                model->getItemText(1) == "htdemucs_6s",
             "model choices/default mismatch");
     require(compute->getSelectedItemIndex() == 0 &&
                 compute->getItemText(1) == "NVIDIA CUDA" &&
@@ -338,8 +366,8 @@ int run() {
             "L4: startup did not preselect the Vocals separation mode");
     require(separationMode->getItemText(0) == htfx::tr("combo.separationMode4Stem") &&
                 separationMode->getItemText(1) == htfx::tr("combo.separationMode6Stem") &&
-                separationMode->getNumItems() == 12,
-            "Separation mode list mismatch (2 HTDemucs + 10 RoFormer categories)");
+                                separationMode->getNumItems() == 2 + roformerCategoryCount,
+            "Separation mode list mismatch (2 HTDemucs + one per curated RoFormer category)");
 
     advanced->onClick();
     require(editor->getHeight() == 826, "expanded editor size mismatch");
@@ -369,7 +397,7 @@ int run() {
             "L4: startup Vocals preselect should show the RoFormer browser "
             "in the expanded advanced panel");
     require(roformerCategory->getItemText(0) == htfx::tr("combo.roformerAllCategories") &&
-                roformerCategory->getNumItems() == 11,
+                roformerCategory->getNumItems() == 1 + roformerCategoryCount,
             "RoFormer category browser mismatch");
     // Startup preselects the Vocals mode, so the browser opens filtered to
     // that category (a subset); the full 99-model catalog is asserted at the
@@ -432,7 +460,7 @@ int run() {
             "B3: 4-stem separation did not hide the 6-stem-only sliders");
 
     separationMode->setSelectedItemIndex(1, juce::sendNotificationSync);
-    require(waitUntil([&] { return model->getSelectedItemIndex() == 2; },
+    require(waitUntil([&] { return model->getSelectedItemIndex() == 1; },
                        std::chrono::seconds(3)),
             "B2: choosing 6-stem separation did not default the model box to "
             "htdemucs_6s");
@@ -463,7 +491,18 @@ int run() {
                 std::chrono::seconds(3)),
             "B2: choosing the Vocals separation mode did not lock the RoFormer "
             "category filter, or D3: did not show the RoFormer browser trio");
-    require(processor->getSelectedRoformerModel() == "melband-roformer-big-beta5e",
+    // The editor's rule: the first audited model of the category, in catalog
+    // order, falling back to the first model of the category.
+    juce::String expectedVocalsDefault;
+    for (const auto& model : roformerModels) {
+        if (model.category == "vocals" && model.audited) { expectedVocalsDefault = model.id; break; }
+    }
+    if (expectedVocalsDefault.isEmpty()) {
+        for (const auto& model : roformerModels) {
+            if (model.category == "vocals") { expectedVocalsDefault = model.id; break; }
+        }
+    }
+    require(processor->getSelectedRoformerModel() == expectedVocalsDefault,
             "B2: choosing the Vocals separation mode did not default to the "
             "audited-first vocals model");
     require(roformerStatus->getText().contains(htfx::tr("roformer.statusAudited")),
@@ -555,22 +594,28 @@ int run() {
                        std::chrono::seconds(3)),
             "re-selecting the Guitar separation mode did not restore its category");
     roformerCategory->setText("vocals", juce::sendNotificationSync);
-    require(roformerModel->getNumItems() == 24,
-            "RoFormer category filter did not show the 24 vocal models");
+    const int vocalModelCount = static_cast<int>(std::count_if(
+        roformerModels.begin(), roformerModels.end(),
+        [](const auto& model) { return model.category == "vocals"; }));
+    require(roformerModel->getNumItems() == vocalModelCount,
+            "RoFormer category filter did not show every vocal model in the catalog");
     roformerCategory->setSelectedItemIndex(0, juce::sendNotificationSync);
-    roformerSearch->setText("melband-roformer-instv8b", true);
+    // The curated catalog carries no experimental models, so the search is
+    // exercised on the one extra-effect entry (bleed suppression), which the
+    // smoke cache never holds - that keeps the "not downloaded" status path
+    // covered.
+    const juce::String searchId =
+        "roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris";
+    roformerSearch->setText("bleed-suppressor", true);
     roformerSearch->onTextChange();
-    require(roformerModel->getNumItems() == 1 &&
-                roformerModel->getItemText(0).contains(
-                    htfx::tr("roformer.tagExperimental")),
-            "RoFormer search/experimental marker mismatch");
+    require(roformerModel->getNumItems() == 1,
+            "RoFormer search did not narrow the browser to the one matching model");
     roformerModel->setSelectedItemIndex(0, juce::sendNotificationSync);
-    require(processor->getSelectedRoformerModel() ==
-                "melband-roformer-instv8b",
+    require(processor->getSelectedRoformerModel() == searchId,
             "RoFormer browser selection did not reach the processor");
-    require(roformerStatus->getText().contains(htfx::tr("roformer.statusExperimental")) &&
+    require(roformerStatus->getText().contains(htfx::tr("roformer.statusAudited")) &&
                 roformerStatus->getText().contains(htfx::tr("roformer.statusNotDownloaded")),
-            "RoFormer download/experimental status mismatch");
+            "RoFormer download/audited status mismatch");
     roformerSearch->clear();
 
     // B4: the checks above only spot-check two of the ten RoFormer category
@@ -691,9 +736,15 @@ int run() {
     // literals until a future L2/L6 iteration covers them.
     require(htfx::Localization::instance().getLanguage() == htfx::Language::zhTW,
             "language did not default to zh-TW");
+    // The list collected at start-up holds pointers into a hierarchy the
+    // editor has partly rebuilt since (mode changes, panel switches, the batch
+    // clip rows), so look the language controls up in a fresh collection.
+    std::vector<juce::Component*> languageComponents;
+    collectComponents(*editor, languageComponents);
     auto* languageToggle =
-        findNamedComponent<juce::TextButton>(components, "Language toggle");
-    auto* resetWorker = findNamedComponent<juce::TextButton>(components, "Reset worker");
+        findNamedComponent<juce::TextButton>(languageComponents, "Language toggle");
+    auto* resetWorker =
+        findNamedComponent<juce::TextButton>(languageComponents, "Reset worker");
     require(languageToggle != nullptr && resetWorker != nullptr,
             "language toggle / reset worker controls were not found");
     require(languageToggle->getButtonText() == "EN",
@@ -724,13 +775,13 @@ int run() {
     processor->releaseResources();
     std::cout << "default_panel=general quick_exports=vocals/accompany "
                  "default_mode=Record latency=0 advanced=collapsed/expanded/recollapsed"
-                 " segments=5 models=4 compute=Auto/CUDA/CPU/MPS cpu_warning=true"
+                 " segments=5 models=2 compute=Auto/CUDA/CPU/MPS cpu_warning=true"
                  " record_button=red media_buttons=true proportional_scale=true"
                  " fullscreen_toggle=true roformer_cpp_route=true"
                  " roformer_stems=2 roformer_seconds=2"
-                 " roformer_browser=99 categories=10 search=true"
-                 " experimental=true download_status=true"
-                 " separation_mode_gate=true separation_modes=12"
+                 " roformer_browser=" << roformerModels.size() << " categories=" << roformerCategoryCount << " search=true"
+                 " experimental=none download_status=true"
+                 " separation_mode_gate=true separation_modes=" << (2 + roformerCategoryCount) <<
                  " separation_mode_defaults=true separation_mode_stem_gating=true"
                  " separation_mode_all_categories_verified=true"
                  " startup_default_mode=vocals"
@@ -744,7 +795,7 @@ int run() {
 
 }  // namespace
 
-int main() {
+int runSmoke() {
     try {
         juce::ScopedJuceInitialiser_GUI juceInitialiser;
         return run();
@@ -753,5 +804,57 @@ int main() {
             juce::AudioProcessor::wrapperType_Undefined);
         std::cerr << "ui_configuration_smoke fatal: " << error.what() << '\n';
         return 2;
+    }
+}
+
+// An access violation exits the test with 0xC0000005 and nothing else. Catch
+// it here and walk the faulting thread from the exception context, so an
+// intermittent crash leaves a symbolized stack to debug from.
+#include <windows.h>
+#include <dbghelp.h>
+#pragma comment(lib, "dbghelp.lib")
+static LONG reportCrash(EXCEPTION_POINTERS* info) {
+    const auto* record = info->ExceptionRecord;
+    std::fprintf(stderr, "\nui_configuration_smoke CRASH: code=0x%08lX address=%p\n",
+                 static_cast<unsigned long>(record->ExceptionCode), record->ExceptionAddress);
+    if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record->NumberParameters >= 2) {
+        std::fprintf(stderr, "  %s at %p\n", record->ExceptionInformation[0] == 0 ? "read" : "write",
+                     reinterpret_cast<void*>(record->ExceptionInformation[1]));
+    }
+    const HANDLE process = GetCurrentProcess();
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+    SymInitialize(process, nullptr, TRUE);
+    CONTEXT context = *info->ContextRecord;
+    STACKFRAME64 frame{};
+    frame.AddrPC.Offset = context.Rip;    frame.AddrPC.Mode = AddrModeFlat;
+    frame.AddrFrame.Offset = context.Rbp; frame.AddrFrame.Mode = AddrModeFlat;
+    frame.AddrStack.Offset = context.Rsp; frame.AddrStack.Mode = AddrModeFlat;
+    alignas(SYMBOL_INFO) char buffer[sizeof(SYMBOL_INFO) + 512]{};
+    auto* symbol = reinterpret_cast<SYMBOL_INFO*>(buffer);
+    symbol->SizeOfStruct = sizeof(SYMBOL_INFO); symbol->MaxNameLen = 511;
+    for (int depth = 0; depth < 40; ++depth) {
+        if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, GetCurrentThread(), &frame, &context,
+                         nullptr, SymFunctionTableAccess64, SymGetModuleBase64, nullptr) ||
+            frame.AddrPC.Offset == 0) {
+            break;
+        }
+        DWORD64 displacement = 0; DWORD lineDisplacement = 0;
+        IMAGEHLP_LINE64 line{}; line.SizeOfStruct = sizeof(line);
+        const bool haveSymbol = SymFromAddr(process, frame.AddrPC.Offset, &displacement, symbol);
+        const bool haveLine = SymGetLineFromAddr64(process, frame.AddrPC.Offset, &lineDisplacement, &line);
+        std::fprintf(stderr, "  #%02d %p %s+0x%llx  %s:%lu\n", depth,
+                     reinterpret_cast<void*>(frame.AddrPC.Offset),
+                     haveSymbol ? symbol->Name : "?", static_cast<unsigned long long>(displacement),
+                     haveLine ? line.FileName : "", haveLine ? line.LineNumber : 0UL);
+    }
+    std::fflush(stderr);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+int main() {
+    __try {
+        return runSmoke();
+    } __except (reportCrash(GetExceptionInformation())) {
+        return 5;
     }
 }

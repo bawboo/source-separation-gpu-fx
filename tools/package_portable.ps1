@@ -79,6 +79,7 @@ foreach ($expected in @(
     'Resources\sidecar\demucs_repo\demucs\states.py',
     'Resources\sidecar\worker\worker_main.py',
     'Resources\sidecar\models\roformer-manifest.json',
+    'Resources\sidecar\models\roformer-catalog.json',
     'Resources\sidecar\Runtime\htdemucs-worker\htdemucs-worker.exe',
     'Resources\sidecar\Runtime\ffmpeg\bin\ffmpeg.exe')) {
     if (-not (Test-Path -LiteralPath (Join-Path $stageRoot $expected) -PathType Leaf)) {

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "notes": [
+    "Curated subset of roformer-manifest.json that the application offers.",
+    "One representative model per separation category; a second entry in a",
+    "category exists only when it produces a genuinely different effect, not",
+    "a quality tier of the same one. The manifest stays complete so that",
+    "checkpoints, URLs and SHA-256 values remain verifiable.",
+    "cpu: whether the CPU runtime offers the model. Measured 2026-09-04/05 on",
+    "a laptop CPU (RTX 4050 machine, CPU runtime, 5-minute song, full run):",
+    "guitar (45 MB) ~8 min of inference; de-reverb-big (456 MB) estimated",
+    "~4 hours; the 913 MB class is slower still. Only the guitar model is",
+    "usable on CPU; the rest are GPU-only. Stem separation on CPU is served by",
+    "HTDemucs 4/6-stem (about 2 minutes per song)."
+  ],
+  "dropped_categories": {
+    "general": "General-purpose vocal models; same two-stem vocal/instrumental effect as the vocals category.",
+    "instvoc": "Dual vocal+instrumental output; the vocals and instrumental representatives already cover both stems."
+  },
+  "models": [
+    {
+      "id": "melband-roformer-kim-vocals",
+      "category": "vocals",
+      "cpu": false
+    },
+    {
+      "id": "melband-roformer-inst-gabox-bv2",
+      "category": "instrumental",
+      "cpu": false
+    },
+    {
+      "id": "melband-roformer-karaoke-gabox",
+      "category": "karaoke",
+      "cpu": false
+    },
+    {
+      "id": "roformer-model-melband-roformer-guitar-by-becruily",
+      "category": "guitar",
+      "cpu": true
+    },
+    {
+      "id": "roformer-model-melband-roformer-de-reverb-big-by-sucial",
+      "category": "dereverb",
+      "cpu": false
+    },
+    {
+      "id": "roformer-model-mel-roformer-denoise-aufr33",
+      "category": "denoise",
+      "cpu": false
+    },
+    {
+      "id": "roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris",
+      "category": "denoise",
+      "cpu": false,
+      "effect": "bleed suppression rather than noise removal"
+    },
+    {
+      "id": "roformer-model-mel-roformer-crowd-aufr33-viperx",
+      "category": "crowd",
+      "cpu": false
+    },
+    {
+      "id": "roformer-model-melband-roformer-aspiration-by-sucial",
+      "category": "aspiration",
+      "cpu": false
+    }
+  ]
+}

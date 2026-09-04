@@ -109,6 +109,37 @@ def ensure_cached(
                 f"got {actual_sha256!r}"
             )
 
+    # Prime the config too. The upstream loader fetches a missing config from
+    # its own registry, and several of those URLs are dead (404) even though
+    # the checkpoint is fine - a fresh install then fails at load time with
+    # "could not obtain its config". The manifest carries a working config_url
+    # and its SHA-256, and the loader skips its own download when the file is
+    # already beside the checkpoint.
+    config_name = entry.get("config")
+    config_url = entry.get("config_url")
+    if config_name and config_url:
+        config_path = model_dir / config_name
+        expected_config_sha = entry.get("config_sha256")
+        expected_size = entry.get("config_size")
+
+        def config_ok() -> bool:
+            if not config_path.is_file():
+                return False
+            if expected_config_sha:
+                return _sha256_of(config_path) == expected_config_sha
+            return expected_size is None or config_path.stat().st_size == expected_size
+
+        if not config_ok():
+            if config_path.is_file():
+                config_path.unlink()
+            downloader(config_url, config_path)
+            if not config_ok():
+                if config_path.is_file():
+                    config_path.unlink()
+                raise CacheVerificationError(
+                    f"config verification failed for {model_id} ({config_name})"
+                )
+
     os.utime(model_dir, None)
     evict_oldest(cache_dir, keep=max_cached)
 
@@ -124,28 +155,62 @@ def http_downloader(
     url: str,
     destination: Path,
     on_progress: Callable[[int, int], None] | None = None,
+    *,
+    attempts: int = 6,
 ) -> None:
     """Stream `url` to `destination`; real network path used outside tests.
+
+    A checkpoint is up to 1.7 GB, and a single connection reset used to fail
+    the whole separation. Interrupted transfers are resumed with a Range
+    request from the bytes already on disk, and retried with backoff; only
+    after every attempt fails does the error propagate.
 
     `on_progress(received, total)` is called as bytes arrive so the caller can
     show a real percentage instead of an unbounded wait.
     """
+    import time
+
     import requests
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     tmp = destination.with_suffix(destination.suffix + ".part")
-    with requests.get(url, stream=True, timeout=60) as response:
-        response.raise_for_status()
-        total = int(response.headers.get("Content-Length") or 0)
-        received = 0
-        with open(tmp, "wb") as handle:
-            for chunk in response.iter_content(chunk_size=1 << 20):
-                if not chunk:
-                    continue
-                handle.write(chunk)
-                received += len(chunk)
-                if on_progress is not None:
-                    on_progress(received, total)
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        received = tmp.stat().st_size if tmp.is_file() else 0
+        headers = {"Range": f"bytes={received}-"} if received else {}
+        try:
+            with requests.get(url, stream=True, timeout=60, headers=headers) as response:
+                if received and response.status_code == 200:
+                    # Server ignored the range: start over rather than append.
+                    received = 0
+                    tmp.unlink(missing_ok=True)
+                elif received and response.status_code == 416:
+                    # Already complete on disk.
+                    break
+                else:
+                    response.raise_for_status()
+                content_range = response.headers.get("Content-Range", "")
+                if content_range and "/" in content_range:
+                    total = int(content_range.rsplit("/", 1)[1])
+                else:
+                    total = received + int(response.headers.get("Content-Length") or 0)
+                with open(tmp, "ab" if received else "wb") as handle:
+                    for chunk in response.iter_content(chunk_size=1 << 20):
+                        if not chunk:
+                            continue
+                        handle.write(chunk)
+                        received += len(chunk)
+                        if on_progress is not None:
+                            on_progress(received, total)
+            break
+        except (requests.exceptions.RequestException, OSError) as exc:
+            last_error = exc
+            if attempt + 1 < attempts:
+                time.sleep(min(30, 2 ** attempt))
+    else:
+        raise RuntimeError(
+            f"download failed after {attempts} attempts: {url}"
+        ) from last_error
     tmp.replace(destination)
 
 

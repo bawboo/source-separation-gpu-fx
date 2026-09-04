@@ -11,8 +11,11 @@ worker 中執行，不在 audio callback 內跑模型。
 
 - **HTDemucs**：4 軌（鼓／貝斯／其他／人聲）與 6 軌（再加吉他／鋼琴），走
   shared-memory IPC 與 frozen worker 溝通
-- **MelBand RoFormer**：99 個模型、10 個類別，直接啟動 Python worker（不走 IPC），
-  按需下載並驗證 SHA-256，滾動快取上限 3 個
+- **MelBand RoFormer**：manifest 收錄 99 個模型，但 App **只提供**
+  `assets/models/roformer-catalog.json` 列出的代表性子集（每類一個 audited 代表，
+  效果不同才多留），CPU runtime 再依條目的 `cpu` 旗標過濾。直接啟動 Python
+  worker（不走 IPC），按需下載並驗證 SHA-256（checkpoint 與 config 都驗），
+  滾動快取上限 3 個。**新增模型先進 manifest，再決定是否進目錄。**
 
 GitHub：`bawboo/source-separation-gpu-fx`（private）
 
@@ -61,7 +64,14 @@ GitHub：`bawboo/source-separation-gpu-fx`（private）
 - **macOS**：`tools/build_macos.sh`（universal binary：`arm64;x86_64`）。
 - 執行 CMake target 前，先從 `CMakeLists.txt` 或產生的 `.vcxproj` 確認完整名稱，不可猜測；
   若回報 target 不存在，修正後必須重跑原驗證指令。
-- **Smoke tests**：`.loop\checks\full.cmd`（四個 smoke 全過）。
+- **Smoke tests**：`.loop\checks\full.cmd`（四個 smoke 全過）。跑之前設
+  `HTFX_PYTHON=<htfx-roformer env 的 python.exe>`，並確認
+  `build\windows-installed\Release\Resources\sidecar` 這個 junction 指向現行的
+  sidecar（`verify\payload-current`），否則 RoFormer 相關的兩個 smoke 會失敗。
+- **全功能驗收**：`htdemucs_full_feature_check.exe "<歌.wav>" --backend auto|cpu`
+  —— 對一首真實歌曲跑完所有使用者功能（每種模式、三種匯出、取消、影片回填、
+  批次），CPU 與 GPU 各跑一次。執行時間長，用脫離式啟動（Start-Process）並看 log，
+  不要綁在工具的單次逾時上。
 - **端到端驗收**：`htdemucs_goal_check.exe "<某首歌.wav>"` — 對真實歌曲跑完
   HTDemucs 4/6 軌與兩個 RoFormer 類別的「匯入→分離→匯出人聲→匯出伴奏」。
 - **跑測試時不可同時開著 App**（會搶同一份模型快取，症狀是假的 Access violation）。

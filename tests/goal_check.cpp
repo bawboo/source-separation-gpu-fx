@@ -66,9 +66,9 @@ bool runMode(
         }
     } else {
         processor.clearRoformerModel();
-        // kModelNames order: htdemucs, htdemucs_ft, htdemucs_6s, hdemucs_mmi
+        // kModelNames order: htdemucs, htdemucs_6s
         const int modelIndex =
-            juce::String(mode.htdemucsModel) == "htdemucs_6s" ? 2 : 0;
+            juce::String(mode.htdemucsModel) == "htdemucs_6s" ? 1 : 0;
         if (auto* parameter = processor.parameters().getParameter("model")) {
             parameter->setValueNotifyingHost(
                 parameter->convertTo0to1(static_cast<float>(modelIndex)));
