@@ -76,7 +76,8 @@ GitHub：`bawboo/source-separation-gpu-fx`（private）
   —— 對資料夾內每個檔案跑匯入→分離→全部匯出（影片再回填 MP4），期望值由檔名決定
   （`bogus*`／`*_empty*`／`*_no_audio*` 必須被拒絕、`*_silent*` 可為靜音、
   `*_half_second*` 為 0.5 秒、`*_20min*` 為 1200 秒、其餘為 30 秒）。`--batch N` 決定批次
-  段落匯入幾個檔案（預設 3）。測試媒體以 `tools/make_test_media.sh` 用 ffmpeg 產生 30 秒
+  段落匯入幾個檔案（預設 3）；`--roformer <模型 id>` 讓逐檔段落改走該 RoFormer 模型
+  （預設 HTDemucs 4 軌）。測試媒體以 `tools/make_test_media.sh` 用 ffmpeg 產生 30 秒
   合成訊號，改動匯入／匯出路徑後 CPU 與 GPU 各跑一次；要驗 CPU 版實際體感，另設
   `HTFX_WORKER_EXECUTABLE` 指向 `build/standalone-runtime-cpu-dist` 的 worker。
 - **介面截圖**：`htdemucs_ui_snapshot.exe "<輸出資料夾>" [媒體檔...]` —— 不開 App 直接把

@@ -505,6 +505,7 @@ int main(int argc, char** argv) {
     }
     juce::String backend = "auto";
     int batchSize = 3;  // --batch N: how many clips the batch phase imports
+    juce::String roformerId;  // --roformer <id>: per-file phase through a RoFormer model
     juce::Array<juce::File> inputs;
     for (std::size_t i = 0; i < args.size(); ++i) {
         if (args[i] == "--backend" && i + 1 < args.size()) {
@@ -513,6 +514,10 @@ int main(int argc, char** argv) {
         }
         if (args[i] == "--batch" && i + 1 < args.size()) {
             batchSize = (std::max)(2, args[++i].getIntValue());
+            continue;
+        }
+        if (args[i] == "--roformer" && i + 1 < args.size()) {
+            roformerId = args[++i];  // run the per-file phase through this model
             continue;
         }
         const juce::File path{args[i]};
@@ -561,6 +566,13 @@ int main(int argc, char** argv) {
     setChoice(*processor, "computeBackend", backend == "cpu" ? 2 : backend == "cuda" ? 1 : 0);
     processor->clearRoformerModel();
     setChoice(*processor, "model", 0);
+    if (roformerId.isNotEmpty()) {
+        if (!processor->selectRoformerModel(roformerId)) {
+            std::cerr << "RoFormer model not in the catalog: " << roformerId << std::endl;
+            return 2;
+        }
+        std::cout << "separation model: " << roformerId << "\n" << std::endl;
+    }
     processor->applyUserConfiguration();
     const auto stallTimeout = std::chrono::seconds(backend == "cpu" ? 900 : 600);
 
