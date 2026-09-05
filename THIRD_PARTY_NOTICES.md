@@ -26,9 +26,17 @@ build. It is an engineering compliance inventory, not legal advice.
    and the [MUSDB18 dataset terms](https://sigsep.github.io/datasets/musdb.html)
    for the Demucs side.
 3. **FFmpeg switched to an LGPL build - gate closed for the Windows
-   packages.** The app only ever shells out to FFmpeg to decode an input file
-   into PCM (`-vn -ac 2 -ar 44100 -c:a pcm_f32le`), so no GPL-only encoder is
-   needed. The Windows packages therefore ship
+   packages.** The app shells out to FFmpeg to decode an input file into PCM
+   (`-vn -ac 2 -ar 44100 -c:a pcm_f32le`) and, for the "mix back into the
+   video" export, to mux the new AAC audio with the original picture. The
+   picture is stream-copied whenever MP4 can carry it; when it cannot (VP8/VP9
+   from WebM, WMV, MPEG-1) it is re-encoded with `libopenh264` (Cisco
+   OpenH264, BSD-2-Clause) and, failing that, FFmpeg's native `mpeg4`
+   encoder. Both are present in the LGPL build; no GPL-only encoder (libx264,
+   libx265) is used. Note that H.264/MPEG-4 encoding may be subject to
+   patent licensing in some jurisdictions; the royalty-free terms Cisco
+   offers apply only to Cisco's own OpenH264 binary, which this build does
+   not download - review before commercial distribution. The Windows packages therefore ship
    `ffmpeg-master-latest-win64-lgpl-shared` from
    [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds), whose
    configuration carries `--enable-version3` and neither `--enable-gpl` nor

@@ -77,8 +77,10 @@ GitHub：`bawboo/source-separation-gpu-fx`（private）
   （`bogus*`／`*_empty*`／`*_no_audio*` 必須被拒絕、`*_silent*` 可為靜音、
   `*_half_second*` 為 0.5 秒、`*_20min*` 為 1200 秒、其餘為 30 秒）。`--batch N` 決定批次
   段落匯入幾個檔案（預設 3）；`--roformer <模型 id>` 讓逐檔段落改走該 RoFormer 模型
-  （預設 HTDemucs 4 軌）。測試媒體以 `tools/make_test_media.sh` 用 ffmpeg 產生 30 秒
-  合成訊號，改動匯入／匯出路徑後 CPU 與 GPU 各跑一次；要驗 CPU 版實際體感，另設
+  （預設 HTDemucs 4 軌）。測試媒體以 `tools/make_test_media.sh <資料夾> <完整版 ffmpeg.exe>`
+  產生（30 秒合成訊號；子資料夾 `media2/` 是第二批邊界案例、`media3/` 是 20 分鐘壓力檔；
+  產生器需要 libx264/libvpx/libmp3lame 等編碼器，用本機的 full build 而不是發行用的 LGPL
+  build），改動匯入／匯出路徑後 CPU 與 GPU 各跑一次；要驗 CPU 版實際體感，另設
   `HTFX_WORKER_EXECUTABLE` 指向 `build/standalone-runtime-cpu-dist` 的 worker。
 - **介面截圖**：`htdemucs_ui_snapshot.exe "<輸出資料夾>" [媒體檔...]` —— 不開 App 直接把
   編輯器繪成 PNG（一般／進階面板、中英文、匯入前後、分離中／完成、匯出後、拖曳中；給

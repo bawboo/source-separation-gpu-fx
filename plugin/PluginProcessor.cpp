@@ -2511,18 +2511,21 @@ bool HTDemucsGpuFXAudioProcessor::beginMultiMediaImport(
         return false;
     }
     if (mediaBusy_.load(std::memory_order_acquire)) {
+        setMediaMessage(htfx::tr("status.mediaBusyRetryLater"));
         return false;
     }
     stopMediaThread();
     bool expected = false;
     if (!mediaBusy_.compare_exchange_strong(
             expected, true, std::memory_order_acq_rel)) {
+        setMediaMessage(htfx::tr("status.mediaBusyRetryLater"));
         return false;
     }
     recording_.store(false, std::memory_order_release);
     stopRecordingThread();
     stopSeparationThread();
     recordRing_.clearWhenStopped();
+    setLastExportedFile({});  // the new clips have not been exported
     {
         const juce::ScopedLock lock(clipsLock_);
         clips_.clear();
@@ -2585,17 +2588,36 @@ bool HTDemucsGpuFXAudioProcessor::beginMultiMediaImport(
                     static_cast<double>(index + 1) / juce::jmax(1, total),
                     std::memory_order_release);
             }
+            if (stopToken.stop_requested()) {
+                // Cancelled by the user: not an error, and not "imported N".
+                separationState_.store(SeparationState::cancelled, std::memory_order_release);
+                setSeparationMessage(htfx::tr("status.mediaImportCancelled"));
+                setMediaMessage(htfx::tr("status.mediaImportCancelled"));
+                mediaBusy_.store(false, std::memory_order_release);
+                return;
+            }
             auto message = htfx::tr("clip.importedCountPrefix") +
                            juce::String(imported) +
                            htfx::tr("clip.importedCountSuffix");
             if (!skipped.isEmpty()) {
                 // Say which files were dropped rather than silently
-                // importing fewer than were chosen.
+                // importing fewer than were chosen (first few names only:
+                // a folder of hundreds must not become a screen-wide line).
+                juce::StringArray named;
+                for (int i = 0; i < juce::jmin(5, skipped.size()); ++i) {
+                    named.add(skipped[i]);
+                }
                 message += htfx::tr("clip.importSkippedPrefix") +
                            juce::String(skipped.size()) +
                            htfx::tr("clip.importSkippedMiddle") +
-                           skipped.joinIntoString(", ") +
-                           htfx::tr("clip.importSkippedSuffix");
+                           named.joinIntoString(", ") +
+                           (skipped.size() > named.size() ? htfx::tr("clip.importSkippedMore")
+                                                          : juce::String());
+            }
+            // P1: nothing decoded => the state must not stay at "loading",
+            // which would keep every control disabled with no way out.
+            if (imported == 0) {
+                separationState_.store(SeparationState::error, std::memory_order_release);
             }
             setSeparationMessage(message);
             setMediaMessage(message);
@@ -2804,11 +2826,11 @@ void HTDemucsGpuFXAudioProcessor::batchExportLoop(
                              juce::String(counter) + ")" + suffix + ".wav";
             }
         }
-        namesUsed.add(outputName);
         const auto outputFile = folder.getChildFile(outputName);
         if (!beginQuickExport(outputFile, kind)) {
             continue;
         }
+        namesUsed.add(outputName);
         // beginQuickExport runs on the media thread; wait for it so the files
         // are written one at a time and in order.
         while (!stopToken.stop_requested() &&
@@ -2835,9 +2857,13 @@ bool HTDemucsGpuFXAudioProcessor::beginMediaImport(const juce::File& mediaFile) 
     if (!mediaFile.existsAsFile()) {
         // Windows file APIs stop at 260 characters unless the process is
         // long-path aware; say so instead of "not found".
-        setMediaMessage(mediaFile.getFullPathName().length() > 259
-                            ? htfx::tr("status.mediaPathTooLong")
-                            : htfx::tr("status.selectedMediaFileNotFound"));
+#if JUCE_WINDOWS
+        const bool tooLong = mediaFile.getFullPathName().length() > 259;
+#else
+        const bool tooLong = false;
+#endif
+        setMediaMessage(tooLong ? htfx::tr("status.mediaPathTooLong")
+                                : htfx::tr("status.selectedMediaFileNotFound"));
         return false;
     }
     if (mediaBusy_.load(std::memory_order_acquire)) {
@@ -2863,6 +2889,7 @@ bool HTDemucsGpuFXAudioProcessor::beginMediaImport(const juce::File& mediaFile) 
     previewCursor_.store(0, std::memory_order_release);
     previewResult_.store(
         std::shared_ptr<const SeparationResult>{}, std::memory_order_release);
+    setLastExportedFile({});  // the new clip has not been exported
     separationProgress_.store(0.0, std::memory_order_release);
     separationState_.store(SeparationState::loading, std::memory_order_release);
     mediaProgress_.store(0.01, std::memory_order_release);
@@ -3364,11 +3391,17 @@ void HTDemucsGpuFXAudioProcessor::mixExportLoop(
             juce::StringArray{"-c:v", "mpeg4", "-q:v", "3", "-pix_fmt", "yuv420p",
                               "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2"}};
         bool muxed = false;
+        bool containerProblem = false;
         for (std::size_t attempt = 0; attempt < videoCodecs.size() && !muxed; ++attempt) {
             if (stopToken.stop_requested()) {
                 break;
             }
             if (attempt > 0) {
+                // Only a "this codec cannot go into MP4" failure is worth a
+                // re-encode; a full disk or a locked file is not.
+                if (!containerProblem) {
+                    break;
+                }
                 setMediaMessage(htfx::tr("status.mixReencodingVideo"));
                 temporaryVideo.deleteFile();
             }
@@ -3380,14 +3413,30 @@ void HTDemucsGpuFXAudioProcessor::mixExportLoop(
             arguments.addArray(videoCodecs[attempt]);
             arguments.addArray({"-c:a", "aac", "-b:a", "320k", "-af", "apad", "-shortest",
                                 "-movflags", "+faststart", temporaryVideo.getFullPathName()});
-            error.clear();
-            muxed = runFfmpeg(arguments, stopToken, error);
+            juce::String attemptError;
+            muxed = runFfmpeg(arguments, stopToken, attemptError);
+            if (!muxed) {
+                // Decided by the stream-copy attempt only; a later encoder
+                // failing for its own reason must not cancel the fallback.
+                if (attempt == 0) {
+                    containerProblem =
+                        attemptError.containsIgnoreCase("not currently supported in container") ||
+                        attemptError.containsIgnoreCase("Could not find tag for codec");
+                }
+                // keep the first (most telling) message; later ones are appended
+                error = error.isEmpty() ? attemptError : error + " | " + attemptError;
+            }
         }
         temporaryMix.deleteFile();
         if (!muxed) {
             temporaryVideo.deleteFile();
-            setMediaMessage(
-                error + htfx::tr("status.mp4StreamCopyIncompatibleSuffix"));
+            if (stopToken.stop_requested()) {
+                setMediaMessage(htfx::tr("status.mixExportCancelledVideo"));
+            } else {
+                setMediaMessage(
+                    error + (containerProblem ? htfx::tr("status.mp4StreamCopyIncompatibleSuffix")
+                                              : juce::String()));
+            }
             mediaBusy_.store(false, std::memory_order_release);
             return;
         }
@@ -4511,9 +4560,13 @@ public:
                 target.revealToUser();
             }
         };
-        openOutputButton_.setVisible(false);
         addAndMakeVisible(openOutputButton_);
         openOutputButton_.setVisible(false);
+        clipViewport_.setViewedComponent(&clipList_, false);
+        clipViewport_.setScrollBarsShown(true, false);
+        clipViewport_.setScrollBarThickness(10);
+        addAndMakeVisible(clipViewport_);
+        clipViewport_.setVisible(false);
         status_.setJustificationType(juce::Justification::centredLeft);
         metrics_.setJustificationType(juce::Justification::centredLeft);
         status_.setFont(juce::FontOptions{15.0f, juce::Font::bold});
@@ -4575,20 +4628,35 @@ public:
     // corresponding button would, and only when that button is enabled.
     bool keyPressed(const juce::KeyPress& key) override {
         const auto ctrl = juce::ModifierKeys::ctrlModifier;
-        if (key == juce::KeyPress::spaceKey && previewPlayButton_.isEnabled()) {
+        // isVisible() rather than isShowing(): the latter is false for an
+        // editor without a window peer (the smoke tests), while visibility
+        // in the tree is what the panels toggle.
+        if (key == juce::KeyPress::spaceKey && previewPlayButton_.isVisible() &&
+            previewPlayButton_.isEnabled()) {
             processor_.togglePreviewPlayback();
             return true;
         }
-        if (key == juce::KeyPress::escapeKey && cancelButton_.isVisible()) {
-            cancelButton_.onClick();
-            return true;
+        if (key == juce::KeyPress::escapeKey) {
+            // Cancel whatever is running, on either panel (the simple panel
+            // has no Cancel button of its own).
+            const auto state = processor_.getSeparationState();
+            const bool running =
+                processor_.isMediaBusy() || processor_.isModelDownloadBusy() ||
+                state == HTDemucsGpuFXAudioProcessor::SeparationState::loading ||
+                state == HTDemucsGpuFXAudioProcessor::SeparationState::separating;
+            if (running) {
+                cancelButton_.onClick();
+                return true;
+            }
+            return false;
         }
-        if (key == juce::KeyPress('o', ctrl, 0) && importButton_.isEnabled()) {
+        if (key == juce::KeyPress('o', ctrl, 0) && importButton_.isVisible() &&
+            importButton_.isEnabled()) {
             chooseMediaFile();
             return true;
         }
-        if (key == juce::KeyPress('e', ctrl, 0) && exportButton_.isEnabled() &&
-            advancedPanel_) {
+        if (key == juce::KeyPress('e', ctrl, 0) && exportButton_.isVisible() &&
+            exportButton_.isEnabled()) {
             showExportDialog();
             return true;
         }
@@ -4599,30 +4667,51 @@ public:
         dragOver_ = false;
         scaledContent_.repaint();
         juce::Array<juce::File> media;
+        bool sawAcceptedName = false;
         for (const auto& path : files) {
-            if (isAcceptedMediaName(path) && juce::File(path).existsAsFile()) {
-                media.add(juce::File(path));
+            if (!isAcceptedMediaName(path)) {
+                continue;
+            }
+            sawAcceptedName = true;
+            const juce::File file(path);
+            if (file.existsAsFile()) {
+                media.add(file);
             }
         }
         if (media.isEmpty()) {
+            if (sawAcceptedName) {
+                // e.g. dragged straight out of a zip or a phone: the shell
+                // hands over names that are not real files.
+                showNotice(htfx::tr("status.dropNothingUsable"));
+            }
             return;
         }
-        // Same gate as the Import button: a drop must not cancel a
-        // separation, export or download that is in flight.
-        if (!importButton_.isEnabled()) {
+        // Same gate as the Import button, plus what the button does not
+        // see: a batch in flight and a queued quick export.
+        if (!importButton_.isEnabled() || processor_.isBatchBusy() ||
+            pendingQuickExport_.has_value()) {
             showNotice(htfx::tr("status.dropIgnoredBusy"));
             return;
         }
-        if (modeBox_.getSelectedItemIndex() != 0) {
-            // Import only exists in record mode; switch the same way the
-            // combo would.
-            modeBox_.setSelectedItemIndex(0, juce::sendNotificationSync);
-        }
-        if (media.size() > 1) {
-            processor_.beginMultiMediaImport(media);
-        } else {
-            processor_.beginMediaImport(media.getReference(0));
-        }
+        // Leave the OS drop callback before touching parameters or threads.
+        juce::Component::SafePointer<HTDemucsGpuFXEditor> safeThis(this);
+        juce::MessageManager::callAsync([safeThis, media] {
+            if (safeThis == nullptr) {
+                return;
+            }
+            if (safeThis->modeBox_.getSelectedItemIndex() != 0) {
+                // Import only exists in record mode; switch the same way
+                // the combo would.
+                safeThis->modeBox_.setSelectedItemIndex(0, juce::sendNotificationSync);
+            }
+            const bool started = media.size() > 1
+                                     ? safeThis->processor_.beginMultiMediaImport(media)
+                                     : safeThis->processor_.beginMediaImport(media.getReference(0));
+            if (!started) {
+                const auto why = safeThis->processor_.getMediaStatusText();
+                safeThis->showNotice(why.isNotEmpty() ? why : htfx::tr("status.dropIgnoredBusy"));
+            }
+        });
     }
 
     void resized() override {
@@ -4649,14 +4738,14 @@ public:
             exports.removeFromLeft(12);
             accompanyOnlyButton_.setBounds(exports);
             area.removeFromTop(6);
-            for (auto& row : clipRows_) {
-                row->setBounds(area.removeFromTop(22).reduced(0, 1));
-            }
+            layoutClipList(area.removeFromTop(clipListHeight()));
             progressBar_.setBounds(area.removeFromTop(16));
             area.removeFromTop(4);
             auto statusRow = area.removeFromTop(30);
-            openOutputButton_.setBounds(statusRow.removeFromRight(124).reduced(0, 3));
-            statusRow.removeFromRight(6);
+            if (openOutputButton_.isVisible()) {
+                openOutputButton_.setBounds(statusRow.removeFromRight(124).reduced(0, 3));
+                statusRow.removeFromRight(6);
+            }
             status_.setBounds(statusRow);
 
             const float scale = (std::min)(
@@ -4698,9 +4787,7 @@ public:
         exportButton_.setBounds(transport.removeFromLeft(86));
         transport.removeFromLeft(5);
         cancelButton_.setBounds(transport.removeFromLeft(80));
-        for (auto& row : clipRows_) {
-            row->setBounds(area.removeFromTop(22).reduced(0, 1));
-        }
+        layoutClipList(area.removeFromTop(clipListHeight()));
         progressBar_.setBounds(area.removeFromTop(18).reduced(0, 1));
         area.removeFromTop(4);
 
@@ -4765,8 +4852,10 @@ public:
         auto footer = area.removeFromBottom(50);
         footerDivider_ = footer.getY() - 2;
         auto statusRow = footer.removeFromTop(24);
-        openOutputButton_.setBounds(statusRow.removeFromRight(124).reduced(0, 1));
-        statusRow.removeFromRight(6);
+        if (openOutputButton_.isVisible()) {
+            openOutputButton_.setBounds(statusRow.removeFromRight(124).reduced(0, 1));
+            statusRow.removeFromRight(6);
+        }
         status_.setBounds(statusRow);
         resetWorker_.setBounds(footer.removeFromRight(120).reduced(3));
         metrics_.setBounds(footer);
@@ -4790,11 +4879,31 @@ private:
         return advancedPanel_ ? 720 : 560;
     }
 
+    static constexpr int kClipRowHeight = 22;
+    static constexpr int kMaxVisibleClipRows = 8;
+
+    [[nodiscard]] int clipListHeight() const noexcept {
+        return kClipRowHeight * (std::min)(static_cast<int>(clipRows_.size()), kMaxVisibleClipRows);
+    }
+
     [[nodiscard]] int designHeight() const noexcept {
-        // Multi-file imports add one 22 px row per clip; the panel grows with
-        // them so the progress bar and status line are never pushed off it.
-        const int clipRows = static_cast<int>(clipRows_.size());
-        return (advancedPanel_ ? (advancedVisible_ ? 826 : 576) : 260) + 22 * clipRows;
+        // Multi-file imports add one row per clip, up to eight; beyond that
+        // the list scrolls, so the panel never outgrows the screen.
+        return (advancedPanel_ ? (advancedVisible_ ? 826 : 576) : 260) + clipListHeight();
+    }
+
+    void layoutClipList(juce::Rectangle<int> listArea) {
+        clipViewport_.setBounds(listArea);
+        clipViewport_.setVisible(!clipRows_.empty());
+        const int rows = static_cast<int>(clipRows_.size());
+        const bool scrolls = rows > kMaxVisibleClipRows;
+        const int width = listArea.getWidth() - (scrolls ? clipViewport_.getScrollBarThickness() : 0);
+        clipList_.setSize((std::max)(1, width), kClipRowHeight * rows);
+        for (int i = 0; i < rows; ++i) {
+            clipRows_[static_cast<std::size_t>(i)]->setBounds(
+                juce::Rectangle<int>(0, kClipRowHeight * i, clipList_.getWidth(), kClipRowHeight)
+                    .reduced(0, 1));
+        }
     }
 
     enum class StepState { pending, active, done };
@@ -4804,7 +4913,20 @@ private:
     void showNotice(const juce::String& text) {
         notice_ = text;
         noticeUntil_ = juce::Time::getMillisecondCounter() + 4000;
+        noticeBaseline_ = processor_.getMediaStatusText();
         status_.setText(text, juce::dontSendNotification);
+        status_.setTooltip(text);
+    }
+
+    // True while a notice should still be shown: not expired (wrap-safe
+    // difference), and the processor has not said anything new since --
+    // an error must never sit behind a "busy, try again" line.
+    bool noticeActive() const {
+        if (notice_.isEmpty()) {
+            return false;
+        }
+        const auto remaining = static_cast<juce::int32>(noticeUntil_ - juce::Time::getMillisecondCounter());
+        return remaining > 0 && processor_.getMediaStatusText() == noticeBaseline_;
     }
 
     // Paints the decoration around the controls: the "1 import -> 2 separate
@@ -4876,7 +4998,13 @@ private:
     // timerCallback() whenever the preview result changes.
     void paintWaveformOverview(juce::Graphics& g) {
         const auto area = previewPosition_.getBounds().toFloat().reduced(6.0f, 1.0f);
-        if (overviewPeaks_.empty() || area.getWidth() < 8.0f || !previewPosition_.isVisible()) {
+        if (area.getWidth() < 8.0f || !previewPosition_.isVisible()) {
+            return;
+        }
+        if (overviewPeaks_.empty()) {
+            // no separation yet: a plain groove so the thumb has a track
+            g.setColour(juce::Colour(HtfxLookAndFeel::kOutline));
+            g.fillRoundedRectangle(area.withSizeKeepingCentre(area.getWidth(), 3.0f), 1.5f);
             return;
         }
         const auto accent = juce::Colour(HtfxLookAndFeel::kAccent);
@@ -5600,7 +5728,7 @@ private:
                             ->tickBox()
                             .getToggleState());
                 };
-                scaledContent_.addAndMakeVisible(*row);
+                clipList_.addAndMakeVisible(*row);
                 clipRows_.push_back(std::move(row));
             }
             shownClipCount_ = count;
@@ -5733,7 +5861,7 @@ private:
             separationState == HTDemucsGpuFXAudioProcessor::SeparationState::separating;
         const bool mediaBusy = processor_.isMediaBusy();
         const bool modelBusy = processor_.isModelDownloadBusy();
-        const bool busy = separationBusy || mediaBusy || modelBusy;
+        const bool busy = separationBusy || mediaBusy || modelBusy || processor_.isBatchBusy();
         const bool recording =
             separationState == HTDemucsGpuFXAudioProcessor::SeparationState::recording;
         progressValue_ = modelBusy
@@ -5756,7 +5884,10 @@ private:
             !recording && !busy && processor_.getRecordedSeconds() > 0.0 &&
             processor_.isModelInstalled(modelBox_.getText()));
         exportButton_.setEnabled(!recording && !busy && processor_.hasPreview());
-        cancelButton_.setVisible((recordMode && (separationBusy || mediaBusy)) || modelBusy);
+        // Only the advanced panel lays the Cancel button out; the simple
+        // panel cancels with Esc.
+        cancelButton_.setVisible(advancedPanel_ &&
+                                 ((recordMode && (separationBusy || mediaBusy)) || modelBusy));
         const bool configurationEnabled = !recording && !busy;
         const bool modeChosen = separationModeBox_.getSelectedItemIndex() >= 0;
         const bool roformerModeActive = roformerModeSelected();
@@ -5793,8 +5924,8 @@ private:
 
         {
             const auto result = processor_.getPreviewResult();
-            if (result.get() != overviewSource_) {
-                overviewSource_ = result.get();
+            if (result != overviewSource_) {
+                overviewSource_ = result;  // held, so the address cannot be recycled
                 if (result != nullptr) {
                     rebuildOverviewPeaks(*result);
                 } else {
@@ -5847,24 +5978,26 @@ private:
         const auto mediaStatus = processor_.getMediaStatusText();
         const auto modelStatus = processor_.getModelDownloadStatusText();
         updateRoformerStatus();
-        openOutputButton_.setVisible(processor_.getLastExportedFile().exists());
-        openOutputButton_.setEnabled(!mediaBusy);
-        // Long status lines (an export path, an FFmpeg error) get cut off in
-        // the label; hovering shows the whole text.
-        if (status_.getTooltip() != status_.getText()) {
-            status_.setTooltip(status_.getText());
+        // The path is only stat'ed when the button is clicked; a dead
+        // network share must not stall the message thread ten times a second.
+        const bool haveExport = processor_.getLastExportedFile() != juce::File{};
+        if (haveExport != openOutputButton_.isVisible()) {
+            openOutputButton_.setVisible(haveExport);
+            resized();  // the status line takes the whole row while hidden
         }
-        if (juce::Time::getMillisecondCounter() < noticeUntil_) {
-            status_.setText(notice_, juce::dontSendNotification);
-        } else {
-            status_.setText(
-                modelBusy || (!selectedModelInstalled && modelStatus.isNotEmpty())
-                    ? modelStatus
-                    : recordMode
-                    ? (mediaStatus.isNotEmpty() ? mediaStatus
-                                                : processor_.getRecordStatusText())
-                    : processor_.getBridgeStatusText(),
-                juce::dontSendNotification);
+        openOutputButton_.setEnabled(!mediaBusy);
+        const auto statusText =
+            noticeActive() ? notice_
+            : modelBusy || (!selectedModelInstalled && modelStatus.isNotEmpty())
+                ? modelStatus
+            : recordMode ? (mediaStatus.isNotEmpty() ? mediaStatus
+                                                     : processor_.getRecordStatusText())
+                         : processor_.getBridgeStatusText();
+        if (statusText != status_.getText()) {
+            status_.setText(statusText, juce::dontSendNotification);
+            // Long status lines (an export path, an FFmpeg error) get cut
+            // off in the label; hovering shows the whole text.
+            status_.setTooltip(statusText);
         }
         const int latency = processor_.getActiveLatencySamples();
         metrics_.setText(
@@ -5924,8 +6057,9 @@ private:
     bool dragOver_ = false;
     juce::String notice_;
     juce::uint32 noticeUntil_ = 0;
+    juce::String noticeBaseline_;
     std::vector<float> overviewPeaks_;
-    const void* overviewSource_ = nullptr;
+    std::shared_ptr<const void> overviewSource_;
     StepState stepImport_ = StepState::active;
     StepState stepSeparate_ = StepState::pending;
     StepState stepExport_ = StepState::pending;
@@ -5942,6 +6076,8 @@ private:
     // Clip list (multi-file): one row per imported file, rebuilt whenever the
     // processor reports a different clip count.
     std::vector<std::unique_ptr<ClipRow>> clipRows_;
+    juce::Viewport clipViewport_;  // the rows live in clipList_ inside it
+    juce::Component clipList_;
     int shownClipCount_ = -1;
     juce::Label modeLabel_;
     juce::ComboBox modeBox_;

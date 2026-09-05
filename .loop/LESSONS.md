@@ -63,3 +63,5 @@
 - SIGN (2026-09-06): 同一個 30 秒片段的 HTDemucs 4 軌，在 CUDA runtime 選 CPU 後端約 43 s，在 CPU 凍結 runtime（`standalone-runtime-cpu-dist`）卻要 85–100 s。CPU 版使用者拿到的是後者，`--backend cpu` 的數字不能直接代表 CPU 版體感；要量 CPU 版就設 `HTFX_WORKER_EXECUTABLE` 指向 CPU dist。
 - SIGN (2026-09-06, ui_snapshot EN): 動態狀態訊息（「已匯出伴奏：路徑」「已匯入 N 個檔案」）是在事件發生當下用 `htfx::tr()` 組好的字串，之後切換語言不會重譯；剪輯列的「待分離／完成」也曾如此，已改成存字串表的 key、在 `getClipInfo()` 讀取時才翻譯。其餘 setMediaMessage 呼叫點很多，仍是「以設定當下的語言顯示」——要徹底解決得改成存 key＋參數。
 - SIGN (2026-09-06): 把 `HTFX_WORKER_EXECUTABLE` 指向 `standalone-runtime-cpu-dist` 的 worker，主程式會讀到旁邊的 `runtime-manifest.json`（flavor=cpu），目錄過濾隨之生效——`full_feature_check --modes quick` 在這個設定下只跑 6 軌與 guitar，vocals 自動消失。這是驗證「CPU 版使用者實際看到的模式清單」的正確方法，不必另外打包安裝。
+- SIGN (2026-09-06, code review): 多檔匯入在啟動時把 `separationState_` 設成 loading，只有「第一個成功的檔案」會把它推進；全部失敗時狀態就永遠停在 loading，UI 全部停用、取消無效。**任何在迴圈前先設「進行中」狀態的流程，都要有「一個都沒成功」的出口。** 這條是審查找到的，矩陣測試原本只測「夾一個壞檔」沒測「全是壞檔」。
+- SIGN (2026-09-06, code review): 10 Hz timer 裡不要做會阻塞的系統呼叫——`File::exists()` 對斷線的網路磁碟會卡住訊息執行緒；判斷「有沒有匯出」用路徑是否為空，真的要驗證存在時在使用者按下時才查。同樣道理，捷徑鍵要看 `isShowing()` 不能只看 `isEnabled()`（簡易面板的預覽按鈕隱藏但仍 enabled，空白鍵會暗中播放）。

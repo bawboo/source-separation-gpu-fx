@@ -164,7 +164,7 @@ bool checkExport(const std::string& label, const juce::File& file,
     }
     std::string detail;
     bool ok = true;
-    if (std::abs(info.sampleRate - 44'100.0) > 0.5) {
+    if (std::abs(info.sampleRate - Processor::kSampleRate) > 0.5) {
         ok = false; detail += "rate=" + std::to_string(static_cast<int>(info.sampleRate)) + " ";
     }
     if (info.channels != 2) {
@@ -330,7 +330,7 @@ void exercise(Processor& processor, const juce::File& file, const juce::File& ou
     }
     report(label + ": classified as " + (isVideoName(file) ? "video" : "audio"),
            processor.importedFromVideo() == isVideoName(file));
-    const auto frames = static_cast<juce::int64>(std::llround(seconds * 44'100.0));
+    const auto frames = static_cast<juce::int64>(std::llround(seconds * Processor::kSampleRate));
 
     // separate (HTDemucs 4-stem)
     const auto startedAt = std::chrono::steady_clock::now();
@@ -561,7 +561,7 @@ int main(int argc, char** argv) {
     juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Standalone);
     auto processor = std::make_unique<Processor>();
     juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Undefined);
-    processor->prepareToPlay(44'100.0, 256);
+    processor->prepareToPlay(Processor::kSampleRate, 256);
     setChoice(*processor, "operatingMode", 0);
     setChoice(*processor, "computeBackend", backend == "cpu" ? 2 : backend == "cuda" ? 1 : 0);
     processor->clearRoformerModel();
@@ -648,7 +648,7 @@ int main(int argc, char** argv) {
                         const auto info = inspect(f);
                         report("batch: " + f.getFileName().toStdString(),
                                info.readable && info.channels == 2 && info.isFloat &&
-                                   std::abs(info.frames / 44'100.0 - 30.0) <= 0.2 && info.rms > 1e-7,
+                                   std::abs(info.frames / static_cast<double>(Processor::kSampleRate) - 30.0) <= 0.2 && info.rms > 1e-7,
                                std::to_string(info.frames) + " frames");
                     }
                 }
@@ -732,6 +732,23 @@ int main(int argc, char** argv) {
                         report("batch with a bogus file: the good clips separate", separated == 2,
                                std::to_string(separated) + " separated");
                     }
+                }
+            }
+            // a batch where nothing decodes must leave the processor usable
+            if (bogus.existsAsFile()) {
+                if (processor->beginMultiMediaImport({bogus, bogus})) {
+                    waitForMedia(*processor, std::chrono::seconds(300));
+                    const auto state = processor->getSeparationState();
+                    const bool usable = state != State::loading && state != State::separating &&
+                                        !processor->isMediaBusy();
+                    report("batch of only bogus files: processor stays usable",
+                           usable && processor->getMediaStatusText().isNotEmpty(),
+                           "state=" + std::to_string(static_cast<int>(state)) + " " +
+                               processor->getMediaStatusText().toStdString().substr(0, 80));
+                    const bool recovered = processor->beginMediaImport(good) &&
+                                           waitForMedia(*processor, std::chrono::seconds(300)) &&
+                                           processor->getRecordedSeconds() > 1.0;
+                    report("batch of only bogus files: import works afterwards", recovered);
                 }
             }
             // a batch through a RoFormer model

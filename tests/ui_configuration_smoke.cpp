@@ -788,13 +788,19 @@ int run() {
     {
         // Shortcuts mirror the buttons: nothing to preview => Space is not
         // consumed; nothing running => Esc is not consumed.
-        // (a preview exists here when the RoFormer route above produced one)
+        // The general panel hides the preview transport, so Space must not
+        // start playback there even though a preview exists; on the
+        // advanced panel it follows whether there is a preview.
+        require(!editor->keyPressed(juce::KeyPress(juce::KeyPress::spaceKey)),
+                "Space acted while the preview transport is hidden (general panel)");
+        panelSwitch->onClick();  // -> advanced panel
         const bool spaceConsumed = editor->keyPressed(juce::KeyPress(juce::KeyPress::spaceKey));
         require(spaceConsumed == processor->hasPreview(),
-                "Space handling does not follow whether a preview exists");
+                "Space handling does not follow whether a preview exists (advanced panel)");
         if (spaceConsumed) {
             editor->keyPressed(juce::KeyPress(juce::KeyPress::spaceKey));  // pause again
         }
+        panelSwitch->onClick();  // back to the general panel
         require(!editor->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey)),
                 "Esc was consumed with nothing to cancel");
     }

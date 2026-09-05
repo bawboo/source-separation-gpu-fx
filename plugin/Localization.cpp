@@ -46,7 +46,6 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"clip.importedCountSuffix", StringPair{u8" 個檔案，按「僅匯出人聲／伴奏」即可整批處理（進階面板可先按「分離」）", u8" files - Export Vocals/Accompany only processes them all (or press Separate on the advanced panel)"}},
         {"clip.importSkippedPrefix", StringPair{u8"；", u8"; "}},
         {"clip.importSkippedMiddle", StringPair{u8" 個無法讀取，已略過：", u8" could not be read and were skipped: "}},
-        {"clip.importSkippedSuffix", StringPair{u8"", u8""}},
         {"clip.batchSeparationFinished", StringPair{u8"全部分離完成", u8"All clips separated"}},
         {"clip.exportFinishedPrefix", StringPair{u8"已匯出 ", u8"Exported "}},
         {"clip.exportFinishedSuffix", StringPair{u8" 個檔案", u8" files"}},
@@ -89,6 +88,11 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"button.openOutput", StringPair{u8"開啟輸出位置", u8"Show output"}},
         {"tip.openOutput", StringPair{u8"在檔案總管中顯示最近一次匯出的檔案或資料夾",
                                       u8"Reveal the most recent export in Explorer"}},
+        {"status.dropNothingUsable", StringPair{u8"拖進來的項目不是可讀取的檔案（例如壓縮檔或手機裡的內容），請先複製到磁碟再匯入",
+                                                u8"The dropped items are not readable files (for example inside a zip or on a phone); copy them to disk first"}},
+        {"status.mixExportCancelledVideo", StringPair{u8"影片回填已取消", u8"Video mix-back cancelled"}},
+        {"status.mediaImportInProgress", StringPair{u8"正在匯入", u8"Importing"}},
+        {"clip.importSkippedMore", StringPair{u8" 等", u8" and more"}},
         {"status.dropIgnoredBusy", StringPair{u8"目前有工作進行中，等它完成後再拖入檔案", u8"Busy right now; drop the file again once the current job finishes"}},
         {"tip.import", StringPair{u8"選擇一個或多個音訊／影片檔（Ctrl+O；也可以直接拖進視窗）",
                                   u8"Choose one or more audio/video files (Ctrl+O; or drop them onto the window)"}},
@@ -477,15 +481,15 @@ juce::File Localization::settingsFile() {
 
 void Localization::reload() {
     const auto file = settingsFile();
-    language_ = file.existsAsFile() ? languageFromTag(file.loadFileAsString())
-                                     : Language::zhTW;
+    language_.store(file.existsAsFile() ? languageFromTag(file.loadFileAsString())
+                                     : Language::zhTW, std::memory_order_release);
 }
 
 void Localization::setLanguage(Language language) {
-    language_ = language;
+    language_.store(language, std::memory_order_release);
     const auto file = settingsFile();
     file.getParentDirectory().createDirectory();
-    file.replaceWithText(tagFromLanguage(language_));
+    file.replaceWithText(tagFromLanguage(language));
 }
 
 juce::String Localization::tr(const juce::String& key) const {
@@ -494,7 +498,7 @@ juce::String Localization::tr(const juce::String& key) const {
     if (entry == table.end()) {
         return key;
     }
-    return entry->second[static_cast<std::size_t>(language_)];
+    return entry->second[static_cast<std::size_t>(language_.load(std::memory_order_acquire))];
 }
 
 }  // namespace htfx

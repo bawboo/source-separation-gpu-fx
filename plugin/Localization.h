@@ -2,6 +2,8 @@
 
 #include <juce_core/juce_core.h>
 
+#include <atomic>
+
 namespace htfx {
 
 // UI display language. Model IDs and other stable identifiers are never
@@ -22,7 +24,7 @@ class Localization {
 public:
     static Localization& instance();
 
-    [[nodiscard]] Language getLanguage() const noexcept { return language_; }
+    [[nodiscard]] Language getLanguage() const noexcept { return language_.load(std::memory_order_acquire); }
 
     // Persists the choice to disk immediately.
     void setLanguage(Language language);
@@ -43,7 +45,8 @@ public:
 private:
     Localization();
 
-    Language language_ = Language::zhTW;
+    // Read by tr() on worker threads while the language button writes it.
+    std::atomic<Language> language_{Language::zhTW};
 };
 
 [[nodiscard]] inline juce::String tr(const juce::String& key) {
