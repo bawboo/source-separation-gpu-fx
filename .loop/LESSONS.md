@@ -60,3 +60,4 @@
 - SIGN (2026-09-06, 工具面): 在 Claude Code 的 Bash 工具裡用 heredoc 餵 Python 改檔，內容中的反斜線序列會被剝一層（`\n` 變成真正的換行、`\\` 變成單一反斜線），`<<` 也可能讓 heredoc 解析失敗；C++ 字串裡的 `\n` 與 Windows 路徑就這樣壞掉過三次。**含反斜線的補丁一律用 Write 工具寫成 .py 檔再執行，或直接用 Edit 工具。**
 - SIGN (2026-09-06): 用合成訊號跑 `full_feature_check` 時，「export vocals」會因為訊號裡沒有人聲而被靜音門檻（1e-4，給真實歌曲用）判失敗；判讀時只看每個模式的 `separate` 行。全新快取（清空 RoformerModels）下 10 個模式全部下載＋分離成功，30 秒片段的 GPU 牆鐘時間：guitar 23 s、dereverb 72 s、其餘 110–140 s，aspiration 458 s（含 797 MB 下載）。
 - SIGN (2026-09-06): 30 秒片段在 CPU（`--backend cpu`）的牆鐘時間：HTDemucs 6 軌 43 s、guitar RoFormer 249 s、kim-vocals RoFormer 605 s——換算整首 5 分鐘歌約 100 分鐘，證實目錄把 vocals 類標成 GPU 專用是對的。
+- SIGN (2026-09-06): 同一個 30 秒片段的 HTDemucs 4 軌，在 CUDA runtime 選 CPU 後端約 43 s，在 CPU 凍結 runtime（`standalone-runtime-cpu-dist`）卻要 85–100 s。CPU 版使用者拿到的是後者，`--backend cpu` 的數字不能直接代表 CPU 版體感；要量 CPU 版就設 `HTFX_WORKER_EXECUTABLE` 指向 CPU dist。

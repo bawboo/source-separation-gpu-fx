@@ -23,6 +23,7 @@
 //   everything else                 is 30 s long (±0.2 s for lossy codecs)
 //
 // Usage: htdemucs_format_matrix_check.exe <file-or-dir>... [--backend auto|cpu|cuda]
+//                                                         [--batch N]
 
 #include "Localization.h"
 #include "PluginProcessor.h"
@@ -475,10 +476,15 @@ int main(int argc, char** argv) {
         }
     }
     juce::String backend = "auto";
+    int batchSize = 3;  // --batch N: how many clips the batch phase imports
     juce::Array<juce::File> inputs;
     for (std::size_t i = 0; i < args.size(); ++i) {
         if (args[i] == "--backend" && i + 1 < args.size()) {
             backend = args[++i];
+            continue;
+        }
+        if (args[i] == "--batch" && i + 1 < args.size()) {
+            batchSize = (std::max)(2, args[++i].getIntValue());
             continue;
         }
         const juce::File path{args[i]};
@@ -547,7 +553,16 @@ int main(int argc, char** argv) {
                     break;
                 }
             }
-            if (batch.size() == 3) break;
+            if (batch.size() == batchSize) break;
+        }
+        // Beyond one per format: fill up with any other eligible 30 s clips.
+        for (const auto& f : inputs) {
+            if (batch.size() >= batchSize) break;
+            if (!batch.contains(f) && !expectationFor(f).mustReject &&
+                expectationFor(f).seconds == 30.0 && !expectationFor(f).maySilent &&
+                f.getFullPathName().length() <= 259) {
+                batch.add(f);
+            }
         }
         std::cout << "\n[batch over " << batch.size() << " formats]" << std::endl;
         if (batch.size() < 2) {
