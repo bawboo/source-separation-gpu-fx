@@ -762,6 +762,38 @@ int run() {
             "English language toggle should offer switching back to zh-TW");
     require(languageSettingsFile.loadFileAsString().trim() == "en",
             "language choice was not persisted to disk");
+    {
+        // Relabelling the combos must not drop their selection: JUCE's
+        // getSelectedItemIndex() compares the shown text with the item text,
+        // so a combo whose label was not refreshed reads as "nothing chosen".
+        std::vector<juce::Component*> afterToggle;
+        collectComponents(*editor, afterToggle);
+        auto* modeAfter = findNamedComponent<juce::ComboBox>(afterToggle, "Separation mode");
+        require(modeAfter != nullptr && modeAfter->getSelectedItemIndex() >= 0 &&
+                    modeAfter->getText() == modeAfter->getItemText(modeAfter->getSelectedItemIndex()),
+                "language toggle dropped the separation-mode selection");
+        juce::ComboBox* operatingAfter = nullptr;
+        for (auto* component : afterToggle) {
+            if (auto* box = dynamic_cast<juce::ComboBox*>(component);
+                box != nullptr && box->getNumItems() == 2 &&
+                box->getItemText(0) == htfx::tr("combo.modeRecord")) {
+                operatingAfter = box;
+            }
+        }
+        require(operatingAfter != nullptr && operatingAfter->getSelectedItemIndex() == 0 &&
+                    operatingAfter->getText() == htfx::tr("combo.modeRecord"),
+                "language toggle dropped the operating-mode selection");
+    }
+
+    {
+        // Dropping media onto the editor must be accepted; other files not.
+        auto* dropTarget = dynamic_cast<juce::FileDragAndDropTarget*>(editor.get());
+        require(dropTarget != nullptr, "editor does not accept dropped files");
+        require(dropTarget->isInterestedInFileDrag({"C:\\x\\song.MP3"}) &&
+                    dropTarget->isInterestedInFileDrag({"C:\\x\\clip.webm"}) &&
+                    !dropTarget->isInterestedInFileDrag({"C:\\x\\notes.txt"}),
+                "file-drop interest does not follow the accepted media list");
+    }
 
     std::unique_ptr<juce::AudioProcessorEditor> reopenedEditor(processor->createEditor());
     require(reopenedEditor != nullptr, "editor could not be reopened");

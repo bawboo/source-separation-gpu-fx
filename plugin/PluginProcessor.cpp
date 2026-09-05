@@ -2708,11 +2708,17 @@ void HTDemucsGpuFXAudioProcessor::batchExportLoop(
     folder.createDirectory();
     const int total = getClipCount();
     int exported = 0;
+    // Output names written by this batch. Two clips can share a base name
+    // (song.mp3 and song.flac, or the same name from two folders); the
+    // second one gets its source extension, then a counter, so nothing in
+    // the batch overwrites another clip's export.
+    juce::StringArray namesUsed;
     for (int index = 0; index < total; ++index) {
         if (stopToken.stop_requested()) {
             break;
         }
         juce::String baseName;
+        juce::String sourceExtension;
         bool selected = false;
         bool hasResult = false;
         {
@@ -2724,6 +2730,7 @@ void HTDemucsGpuFXAudioProcessor::batchExportLoop(
             selected = clip.selected;
             hasResult = clip.result != nullptr;
             baseName = clip.sourceFile.getFileNameWithoutExtension();
+            sourceExtension = clip.sourceFile.getFileExtension().trimCharactersAtStart(".");
         }
         if (!selected) {
             continue;
@@ -2767,7 +2774,16 @@ void HTDemucsGpuFXAudioProcessor::batchExportLoop(
 
         const juce::String suffix =
             kind == QuickExportKind::vocals ? "_vocals" : "_accompany";
-        const auto outputFile = folder.getChildFile(baseName + suffix + ".wav");
+        juce::String outputName = baseName + suffix + ".wav";
+        if (namesUsed.contains(outputName, true)) {
+            outputName = baseName + " (" + sourceExtension + ")" + suffix + ".wav";
+            for (int counter = 2; namesUsed.contains(outputName, true); ++counter) {
+                outputName = baseName + " (" + sourceExtension + " " +
+                             juce::String(counter) + ")" + suffix + ".wav";
+            }
+        }
+        namesUsed.add(outputName);
+        const auto outputFile = folder.getChildFile(outputName);
         if (!beginQuickExport(outputFile, kind)) {
             continue;
         }
@@ -3302,14 +3318,37 @@ void HTDemucsGpuFXAudioProcessor::mixExportLoop(
                 outputFile.getFileNameWithoutExtension() + ".htfx-part",
                 ".mp4",
                 false);
-        const juce::StringArray arguments{
-            "-hide_banner", "-loglevel", "error", "-y", "-i",
-            originalMediaFile.getFullPathName(), "-i",
-            temporaryMix.getFullPathName(), "-map", "0:v:0", "-map", "1:a:0",
-            "-map_metadata", "0", "-c:v", "copy", "-c:a", "aac", "-b:a",
-            "320k", "-af", "apad", "-shortest", "-movflags", "+faststart",
-            temporaryVideo.getFullPathName()};
-        const bool muxed = runFfmpeg(arguments, stopToken, error);
+        // Stream-copy the video when MP4 can carry it (H.264, HEVC, MPEG-4,
+        // AV1...). Sources MP4 cannot hold as-is -- VP8/VP9 from WebM, WMV,
+        // MPEG-1 -- are re-encoded instead: H.264 through OpenH264 first, the
+        // native MPEG-4 encoder as the last resort. Both are in the LGPL
+        // FFmpeg build the app ships with.
+        const std::array<juce::StringArray, 3> videoCodecs{
+            juce::StringArray{"-c:v", "copy"},
+            juce::StringArray{"-c:v", "libopenh264", "-pix_fmt", "yuv420p", "-b:v", "6M",
+                              "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2"},
+            juce::StringArray{"-c:v", "mpeg4", "-q:v", "3", "-pix_fmt", "yuv420p",
+                              "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2"}};
+        bool muxed = false;
+        for (std::size_t attempt = 0; attempt < videoCodecs.size() && !muxed; ++attempt) {
+            if (stopToken.stop_requested()) {
+                break;
+            }
+            if (attempt > 0) {
+                setMediaMessage(htfx::tr("status.mixReencodingVideo"));
+                temporaryVideo.deleteFile();
+            }
+            juce::StringArray arguments{
+                "-hide_banner", "-loglevel", "error", "-y", "-i",
+                originalMediaFile.getFullPathName(), "-i",
+                temporaryMix.getFullPathName(), "-map", "0:v:0", "-map", "1:a:0",
+                "-map_metadata", "0"};
+            arguments.addArray(videoCodecs[attempt]);
+            arguments.addArray({"-c:a", "aac", "-b:a", "320k", "-af", "apad", "-shortest",
+                                "-movflags", "+faststart", temporaryVideo.getFullPathName()});
+            error.clear();
+            muxed = runFfmpeg(arguments, stopToken, error);
+        }
         temporaryMix.deleteFile();
         if (!muxed) {
             temporaryVideo.deleteFile();
@@ -3685,16 +3724,16 @@ juce::String HTDemucsGpuFXAudioProcessor::getRecordStatusText() const {
         return separationMessage_;
     }
     switch (state) {
-        case SeparationState::idle: return "Ready to record";
-        case SeparationState::recording: return "Recording";
-        case SeparationState::recorded: return "Ready to separate";
-        case SeparationState::loading: return "Loading model";
-        case SeparationState::separating: return "Separating";
-        case SeparationState::previewReady: return "Ready to preview";
-        case SeparationState::error: return "Error";
-        case SeparationState::cancelled: return "Cancelled";
+        case SeparationState::idle: return htfx::tr("status.readyToRecord");
+        case SeparationState::recording: return htfx::tr("status.recording");
+        case SeparationState::recorded: return htfx::tr("status.readyToSeparate");
+        case SeparationState::loading: return htfx::tr("status.loadingModel");
+        case SeparationState::separating: return htfx::tr("status.separating");
+        case SeparationState::previewReady: return htfx::tr("status.readyToPreview");
+        case SeparationState::error: return htfx::tr("status.error");
+        case SeparationState::cancelled: return htfx::tr("status.cancelled");
     }
-    return "Unknown";
+    return htfx::tr("status.unknown");
 }
 
 juce::String HTDemucsGpuFXAudioProcessor::getResolvedDeviceName() const {
@@ -3954,7 +3993,165 @@ private:
     bool active_ = false;
 };
 
+// The visual identity every control shares: one dark ground, flat rounded
+// surfaces, and colour used only to say what a control does -- blue for the
+// primary action, amber for vocals, teal for accompaniment, red for record
+// and cancel. Disabled controls fade instead of changing shape, so the layout
+// reads the same whether or not a step is available yet.
+class HtfxLookAndFeel final : public juce::LookAndFeel_V4 {
+public:
+    static constexpr juce::uint32 kBackground = 0xff171a20;
+    static constexpr juce::uint32 kSurface = 0xff21252d;
+    static constexpr juce::uint32 kSurfaceRaised = 0xff2c313b;
+    static constexpr juce::uint32 kOutline = 0xff3b4352;
+    static constexpr juce::uint32 kText = 0xffe9ecf1;
+    static constexpr juce::uint32 kTextMuted = 0xff97a1b1;
+    static constexpr juce::uint32 kAccent = 0xff3d8fe0;
+    static constexpr juce::uint32 kVocals = 0xffd9962f;
+    static constexpr juce::uint32 kAccompany = 0xff2aa88f;
+    static constexpr juce::uint32 kDanger = 0xffb3262e;
+    static constexpr juce::uint32 kSuccess = 0xff43b96a;
+
+    HtfxLookAndFeel() {
+        setColourScheme({juce::Colour(kBackground), juce::Colour(kSurface),
+                         juce::Colour(kSurfaceRaised), juce::Colour(kOutline),
+                         juce::Colour(kText), juce::Colour(kAccent), juce::Colour(kText),
+                         juce::Colour(kAccent), juce::Colour(kText)});
+        setColour(juce::TextButton::buttonColourId, juce::Colour(kSurfaceRaised));
+        setColour(juce::TextButton::buttonOnColourId, juce::Colour(kAccent));
+        setColour(juce::TextButton::textColourOffId, juce::Colour(kText));
+        setColour(juce::TextButton::textColourOnId, juce::Colour(kText));
+        setColour(juce::ComboBox::backgroundColourId, juce::Colour(kSurface));
+        setColour(juce::ComboBox::outlineColourId, juce::Colour(kOutline));
+        setColour(juce::ComboBox::arrowColourId, juce::Colour(kTextMuted));
+        setColour(juce::ComboBox::textColourId, juce::Colour(kText));
+        setColour(juce::PopupMenu::backgroundColourId, juce::Colour(kSurfaceRaised));
+        setColour(juce::PopupMenu::textColourId, juce::Colour(kText));
+        setColour(juce::PopupMenu::highlightedBackgroundColourId, juce::Colour(kAccent));
+        setColour(juce::Label::textColourId, juce::Colour(kText));
+        setColour(juce::Slider::backgroundColourId, juce::Colour(kOutline));
+        setColour(juce::Slider::trackColourId, juce::Colour(kAccent));
+        setColour(juce::Slider::thumbColourId, juce::Colour(kText));
+        setColour(juce::Slider::textBoxBackgroundColourId, juce::Colour(kSurface));
+        setColour(juce::Slider::textBoxOutlineColourId, juce::Colour(kOutline));
+        setColour(juce::Slider::textBoxTextColourId, juce::Colour(kText));
+        setColour(juce::TextEditor::backgroundColourId, juce::Colour(kSurface));
+        setColour(juce::TextEditor::outlineColourId, juce::Colour(kOutline));
+        setColour(juce::TextEditor::focusedOutlineColourId, juce::Colour(kAccent));
+        setColour(juce::TextEditor::textColourId, juce::Colour(kText));
+        setColour(juce::ToggleButton::textColourId, juce::Colour(kText));
+        setColour(juce::ToggleButton::tickColourId, juce::Colour(kAccent));
+        setColour(juce::ToggleButton::tickDisabledColourId, juce::Colour(kTextMuted));
+        setColour(juce::GroupComponent::outlineColourId, juce::Colour(kOutline));
+        setColour(juce::GroupComponent::textColourId, juce::Colour(kTextMuted));
+        setColour(juce::ProgressBar::backgroundColourId, juce::Colour(kSurface));
+        setColour(juce::ProgressBar::foregroundColourId, juce::Colour(kAccent));
+    }
+
+    void drawButtonBackground(juce::Graphics& g, juce::Button& button,
+                              const juce::Colour& backgroundColour,
+                              bool highlighted, bool down) override {
+        const auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
+        constexpr float radius = 6.0f;
+        auto fill = backgroundColour;
+        if (!button.isEnabled()) {
+            fill = fill.withMultipliedAlpha(0.35f);
+        } else if (down) {
+            fill = fill.darker(0.25f);
+        } else if (highlighted) {
+            fill = fill.brighter(0.15f);
+        }
+        g.setColour(fill);
+        g.fillRoundedRectangle(bounds, radius);
+        g.setColour(juce::Colour(kOutline).withAlpha(button.isEnabled() ? 0.9f : 0.35f));
+        g.drawRoundedRectangle(bounds, radius, 1.0f);
+    }
+
+    // Determinate: a rounded track, the accent fill, and the percentage in
+    // light text with a soft shadow so it reads on both the track and the
+    // fill (the stock renderer picks one contrast colour and loses the label
+    // once the bar is full). Indeterminate keeps the stock stripes.
+    void drawProgressBar(juce::Graphics& g, juce::ProgressBar& bar, int width, int height,
+                         double progress, const juce::String& textToShow) override {
+        if (progress < 0.0 || progress > 1.0) {
+            LookAndFeel_V4::drawProgressBar(g, bar, width, height, progress, textToShow);
+            return;
+        }
+        const auto bounds = juce::Rectangle<int>(0, 0, width, height).toFloat();
+        const float radius = bounds.getHeight() * 0.5f;
+        g.setColour(bar.findColour(juce::ProgressBar::backgroundColourId));
+        g.fillRoundedRectangle(bounds, radius);
+        g.setColour(juce::Colour(kOutline));
+        g.drawRoundedRectangle(bounds.reduced(0.5f), radius, 1.0f);
+        if (progress > 0.0) {
+            juce::Graphics::ScopedSaveState state(g);
+            juce::Path clip;
+            clip.addRoundedRectangle(bounds, radius);
+            g.reduceClipRegion(clip);
+            g.setColour(bar.findColour(juce::ProgressBar::foregroundColourId));
+            g.fillRect(bounds.withWidth(static_cast<float>(width) * static_cast<float>(progress)));
+        }
+        if (textToShow.isNotEmpty()) {
+            g.setFont(juce::FontOptions{static_cast<float>(height) * 0.7f, juce::Font::bold});
+            g.setColour(juce::Colours::black.withAlpha(0.45f));
+            g.drawText(textToShow, bounds.translated(0.0f, 1.0f).toNearestInt(),
+                       juce::Justification::centred, false);
+            g.setColour(juce::Colour(kText));
+            g.drawText(textToShow, bounds.toNearestInt(), juce::Justification::centred, false);
+        }
+    }
+
+    void drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int,
+                      juce::ComboBox& box) override {
+        const auto bounds = juce::Rectangle<int>(0, 0, width, height).toFloat().reduced(0.5f);
+        const float alpha = box.isEnabled() ? 1.0f : 0.4f;
+        g.setColour(box.findColour(juce::ComboBox::backgroundColourId).withMultipliedAlpha(alpha));
+        g.fillRoundedRectangle(bounds, 5.0f);
+        g.setColour(box.findColour(juce::ComboBox::outlineColourId).withMultipliedAlpha(alpha));
+        g.drawRoundedRectangle(bounds, 5.0f, 1.0f);
+        const auto centre = juce::Point<float>(static_cast<float>(width) - 14.0f,
+                                               static_cast<float>(height) * 0.5f);
+        juce::Path chevron;
+        chevron.startNewSubPath(centre.x - 4.0f, centre.y - 2.0f);
+        chevron.lineTo(centre.x, centre.y + 2.5f);
+        chevron.lineTo(centre.x + 4.0f, centre.y - 2.0f);
+        g.setColour(box.findColour(juce::ComboBox::arrowColourId).withMultipliedAlpha(alpha));
+        g.strokePath(chevron, juce::PathStrokeType(1.6f));
+    }
+};
+
+// The transformed content layer of the editor; the editor paints the frame
+// (cards, the step strip, the status dot) into it through onPaint so the
+// decoration scales with the controls.
+class PaintCanvas final : public juce::Component {
+public:
+    std::function<void(juce::Graphics&)> onPaint;
+    std::function<void(juce::Graphics&)> onPaintOver;
+    void paint(juce::Graphics& g) override {
+        if (onPaint != nullptr) {
+            onPaint(g);
+        }
+    }
+    void paintOverChildren(juce::Graphics& g) override {
+        if (onPaintOver != nullptr) {
+            onPaintOver(g);
+        }
+    }
+};
+
+bool isAcceptedMediaName(const juce::String& path) {
+    const auto extension = juce::File(path).getFileExtension().toLowerCase();
+    for (const auto* accepted : {".wav", ".flac", ".aif", ".aiff", ".mp3", ".ogg", ".m4a",
+                                 ".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".wmv", ".mpeg"}) {
+        if (extension == accepted) {
+            return true;
+        }
+    }
+    return false;
+}
+
 class HTDemucsGpuFXEditor final : public juce::AudioProcessorEditor,
+                                  public juce::FileDragAndDropTarget,
                                   private juce::Timer {
 public:
     explicit HTDemucsGpuFXEditor(HTDemucsGpuFXAudioProcessor& processor)
@@ -3963,6 +4160,24 @@ public:
           state_(processor.parameters()),
           progressBar_(progressValue_) {
         htfx::Localization::instance().reload();
+        setLookAndFeel(&lookAndFeel_);
+        scaledContent_.onPaint = [this](juce::Graphics& g) { paintFrame(g); };
+        scaledContent_.onPaintOver = [this](juce::Graphics& g) { paintDropOverlay(g); };
+        importButton_.setColour(juce::TextButton::buttonColourId,
+                                juce::Colour(HtfxLookAndFeel::kAccent));
+        vocalsOnlyButton_.setColour(juce::TextButton::buttonColourId,
+                                    juce::Colour(HtfxLookAndFeel::kVocals));
+        accompanyOnlyButton_.setColour(juce::TextButton::buttonColourId,
+                                       juce::Colour(HtfxLookAndFeel::kAccompany));
+        separateButton_.setColour(juce::TextButton::buttonColourId,
+                                  juce::Colour(HtfxLookAndFeel::kAccent));
+        cancelButton_.setColour(juce::TextButton::buttonColourId,
+                                juce::Colour(HtfxLookAndFeel::kDanger).darker(0.35f));
+        previewPlayButton_.setColour(juce::TextButton::buttonColourId,
+                                     juce::Colour(HtfxLookAndFeel::kAccent).darker(0.2f));
+        simpleFile_.setBorderSize(juce::BorderSize<int>(0, 10, 0, 10));
+        status_.setBorderSize(juce::BorderSize<int>(0, 18, 0, 0));
+        simpleTitle_.setColour(juce::Label::textColourId, juce::Colour(HtfxLookAndFeel::kText));
 
         updatePanelSwitchButtonText();
         panelSwitchButton_.onClick = [this] { setAdvancedPanel(!advancedPanel_); };
@@ -4262,6 +4477,7 @@ public:
             child->setVisible(wasVisible);
         }
         addAndMakeVisible(scaledContent_);
+        tooltipWindow_ = std::make_unique<juce::TooltipWindow>(this, 500);
         setResizable(false, false);
         applyLocalizedStrings();
         restoreStartupSelection();
@@ -4274,33 +4490,90 @@ public:
         timerCallback();
     }
 
+    ~HTDemucsGpuFXEditor() override {
+        stopTimer();
+        setLookAndFeel(nullptr);
+    }
+
+    void paint(juce::Graphics& g) override {
+        g.fillAll(juce::Colour(HtfxLookAndFeel::kBackground));
+    }
+
+    // Dropping media onto the window imports it, the same as the Import
+    // button: one file replaces the current clip, several become a batch.
+    bool isInterestedInFileDrag(const juce::StringArray& files) override {
+        for (const auto& file : files) {
+            if (isAcceptedMediaName(file)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void fileDragEnter(const juce::StringArray&, int, int) override {
+        dragOver_ = true;
+        scaledContent_.repaint();
+    }
+
+    void fileDragExit(const juce::StringArray&) override {
+        dragOver_ = false;
+        scaledContent_.repaint();
+    }
+
+    void filesDropped(const juce::StringArray& files, int, int) override {
+        dragOver_ = false;
+        scaledContent_.repaint();
+        juce::Array<juce::File> media;
+        for (const auto& path : files) {
+            if (isAcceptedMediaName(path) && juce::File(path).existsAsFile()) {
+                media.add(juce::File(path));
+            }
+        }
+        if (media.isEmpty()) {
+            return;
+        }
+        if (modeBox_.getSelectedItemIndex() != 0) {
+            // Import only exists in record mode; switch the same way the
+            // combo would.
+            modeBox_.setSelectedItemIndex(0, juce::sendNotificationSync);
+        }
+        if (media.size() > 1) {
+            processor_.beginMultiMediaImport(media);
+        } else {
+            processor_.beginMediaImport(media.getReference(0));
+        }
+    }
+
     void resized() override {
         scaledContent_.setTransform({});
         scaledContent_.setBounds(0, 0, designWidth(), designHeight());
         auto area = scaledContent_.getLocalBounds().reduced(12);
 
         if (!advancedPanel_) {
-            auto header = area.removeFromTop(34);
+            auto header = area.removeFromTop(30);
             simpleTitle_.setBounds(header.removeFromLeft(330));
             languageButton_.setBounds(header.removeFromRight(64));
             header.removeFromRight(6);
             panelSwitchButton_.setBounds(header.removeFromRight(130));
-            area.removeFromTop(10);
-            simpleFile_.setBounds(area.removeFromTop(26));
-            area.removeFromTop(8);
-            importButton_.setBounds(area.removeFromTop(38));
-            area.removeFromTop(10);
-            auto exports = area.removeFromTop(42);
+            area.removeFromTop(6);
+            stepStrip_ = area.removeFromTop(18);
+            area.removeFromTop(6);
+            fileChip_ = area.removeFromTop(26);
+            simpleFile_.setBounds(fileChip_);
+            area.removeFromTop(6);
+            importButton_.setBounds(area.removeFromTop(34));
+            area.removeFromTop(6);
+            auto exports = area.removeFromTop(38);
             vocalsOnlyButton_.setBounds(exports.removeFromLeft(256));
             exports.removeFromLeft(12);
             accompanyOnlyButton_.setBounds(exports);
-            area.removeFromTop(10);
+            area.removeFromTop(6);
             for (auto& row : clipRows_) {
                 row->setBounds(area.removeFromTop(22).reduced(0, 1));
             }
-            progressBar_.setBounds(area.removeFromTop(18));
-            area.removeFromTop(5);
-            status_.setBounds(area.removeFromTop(38));
+            progressBar_.setBounds(area.removeFromTop(16));
+            area.removeFromTop(4);
+            status_.setBounds(area.removeFromTop(30));
 
             const float scale = (std::min)(
                 static_cast<float>(getWidth()) / designWidth(),
@@ -4347,7 +4620,12 @@ public:
         progressBar_.setBounds(area.removeFromTop(18).reduced(0, 1));
         area.removeFromTop(4);
 
+        // Only visible stems take a row: a 2-stem RoFormer mode or a 4-stem
+        // HTDemucs mode leaves no blank rows where the other sliders would be.
         for (std::size_t index = 0; index < stemSliders_.size(); ++index) {
+            if (!stemSliders_[index].isVisible()) {
+                continue;
+            }
             auto row = area.removeFromTop(28);
             stemLabels_[index].setBounds(row.removeFromLeft(100));
             stemSliders_[index].setBounds(row);
@@ -4370,16 +4648,23 @@ public:
         advancedButton_.setBounds(area.removeFromTop(28).removeFromLeft(210));
         if (advancedVisible_) {
             area.removeFromTop(3);
+            // Rows belonging to the other model family are hidden by
+            // updateSixSourceControls(); they take no space here.
             auto layoutAdvancedRow = [&](juce::Label& label, juce::Component& control) {
+                if (!control.isVisible()) {
+                    return;
+                }
                 auto row = area.removeFromTop(28);
                 label.setBounds(row.removeFromLeft(150));
                 control.setBounds(row.removeFromLeft(430));
             };
             layoutAdvancedRow(segmentLabel_, segmentBox_);
             layoutAdvancedRow(modelLabel_, modelBox_);
-            auto downloadRow = area.removeFromTop(28);
-            downloadRow.removeFromLeft(150);
-            modelDownloadButton_.setBounds(downloadRow.removeFromLeft(430));
+            if (modelDownloadButton_.isVisible()) {
+                auto downloadRow = area.removeFromTop(28);
+                downloadRow.removeFromLeft(150);
+                modelDownloadButton_.setBounds(downloadRow.removeFromLeft(430));
+            }
             layoutAdvancedRow(roformerCategoryLabel_, roformerCategoryBox_);
             layoutAdvancedRow(roformerSearchLabel_, roformerSearch_);
             layoutAdvancedRow(roformerModelLabel_, roformerModelBox_);
@@ -4391,6 +4676,7 @@ public:
         cpuWarning_.setBounds(area.removeFromTop(26));
 
         auto footer = area.removeFromTop(50);
+        footerDivider_ = footer.getY() - 2;
         status_.setBounds(footer.removeFromTop(24));
         resetWorker_.setBounds(footer.removeFromRight(120).reduced(3));
         metrics_.setBounds(footer);
@@ -4416,6 +4702,96 @@ private:
 
     [[nodiscard]] int designHeight() const noexcept {
         return advancedPanel_ ? (advancedVisible_ ? 826 : 576) : 260;
+    }
+
+    enum class StepState { pending, active, done };
+
+    // Paints the decoration around the controls: the "1 import -> 2 separate
+    // -> 3 export" strip and the file chip on the simple panel, a divider
+    // above the footer on the advanced panel, and the coloured status dot on
+    // both. Everything here is derived from processor state cached by
+    // timerCallback(), never queried mid-paint.
+    void paintFrame(juce::Graphics& g) {
+        const auto text = juce::Colour(HtfxLookAndFeel::kText);
+        const auto muted = juce::Colour(HtfxLookAndFeel::kTextMuted);
+        const auto outline = juce::Colour(HtfxLookAndFeel::kOutline);
+        if (!advancedPanel_) {
+            const std::array<juce::String, 3> labels{
+                htfx::tr("step.import"), htfx::tr("step.separate"), htfx::tr("step.export")};
+            const std::array<StepState, 3> states{stepImport_, stepSeparate_, stepExport_};
+            auto strip = stepStrip_.toFloat();
+            const float gap = 10.0f;
+            const float pillWidth = (strip.getWidth() - 2.0f * gap) / 3.0f;
+            g.setFont(juce::FontOptions{12.5f, juce::Font::bold});
+            for (std::size_t i = 0; i < labels.size(); ++i) {
+                auto pill = strip.removeFromLeft(pillWidth);
+                const auto fill = states[i] == StepState::done
+                                      ? juce::Colour(HtfxLookAndFeel::kSuccess).withAlpha(0.22f)
+                                  : states[i] == StepState::active
+                                      ? juce::Colour(HtfxLookAndFeel::kAccent).withAlpha(0.28f)
+                                      : juce::Colour(HtfxLookAndFeel::kSurface);
+                const auto edge = states[i] == StepState::done
+                                      ? juce::Colour(HtfxLookAndFeel::kSuccess)
+                                  : states[i] == StepState::active
+                                      ? juce::Colour(HtfxLookAndFeel::kAccent)
+                                      : outline;
+                g.setColour(fill);
+                g.fillRoundedRectangle(pill, pill.getHeight() * 0.5f);
+                g.setColour(edge);
+                g.drawRoundedRectangle(pill.reduced(0.5f), pill.getHeight() * 0.5f, 1.0f);
+                g.setColour(states[i] == StepState::pending ? muted : text);
+                g.drawText(labels[i], pill.toNearestInt(), juce::Justification::centred, true);
+                if (i + 1 < labels.size()) {
+                    g.setColour(outline);
+                    g.fillRect(juce::Rectangle<float>(pill.getRight() + 2.0f,
+                                                      pill.getCentreY() - 0.5f, gap - 4.0f, 1.0f));
+                    strip.removeFromLeft(gap);
+                }
+            }
+            g.setColour(juce::Colour(HtfxLookAndFeel::kSurface));
+            g.fillRoundedRectangle(fileChip_.toFloat(), 6.0f);
+            g.setColour(outline);
+            g.drawRoundedRectangle(fileChip_.toFloat().reduced(0.5f), 6.0f, 1.0f);
+        } else if (footerDivider_ > 0) {
+            g.setColour(outline);
+            g.fillRect(12, footerDivider_, designWidth() - 24, 1);
+        }
+        const auto dotColour = statusTone_ == 1 ? juce::Colour(HtfxLookAndFeel::kAccent)
+                             : statusTone_ == 2 ? juce::Colour(HtfxLookAndFeel::kSuccess)
+                             : statusTone_ == 3 ? juce::Colour(HtfxLookAndFeel::kDanger)
+                                                : muted;
+        const auto statusBounds = status_.getBounds().toFloat();
+        const juce::Rectangle<float> dot(statusBounds.getX() + 2.0f,
+                                         statusBounds.getCentreY() - 5.0f, 10.0f, 10.0f);
+        g.setColour(dotColour);
+        g.fillEllipse(dot);
+    }
+
+    // While files are dragged over the window: dim everything, frame it in
+    // the accent colour, and say what letting go will do. Painted above the
+    // controls so no button can cover the hint.
+    void paintDropOverlay(juce::Graphics& g) {
+        if (!dragOver_) {
+            return;
+        }
+        const auto accent = juce::Colour(HtfxLookAndFeel::kAccent);
+        const auto frame = scaledContent_.getLocalBounds().toFloat().reduced(3.0f);
+        g.setColour(juce::Colour(HtfxLookAndFeel::kBackground).withAlpha(0.72f));
+        g.fillRoundedRectangle(frame, 10.0f);
+        g.setColour(accent.withAlpha(0.18f));
+        g.fillRoundedRectangle(frame, 10.0f);
+        g.setColour(accent);
+        g.drawRoundedRectangle(frame, 10.0f, 2.5f);
+        const auto hint = htfx::tr("hint.dropToImport");
+        g.setFont(juce::FontOptions{22.0f, juce::Font::bold});
+        const auto textWidth = juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), hint);
+        const auto pill = juce::Rectangle<float>(textWidth + 48.0f, 44.0f).withCentre(frame.getCentre());
+        g.setColour(juce::Colour(HtfxLookAndFeel::kSurfaceRaised));
+        g.fillRoundedRectangle(pill, 22.0f);
+        g.setColour(accent);
+        g.drawRoundedRectangle(pill, 22.0f, 1.5f);
+        g.setColour(juce::Colour(HtfxLookAndFeel::kText));
+        g.drawText(hint, pill.toNearestInt(), juce::Justification::centred, false);
     }
 
     // Re-applies every localized static string from the current language
@@ -4457,16 +4833,42 @@ private:
         scaleButton_.setButtonText(htfx::tr("button.scaleUi"));
         separationModeBox_.setTextWhenNothingSelected(
             htfx::tr("combo.separationModePlaceholder"));
-        separationModeBox_.changeItemText(1, htfx::tr("combo.separationMode4Stem"));
-        separationModeBox_.changeItemText(2, htfx::tr("combo.separationMode6Stem"));
-        modeBox_.changeItemText(1, htfx::tr("combo.modeRecord"));
-        modeBox_.changeItemText(2, htfx::tr("combo.modeRealtime"));
-        roformerCategoryBox_.changeItemText(1, htfx::tr("combo.roformerAllCategories"));
+        // changeItemText() only rewrites the menu item; the box keeps showing
+        // the old text, and because JUCE's getSelectedItemIndex() compares
+        // the shown text with the item's, every "is a mode chosen" check
+        // would then see -1 until the user reselects. Reselect by id.
+        auto relabel = [](juce::ComboBox& box, std::initializer_list<std::pair<int, juce::String>> items) {
+            const int selectedId = box.getSelectedId();
+            for (const auto& [id, text] : items) {
+                box.changeItemText(id, text);
+            }
+            if (selectedId != 0) {
+                box.setSelectedId(0, juce::dontSendNotification);
+                box.setSelectedId(selectedId, juce::dontSendNotification);
+            }
+        };
+        relabel(separationModeBox_, {{1, htfx::tr("combo.separationMode4Stem")},
+                                     {2, htfx::tr("combo.separationMode6Stem")}});
+        relabel(modeBox_, {{1, htfx::tr("combo.modeRecord")},
+                           {2, htfx::tr("combo.modeRealtime")}});
+        relabel(roformerCategoryBox_, {{1, htfx::tr("combo.roformerAllCategories")}});
         roformerSearch_.setTextToShowWhenEmpty(
             htfx::tr("placeholder.roformerSearch"), juce::Colours::grey);
         updatePanelSwitchButtonText();
         updateAdvancedButtonText();
         updateFullScreenButtonText();
+        importButton_.setTooltip(htfx::tr("tip.import"));
+        vocalsOnlyButton_.setTooltip(htfx::tr("tip.exportVocals"));
+        accompanyOnlyButton_.setTooltip(htfx::tr("tip.exportAccompany"));
+        separateButton_.setTooltip(htfx::tr("tip.separate"));
+        exportButton_.setTooltip(htfx::tr("tip.export"));
+        recordButton_.setTooltip(htfx::tr("tip.record"));
+        cancelButton_.setTooltip(htfx::tr("tip.cancel"));
+        panelSwitchButton_.setTooltip(htfx::tr("tip.panelSwitch"));
+        languageButton_.setTooltip(htfx::tr("tip.language"));
+        separationModeBox_.setTooltip(htfx::tr("tip.separationMode"));
+        previewPlayButton_.setTooltip(htfx::tr("tip.preview"));
+        bypassButton_.setTooltip(htfx::tr("tip.bypass"));
     }
 
     // Multi-file quick export: one destination folder, every ticked clip is
@@ -5105,6 +5507,25 @@ private:
                  &roformerStatusLabel_, &roformerStatus_}) {
             component->setVisible(roformerControlsVisible);
         }
+
+        // The layout skips hidden rows, so it must run again whenever the
+        // set of visible rows changes (this runs from the 10 Hz timer).
+        int visibleRows = 0;
+        for (std::size_t index = 0; index < stemSliders_.size(); ++index) {
+            if (stemSliders_[index].isVisible()) {
+                visibleRows |= 1 << index;
+            }
+        }
+        if (modelControlsVisible) {
+            visibleRows |= 1 << 8;
+        }
+        if (roformerControlsVisible) {
+            visibleRows |= 1 << 9;
+        }
+        if (visibleRows != layoutSignature_) {
+            layoutSignature_ = visibleRows;
+            resized();
+        }
     }
 
     void updateVisibility() {
@@ -5274,11 +5695,48 @@ private:
             juce::dontSendNotification);
         updateCpuWarning();
         updateSixSourceControls();
+
+        // Frame decoration: which step the user is on, and the tone of the
+        // status line (0 idle, 1 busy, 2 ready, 3 error or recording).
+        const bool hasMedia =
+            importedFile.existsAsFile() && processor_.getRecordedSeconds() > 0.0;
+        const bool separated =
+            separationState == HTDemucsGpuFXAudioProcessor::SeparationState::previewReady &&
+            processor_.hasPreview();
+        const auto stepImport = hasMedia ? StepState::done : StepState::active;
+        const auto stepSeparate = separated ? StepState::done
+                                : (separationBusy || modelBusy) ? StepState::active
+                                                                : StepState::pending;
+        const auto stepExport = separated ? StepState::active : StepState::pending;
+        const int tone =
+            separationState == HTDemucsGpuFXAudioProcessor::SeparationState::error || recording
+                ? 3
+            : busy      ? 1
+            : separated ? 2
+                        : 0;
+        if (stepImport != stepImport_ || stepSeparate != stepSeparate_ ||
+            stepExport != stepExport_ || tone != statusTone_) {
+            stepImport_ = stepImport;
+            stepSeparate_ = stepSeparate;
+            stepExport_ = stepExport;
+            statusTone_ = tone;
+            scaledContent_.repaint();
+        }
     }
 
     HTDemucsGpuFXAudioProcessor& processor_;
     juce::AudioProcessorValueTreeState& state_;
-    juce::Component scaledContent_;
+    HtfxLookAndFeel lookAndFeel_;  // outlives every child that draws with it
+    PaintCanvas scaledContent_;
+    juce::Rectangle<int> stepStrip_;
+    juce::Rectangle<int> fileChip_;
+    int footerDivider_ = 0;
+    int layoutSignature_ = -1;
+    bool dragOver_ = false;
+    StepState stepImport_ = StepState::active;
+    StepState stepSeparate_ = StepState::pending;
+    StepState stepExport_ = StepState::pending;
+    int statusTone_ = 0;
     juce::TextButton panelSwitchButton_;
     juce::TextButton languageButton_;
     juce::Label simpleTitle_;
@@ -5351,6 +5809,7 @@ private:
     bool editorFullScreen_ = false;
     bool advancedPanel_ = false;
     bool advancedVisible_ = false;
+    std::unique_ptr<juce::TooltipWindow> tooltipWindow_;  // last: destroyed first
 };
 
 }  // namespace

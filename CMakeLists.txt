@@ -335,6 +335,28 @@ if(HTFX_BUILD_PLUGIN)
         juce::juce_audio_utils
     )
 
+    add_executable(htdemucs_format_matrix_check tests/format_matrix_check.cpp)
+    target_include_directories(htdemucs_format_matrix_check PRIVATE plugin)
+    target_compile_features(htdemucs_format_matrix_check PRIVATE cxx_std_20)
+    if(MSVC)
+        target_compile_options(htdemucs_format_matrix_check PRIVATE /utf-8)
+    endif()
+    target_link_libraries(htdemucs_format_matrix_check PRIVATE
+        HTDemucsGpuFX
+        juce::juce_audio_utils
+    )
+
+    add_executable(htdemucs_ui_snapshot tests/ui_snapshot.cpp)
+    target_include_directories(htdemucs_ui_snapshot PRIVATE plugin)
+    target_compile_features(htdemucs_ui_snapshot PRIVATE cxx_std_20)
+    if(MSVC)
+        target_compile_options(htdemucs_ui_snapshot PRIVATE /utf-8)
+    endif()
+    target_link_libraries(htdemucs_ui_snapshot PRIVATE
+        HTDemucsGpuFX
+        juce::juce_audio_utils
+    )
+
     add_executable(htdemucs_transport_epoch_smoke tests/transport_epoch_smoke.cpp)
     target_include_directories(htdemucs_transport_epoch_smoke PRIVATE plugin)
     target_compile_features(htdemucs_transport_epoch_smoke PRIVATE cxx_std_20)
