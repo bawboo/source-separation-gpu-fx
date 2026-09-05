@@ -786,6 +786,19 @@ int run() {
     }
 
     {
+        // Shortcuts mirror the buttons: nothing to preview => Space is not
+        // consumed; nothing running => Esc is not consumed.
+        // (a preview exists here when the RoFormer route above produced one)
+        const bool spaceConsumed = editor->keyPressed(juce::KeyPress(juce::KeyPress::spaceKey));
+        require(spaceConsumed == processor->hasPreview(),
+                "Space handling does not follow whether a preview exists");
+        if (spaceConsumed) {
+            editor->keyPressed(juce::KeyPress(juce::KeyPress::spaceKey));  // pause again
+        }
+        require(!editor->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey)),
+                "Esc was consumed with nothing to cancel");
+    }
+    {
         // Dropping media onto the editor must be accepted; other files not.
         auto* dropTarget = dynamic_cast<juce::FileDragAndDropTarget*>(editor.get());
         require(dropTarget != nullptr, "editor does not accept dropped files");

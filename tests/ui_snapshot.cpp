@@ -154,6 +154,22 @@ int main(int argc, char** argv) {
         }
     }
 
+    // Many clips at once: the clip list must stay inside the panel.
+    if (args.size() > 2) {
+        juce::Array<juce::File> many;
+        for (std::size_t i = 1; i < args.size(); ++i) {
+            if (juce::File(args[i]).existsAsFile()) {
+                many.add(juce::File(args[i]));
+            }
+        }
+        if (many.size() > 1 && processor->beginMultiMediaImport(many) &&
+            waitUntil([&] { return !processor->isMediaBusy(); }, 300)) {
+            ok = snapshot(*editor, outDir.getChildFile("10-general-batch-zh.png")) && ok;
+            std::cout << "  clips=" << processor->getClipCount()
+                      << " editor=" << editor->getWidth() << "x" << editor->getHeight() << std::endl;
+        }
+    }
+
     if (auto* target = dynamic_cast<juce::FileDragAndDropTarget*>(editor.get()); target != nullptr) {
         target->fileDragEnter({"C:\\x\\song.mp3"}, 10, 10);
         ok = snapshot(*editor, outDir.getChildFile("09-general-dragover-zh.png")) && ok;

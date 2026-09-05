@@ -262,6 +262,8 @@ Expectation expectationFor(const juce::File& file) {
         e.tolerance = 0.05;
     } else if (name.contains("_truncated")) {
         e.seconds = 0.0;
+    } else if (name.contains("_20min")) {
+        e.seconds = 1200.0;
     }
     return e;
 }
@@ -285,8 +287,15 @@ void exercise(Processor& processor, const juce::File& file, const juce::File& ou
 
     const bool started = processor.beginMediaImport(file);
     if (!started) {
-        report(label + ": import starts", e.mustReject,
-               "refused: " + processor.getMediaStatusText().toStdString());
+        // A path beyond MAX_PATH may be refused, but never silently.
+        const bool longPath = file.getFullPathName().length() > 259;
+        const auto status = processor.getMediaStatusText();
+        report(label + ": import starts",
+               e.mustReject || (longPath && status.isNotEmpty()),
+               "refused: '" + status.toStdString() + "' mediaBusy=" +
+                   (processor.isMediaBusy() ? "1" : "0") + " exists=" +
+                   (file.existsAsFile() ? "1" : "0") + " pathLength=" +
+                   std::to_string(file.getFullPathName().length()));
         return;
     }
     if (!waitForMedia(processor, std::chrono::seconds(300))) {
@@ -425,15 +434,21 @@ void exercise(Processor& processor, const juce::File& file, const juce::File& ou
             const bool videoOk = outVideoCodec == sourceVideo || outVideoCodec == "h264" ||
                                  outVideoCodec == "mpeg4";
             const bool ok = videoOk && streams.endsWith("/aac");
-            juce::String durationText;
+            juce::String durationText, sourceDurationText;
             runProcess({ffprobe.getFullPathName(), "-v", "error", "-show_entries",
                         "format=duration", "-of", "csv=p=0", outVideo.getFullPathName()},
                        durationText);
+            runProcess({ffprobe.getFullPathName(), "-v", "error", "-show_entries",
+                        "format=duration", "-of", "csv=p=0", file.getFullPathName()},
+                       sourceDurationText);
             const auto duration = durationText.trim().getDoubleValue();
-            report(label + ": mix into MP4", ok && std::abs(duration - seconds) < 0.5,
+            const auto sourceDuration = sourceDurationText.trim().getDoubleValue();
+            // The picture is kept whole; audio shorter than it is padded, so
+            // the result is as long as the source video, not the audio.
+            report(label + ": mix into MP4", ok && std::abs(duration - sourceDuration) < 0.5,
                    "streams " + streams.toStdString() + " (source " + sourceStreams.toStdString() +
-                   ") " + std::to_string(duration) + " s, " +
-                   std::to_string(outVideo.getSize() / 1024) + " KB");
+                   ") " + std::to_string(duration) + " s (source " + std::to_string(sourceDuration) +
+                   " s), " + std::to_string(outVideo.getSize() / 1024) + " KB");
         }
     }
 }
@@ -527,7 +542,7 @@ int main(int argc, char** argv) {
             for (const auto& f : inputs) {
                 if (f.getFileExtension().equalsIgnoreCase(wanted) &&
                     !expectationFor(f).mustReject && expectationFor(f).seconds == 30.0 &&
-                    !expectationFor(f).maySilent) {
+                    !expectationFor(f).maySilent && f.getFullPathName().length() <= 259) {
                     batch.add(f);
                     break;
                 }
@@ -536,7 +551,8 @@ int main(int argc, char** argv) {
         }
         std::cout << "\n[batch over " << batch.size() << " formats]" << std::endl;
         if (batch.size() < 2) {
-            report("batch: enough inputs", false, std::to_string(batch.size()));
+            // A single-file run (a stress clip, say) has nothing to batch.
+            report("batch: enough inputs", inputs.size() < 2, std::to_string(batch.size()));
         } else if (!processor->beginMultiMediaImport(batch)) {
             report("batch: import starts", false);
         } else if (!waitForMedia(*processor, std::chrono::seconds(600))) {
@@ -597,7 +613,9 @@ int main(int argc, char** argv) {
             }
         }
         std::cout << "\n[cancel import: " << big.getFileName() << "]" << std::endl;
-        if (!processor->beginMediaImport(big)) {
+        if (!big.existsAsFile()) {
+            std::cout << "  (no video input; skipped)" << std::endl;
+        } else if (!processor->beginMediaImport(big)) {
             report("cancel import: starts", false, processor->getMediaStatusText().toStdString());
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -618,6 +636,63 @@ int main(int argc, char** argv) {
                 report("cancel import: import works afterwards", ok,
                        std::to_string(processor->getRecordedSeconds()) + " s");
             }
+        }
+    }
+
+    // ── exports to places that cannot be written ───────────────────────────
+    {
+        std::cout << "\n[unwritable export targets]" << std::endl;
+        juce::File source;
+        for (const auto& f : inputs) {
+            if (f.getFileExtension() == ".flac" || f.getFileExtension() == ".wav") {
+                if (!expectationFor(f).mustReject && expectationFor(f).seconds == 30.0 &&
+                    f.getFullPathName().length() <= 259) {
+                    source = f;
+                    break;
+                }
+            }
+        }
+        if (!source.existsAsFile()) {
+            std::cout << "  (no 30 s WAV/FLAC input; skipped)" << std::endl;
+        } else if (processor->beginMediaImport(source) &&
+                   waitForMedia(*processor, std::chrono::seconds(300)) &&
+                   (processor->beginSeparation() || processor->isModelDownloadBusy())) {
+            waitUntil([&] { return !processor->isModelDownloadBusy(); }, std::chrono::seconds(1800));
+            waitForSeparation(*processor, stallTimeout);
+            if (processor->getSeparationState() == State::previewReady) {
+                // A drive letter that does not exist: the folder cannot be
+                // created, so the export must fail with a message, leave the
+                // processor idle, and not hang.
+                const juce::File bad("Q:\\htfx-no-such-drive\\out.wav");
+                const bool started = processor->beginQuickExport(bad, Kind::vocals);
+                const bool settled = !started || waitForMedia(*processor, std::chrono::seconds(120));
+                report("unwritable quick export: settles with a message",
+                       settled && !bad.existsAsFile() && processor->getMediaStatusText().isNotEmpty(),
+                       processor->getMediaStatusText().toStdString().substr(0, 120));
+                const juce::File badDir("Q:\\htfx-no-such-drive\\stems");
+                const bool stemStarted = processor->beginStemExport(badDir, {0, 1, 2, 3});
+                const bool stemSettled = !stemStarted || waitForMedia(*processor, std::chrono::seconds(120));
+                report("unwritable stem export: settles with a message",
+                       stemSettled && !badDir.isDirectory() && processor->getMediaStatusText().isNotEmpty(),
+                       processor->getMediaStatusText().toStdString().substr(0, 120));
+                const juce::File badVideo("Q:\\htfx-no-such-drive\\mix.mp4");
+                const bool mixStarted = processor->beginMixExport(badVideo, false);
+                const bool mixSettled = !mixStarted || waitForMedia(*processor, std::chrono::seconds(120));
+                report("unwritable mix export: settles with a message",
+                       mixSettled && !badVideo.existsAsFile() && processor->getMediaStatusText().isNotEmpty(),
+                       processor->getMediaStatusText().toStdString().substr(0, 120));
+                // ...and a good export still works afterwards.
+                const auto good = outputDir.getChildFile("after-unwritable.wav");
+                good.deleteFile();
+                const bool ok = processor->beginQuickExport(good, Kind::accompaniment) &&
+                                waitForMedia(*processor, std::chrono::seconds(600)) && good.existsAsFile();
+                report("export works after an unwritable one", ok);
+            } else {
+                report("unwritable export: separation for the check", false,
+                       processor->getRecordStatusText().toStdString());
+            }
+        } else {
+            report("unwritable export: setup", false, "no 30 s WAV/FLAC input or import failed");
         }
     }
 

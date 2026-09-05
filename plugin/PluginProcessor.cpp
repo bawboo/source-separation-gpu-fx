@@ -2808,16 +2808,22 @@ bool HTDemucsGpuFXAudioProcessor::beginMediaImport(const juce::File& mediaFile) 
         return false;
     }
     if (!mediaFile.existsAsFile()) {
-        setMediaMessage(htfx::tr("status.selectedMediaFileNotFound"));
+        // Windows file APIs stop at 260 characters unless the process is
+        // long-path aware; say so instead of "not found".
+        setMediaMessage(mediaFile.getFullPathName().length() > 259
+                            ? htfx::tr("status.mediaPathTooLong")
+                            : htfx::tr("status.selectedMediaFileNotFound"));
         return false;
     }
     if (mediaBusy_.load(std::memory_order_acquire)) {
+        setMediaMessage(htfx::tr("status.mediaBusyRetryLater"));
         return false;
     }
     stopMediaThread();
     bool expected = false;
     if (!mediaBusy_.compare_exchange_strong(
             expected, true, std::memory_order_acq_rel)) {
+        setMediaMessage(htfx::tr("status.mediaBusyRetryLater"));
         return false;
     }
 
@@ -4161,6 +4167,7 @@ public:
           progressBar_(progressValue_) {
         htfx::Localization::instance().reload();
         setLookAndFeel(&lookAndFeel_);
+        setWantsKeyboardFocus(true);
         scaledContent_.onPaint = [this](juce::Graphics& g) { paintFrame(g); };
         scaledContent_.onPaintOver = [this](juce::Graphics& g) { paintDropOverlay(g); };
         importButton_.setColour(juce::TextButton::buttonColourId,
@@ -4520,6 +4527,31 @@ public:
         scaledContent_.repaint();
     }
 
+    // Keyboard: Space plays/pauses the preview, Esc cancels the running job,
+    // Ctrl+O imports, Ctrl+E exports. Each key does exactly what the
+    // corresponding button would, and only when that button is enabled.
+    bool keyPressed(const juce::KeyPress& key) override {
+        const auto ctrl = juce::ModifierKeys::ctrlModifier;
+        if (key == juce::KeyPress::spaceKey && previewPlayButton_.isEnabled()) {
+            processor_.togglePreviewPlayback();
+            return true;
+        }
+        if (key == juce::KeyPress::escapeKey && cancelButton_.isVisible()) {
+            cancelButton_.onClick();
+            return true;
+        }
+        if (key == juce::KeyPress('o', ctrl, 0) && importButton_.isEnabled()) {
+            chooseMediaFile();
+            return true;
+        }
+        if (key == juce::KeyPress('e', ctrl, 0) && exportButton_.isEnabled() &&
+            advancedPanel_) {
+            showExportDialog();
+            return true;
+        }
+        return false;
+    }
+
     void filesDropped(const juce::StringArray& files, int, int) override {
         dragOver_ = false;
         scaledContent_.repaint();
@@ -4530,6 +4562,12 @@ public:
             }
         }
         if (media.isEmpty()) {
+            return;
+        }
+        // Same gate as the Import button: a drop must not cancel a
+        // separation, export or download that is in flight.
+        if (!importButton_.isEnabled()) {
+            showNotice(htfx::tr("status.dropIgnoredBusy"));
             return;
         }
         if (modeBox_.getSelectedItemIndex() != 0) {
@@ -4675,7 +4713,10 @@ public:
 
         cpuWarning_.setBounds(area.removeFromTop(26));
 
-        auto footer = area.removeFromTop(50);
+        // The footer sits on the panel's bottom edge, so a mode that hides
+        // rows leaves its spare space between content and footer rather
+        // than below a floating status line.
+        auto footer = area.removeFromBottom(50);
         footerDivider_ = footer.getY() - 2;
         status_.setBounds(footer.removeFromTop(24));
         resetWorker_.setBounds(footer.removeFromRight(120).reduced(3));
@@ -4701,10 +4742,21 @@ private:
     }
 
     [[nodiscard]] int designHeight() const noexcept {
-        return advancedPanel_ ? (advancedVisible_ ? 826 : 576) : 260;
+        // Multi-file imports add one 22 px row per clip; the panel grows with
+        // them so the progress bar and status line are never pushed off it.
+        const int clipRows = static_cast<int>(clipRows_.size());
+        return (advancedPanel_ ? (advancedVisible_ ? 826 : 576) : 260) + 22 * clipRows;
     }
 
     enum class StepState { pending, active, done };
+
+    // A short-lived line in the status label (e.g. why a drop was ignored);
+    // the processor's own status returns once it expires.
+    void showNotice(const juce::String& text) {
+        notice_ = text;
+        noticeUntil_ = juce::Time::getMillisecondCounter() + 4000;
+        status_.setText(text, juce::dontSendNotification);
+    }
 
     // Paints the decoration around the controls: the "1 import -> 2 separate
     // -> 3 export" strip and the file chip on the simple panel, a divider
@@ -5440,7 +5492,7 @@ private:
                 clipRows_.push_back(std::move(row));
             }
             shownClipCount_ = count;
-            resized();
+            updateSize();  // the design height depends on the row count
         }
         const int active = processor_.getActiveClipIndex();
         for (int index = 0; index < static_cast<int>(clipRows_.size()); ++index) {
@@ -5669,14 +5721,18 @@ private:
         const auto mediaStatus = processor_.getMediaStatusText();
         const auto modelStatus = processor_.getModelDownloadStatusText();
         updateRoformerStatus();
-        status_.setText(
-            modelBusy || (!selectedModelInstalled && modelStatus.isNotEmpty())
-                ? modelStatus
-                : recordMode
-                ? (mediaStatus.isNotEmpty() ? mediaStatus
-                                            : processor_.getRecordStatusText())
-                : processor_.getBridgeStatusText(),
-            juce::dontSendNotification);
+        if (juce::Time::getMillisecondCounter() < noticeUntil_) {
+            status_.setText(notice_, juce::dontSendNotification);
+        } else {
+            status_.setText(
+                modelBusy || (!selectedModelInstalled && modelStatus.isNotEmpty())
+                    ? modelStatus
+                    : recordMode
+                    ? (mediaStatus.isNotEmpty() ? mediaStatus
+                                                : processor_.getRecordStatusText())
+                    : processor_.getBridgeStatusText(),
+                juce::dontSendNotification);
+        }
         const int latency = processor_.getActiveLatencySamples();
         metrics_.setText(
             (recordMode ? "Record/preview latency 0 samples"
@@ -5733,6 +5789,8 @@ private:
     int footerDivider_ = 0;
     int layoutSignature_ = -1;
     bool dragOver_ = false;
+    juce::String notice_;
+    juce::uint32 noticeUntil_ = 0;
     StepState stepImport_ = StepState::active;
     StepState stepSeparate_ = StepState::pending;
     StepState stepExport_ = StepState::pending;

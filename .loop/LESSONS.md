@@ -56,3 +56,5 @@
 - SIGN (2026-09-06): `juce::String(const char*)` 只接受 ASCII，非 ASCII 位元組會逐位元組轉成碼點（「—」變成「â」加兩個控制字元）。字串表的英文字面值也要用 `u8` 前綴（或 `String::fromUTF8`）。開發機介面預設中文，所以英文亂碼一直沒人看到——**兩種語言都要截圖檢查**。
 - SIGN (2026-09-06): 檢視 UI 不必開 App：`htdemucs_ui_snapshot.exe <輸出資料夾> [媒體檔]` 用 `createComponentSnapshot` 把一般／進階面板、中英文、匯入前後與分離完成的狀態都輸出成 PNG，直接看圖。改版面或配色後先跑它，再跑 `ui_configuration_smoke`。
 - SIGN (2026-09-06): 編輯器的裝飾層（步驟列、檔案卡、狀態圓點）畫在承載所有控制項的 `scaledContent_` 的 `paint()` 裡，位於子元件之下；任何要蓋在按鈕上面的提示（拖曳中的「放開即匯入」）必須用 `paintOverChildren()`，否則會被按鈕遮住——截圖工具第一次就抓到了。
+- SIGN (2026-09-06, format_matrix_check media2): JUCE 的 `File::existsAsFile()` 直接呼叫 `GetFileAttributes`，完整路徑超過 260 字元就回 false（除非程式宣告 longPathAware 且系統開了 LongPathsEnabled，後者使用者機器上通常沒開）。匯入被拒時要明講「路徑太長」，不能只說「找不到檔案」。測試資料要放一個 180 字元檔名的檔案在深層資料夾。
+- SIGN (2026-09-06, 工具面): 在 Claude Code 的 Bash 工具裡用 heredoc 餵 Python 改檔，內容中的反斜線序列會被剝一層（`\n` 變成真正的換行、`\\` 變成單一反斜線），`<<` 也可能讓 heredoc 解析失敗；C++ 字串裡的 `\n` 與 Windows 路徑就這樣壞掉過三次。**含反斜線的補丁一律用 Write 工具寫成 .py 檔再執行，或直接用 Edit 工具。**
