@@ -706,8 +706,8 @@ int main(int argc, char** argv) {
                     for (int i = 0; i < clips; ++i) {
                         if (processor->getClipInfo(i).seconds > 1.0) ++usable;
                     }
-                    report("batch with a bogus file: the good clips survive",
-                           usable == 2 && processor->getMediaStatusText().isNotEmpty(),
+                    report("batch with a bogus file: the good clips survive and the skip is named",
+                           usable == 2 && processor->getMediaStatusText().containsIgnoreCase("bogus"),
                            std::to_string(clips) + " clips, " + std::to_string(usable) +
                                " usable; " + processor->getMediaStatusText().toStdString().substr(0, 80));
                     if (usable == 2 && processor->beginBatchSeparation()) {

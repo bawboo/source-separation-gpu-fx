@@ -2541,6 +2541,7 @@ bool HTDemucsGpuFXAudioProcessor::beginMultiMediaImport(
         try {
             const int total = files.size();
             int imported = 0;
+            juce::StringArray skipped;  // files that could not be decoded
             for (int index = 0; index < total; ++index) {
                 if (stopToken.stop_requested()) {
                     break;
@@ -2562,6 +2563,7 @@ bool HTDemucsGpuFXAudioProcessor::beginMultiMediaImport(
                         file, left, right, fallbackError);
                 }
                 if (!decoded || left.empty() || left.size() != right.size()) {
+                    skipped.add(file.getFileName());
                     continue;
                 }
                 Clip clip;
@@ -2583,9 +2585,18 @@ bool HTDemucsGpuFXAudioProcessor::beginMultiMediaImport(
                     static_cast<double>(index + 1) / juce::jmax(1, total),
                     std::memory_order_release);
             }
-            const auto message = htfx::tr("clip.importedCountPrefix") +
-                                 juce::String(imported) +
-                                 htfx::tr("clip.importedCountSuffix");
+            auto message = htfx::tr("clip.importedCountPrefix") +
+                           juce::String(imported) +
+                           htfx::tr("clip.importedCountSuffix");
+            if (!skipped.isEmpty()) {
+                // Say which files were dropped rather than silently
+                // importing fewer than were chosen.
+                message += htfx::tr("clip.importSkippedPrefix") +
+                           juce::String(skipped.size()) +
+                           htfx::tr("clip.importSkippedMiddle") +
+                           skipped.joinIntoString(", ") +
+                           htfx::tr("clip.importSkippedSuffix");
+            }
             setSeparationMessage(message);
             setMediaMessage(message);
             mediaProgress_.store(1.0, std::memory_order_release);
