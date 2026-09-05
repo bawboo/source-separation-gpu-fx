@@ -148,6 +148,12 @@ int main(int argc, char** argv) {
                            s == Processor::SeparationState::error;
                 }, 900);
                 ok = snapshot(*editor, outDir.getChildFile("05-general-ready-zh.png")) && ok;
+                // export once so the "show output" button appears
+                const auto exported = outDir.getChildFile("snapshot-accompany.wav");
+                if (processor->beginQuickExport(exported, Processor::QuickExportKind::accompaniment)) {
+                    waitUntil([&] { return !processor->isMediaBusy(); }, 300);
+                    ok = snapshot(*editor, outDir.getChildFile("05b-general-exported-zh.png")) && ok;
+                }
             }
         } else {
             std::cout << "  import did not complete: " << processor->getMediaStatusText() << std::endl;

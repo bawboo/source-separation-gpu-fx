@@ -166,6 +166,9 @@ public:
     [[nodiscard]] juce::String getMediaStatusText() const;
     [[nodiscard]] juce::String getImportedMediaName() const;
     [[nodiscard]] juce::File getImportedMediaFile() const;
+    // The file or folder the most recent successful export wrote, so the
+    // editor can offer to reveal it. Empty until an export has finished.
+    [[nodiscard]] juce::File getLastExportedFile() const;
     [[nodiscard]] bool previewUsesModel(const juce::String& modelName) const;
     [[nodiscard]] bool isModelDownloadBusy() const noexcept {
         return modelDownloadBusy_.load(std::memory_order_acquire);
@@ -397,6 +400,8 @@ private:
     mutable juce::CriticalSection separationMessageLock_;
     juce::String separationMessage_;
     mutable juce::CriticalSection mediaMessageLock_;
+    juce::File lastExportedFile_;  // guarded by mediaMessageLock_
+    void setLastExportedFile(const juce::File& target);
     juce::String mediaMessage_;
     mutable juce::CriticalSection modelDownloadMessageLock_;
     juce::String modelDownloadMessage_;

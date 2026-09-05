@@ -1956,6 +1956,16 @@ juce::String HTDemucsGpuFXAudioProcessor::getImportedMediaName() const {
                                              : juce::String{};
 }
 
+juce::File HTDemucsGpuFXAudioProcessor::getLastExportedFile() const {
+    const juce::ScopedLock lock(mediaMessageLock_);
+    return lastExportedFile_;
+}
+
+void HTDemucsGpuFXAudioProcessor::setLastExportedFile(const juce::File& target) {
+    const juce::ScopedLock lock(mediaMessageLock_);
+    lastExportedFile_ = target;
+}
+
 juce::File HTDemucsGpuFXAudioProcessor::getImportedMediaFile() const {
     const juce::ScopedLock lock(mediaMetadataLock_);
     return importedMediaFile_;
@@ -2797,6 +2807,9 @@ void HTDemucsGpuFXAudioProcessor::batchExportLoop(
             ++exported;
         }
     }
+    if (exported > 0) {
+        setLastExportedFile(folder);
+    }
     setMediaMessage(
         htfx::tr("clip.exportFinishedPrefix") + juce::String(exported) +
         htfx::tr("clip.exportFinishedSuffix"));
@@ -3019,6 +3032,7 @@ void HTDemucsGpuFXAudioProcessor::stemExportLoop(
                 static_cast<double>(item + 1) / sourceIndices.size(),
                 std::memory_order_release);
         }
+        setLastExportedFile(outputDirectory);
         setMediaMessage(
             htfx::tr("status.stemExportSuccessPrefix") +
             juce::String(sourceIndices.size()) +
@@ -3172,6 +3186,7 @@ void HTDemucsGpuFXAudioProcessor::quickExportLoop(
             return;
         }
         mediaProgress_.store(1.0, std::memory_order_release);
+        setLastExportedFile(outputFile);
         setMediaMessage(
             (kind == QuickExportKind::vocals
                  ? htfx::tr("status.quickExportedVocalsPrefix")
@@ -3298,6 +3313,7 @@ void HTDemucsGpuFXAudioProcessor::mixExportLoop(
                 return;
             }
             mediaProgress_.store(1.0, std::memory_order_release);
+            setLastExportedFile(outputFile);
             setMediaMessage(
                 htfx::tr("status.mixExportedPrefix") +
                 outputFile.getFullPathName());
@@ -3373,6 +3389,7 @@ void HTDemucsGpuFXAudioProcessor::mixExportLoop(
             return;
         }
         mediaProgress_.store(1.0, std::memory_order_release);
+        setLastExportedFile(outputFile);
         setMediaMessage(
             htfx::tr("status.mixExportedMp4Prefix") +
             outputFile.getFullPathName());
@@ -4475,6 +4492,16 @@ public:
         addAndMakeVisible(status_);
         addAndMakeVisible(metrics_);
         addAndMakeVisible(resetWorker_);
+        openOutputButton_.setName("Open output");
+        openOutputButton_.onClick = [this] {
+            const auto target = processor_.getLastExportedFile();
+            if (target.exists()) {
+                target.revealToUser();
+            }
+        };
+        openOutputButton_.setVisible(false);
+        addAndMakeVisible(openOutputButton_);
+        openOutputButton_.setVisible(false);
         status_.setJustificationType(juce::Justification::centredLeft);
         metrics_.setJustificationType(juce::Justification::centredLeft);
         status_.setFont(juce::FontOptions{15.0f, juce::Font::bold});
@@ -4615,7 +4642,10 @@ public:
             }
             progressBar_.setBounds(area.removeFromTop(16));
             area.removeFromTop(4);
-            status_.setBounds(area.removeFromTop(30));
+            auto statusRow = area.removeFromTop(30);
+            openOutputButton_.setBounds(statusRow.removeFromRight(124).reduced(0, 3));
+            statusRow.removeFromRight(6);
+            status_.setBounds(statusRow);
 
             const float scale = (std::min)(
                 static_cast<float>(getWidth()) / designWidth(),
@@ -4722,7 +4752,10 @@ public:
         // than below a floating status line.
         auto footer = area.removeFromBottom(50);
         footerDivider_ = footer.getY() - 2;
-        status_.setBounds(footer.removeFromTop(24));
+        auto statusRow = footer.removeFromTop(24);
+        openOutputButton_.setBounds(statusRow.removeFromRight(124).reduced(0, 1));
+        statusRow.removeFromRight(6);
+        status_.setBounds(statusRow);
         resetWorker_.setBounds(footer.removeFromRight(120).reduced(3));
         metrics_.setBounds(footer);
 
@@ -4974,6 +5007,8 @@ private:
         updatePanelSwitchButtonText();
         updateAdvancedButtonText();
         updateFullScreenButtonText();
+        openOutputButton_.setButtonText(htfx::tr("button.openOutput"));
+        openOutputButton_.setTooltip(htfx::tr("tip.openOutput"));
         importButton_.setTooltip(htfx::tr("tip.import"));
         vocalsOnlyButton_.setTooltip(htfx::tr("tip.exportVocals"));
         accompanyOnlyButton_.setTooltip(htfx::tr("tip.exportAccompany"));
@@ -5800,6 +5835,8 @@ private:
         const auto mediaStatus = processor_.getMediaStatusText();
         const auto modelStatus = processor_.getModelDownloadStatusText();
         updateRoformerStatus();
+        openOutputButton_.setVisible(processor_.getLastExportedFile().exists());
+        openOutputButton_.setEnabled(!mediaBusy);
         if (juce::Time::getMillisecondCounter() < noticeUntil_) {
             status_.setText(notice_, juce::dontSendNotification);
         } else {
@@ -5938,6 +5975,7 @@ private:
     juce::Label status_;
     juce::Label metrics_;
     juce::TextButton resetWorker_;
+    juce::TextButton openOutputButton_;
     struct PendingQuickExport {
         juce::File outputFile;
         HTDemucsGpuFXAudioProcessor::QuickExportKind kind;
