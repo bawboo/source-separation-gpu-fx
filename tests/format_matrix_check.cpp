@@ -413,6 +413,34 @@ void exercise(Processor& processor, const juce::File& file, const juce::File& ou
             checkExport(label + ": mix export", mix, frames, !e.maySilent);
         }
     }
+    // cancelling an export part-way (only a long clip gives us the time):
+    // the processor must settle, leave no half-written file behind, and
+    // export normally afterwards.
+    if (seconds >= 600.0) {
+        const auto target = outputDir.getChildFile(base + "_cancelled.wav");
+        target.deleteFile();
+        if (!processor.beginMixExport(target, false)) {
+            report(label + ": cancel export starts", false, processor.getMediaStatusText().toStdString());
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            processor.cancelMediaOperation();
+            const bool settled = waitForMedia(processor, std::chrono::seconds(120));
+            juce::Array<juce::File> leftovers;
+            outputDir.findChildFiles(leftovers, juce::File::findFiles, false, "*.htfx-part*");
+            report(label + ": cancel export settles cleanly",
+                   settled && !target.existsAsFile() && leftovers.isEmpty(),
+                   std::string(settled ? "" : "still busy ") +
+                       (target.existsAsFile() ? "partial output left " : "") +
+                       (leftovers.isEmpty() ? "" : "temp files left ") +
+                       processor.getMediaStatusText().toStdString().substr(0, 80));
+            const auto again = outputDir.getChildFile(base + "_after_cancel.wav");
+            again.deleteFile();
+            const bool ok = processor.beginMixExport(again, false) &&
+                            waitForMedia(processor, std::chrono::seconds(600));
+            checkExport(label + ": export after cancel", again, frames, !e.maySilent);
+            (void)ok;
+        }
+    }
     // mix export back into the video
     if (isVideoName(file)) {
         const auto outVideo = outputDir.getChildFile(base + "_mix.mp4");
