@@ -43,7 +43,7 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"clip.statusDone", StringPair{u8"完成", u8"Done"}},
         {"clip.statusFailed", StringPair{u8"失敗", u8"Failed"}},
         {"clip.importedCountPrefix", StringPair{u8"已匯入 ", u8"Imported "}},
-        {"clip.importedCountSuffix", StringPair{u8" 個檔案，按「分離」開始處理", u8" files - press Separate to start"}},
+        {"clip.importedCountSuffix", StringPair{u8" 個檔案，按「僅匯出人聲／伴奏」即可整批處理（進階面板可先按「分離」）", u8" files - Export Vocals/Accompany only processes them all (or press Separate on the advanced panel)"}},
         {"clip.batchSeparationFinished", StringPair{u8"全部分離完成", u8"All clips separated"}},
         {"clip.exportFinishedPrefix", StringPair{u8"已匯出 ", u8"Exported "}},
         {"clip.exportFinishedSuffix", StringPair{u8" 個檔案", u8" files"}},

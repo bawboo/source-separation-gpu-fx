@@ -4346,6 +4346,10 @@ public:
         previewStopButton_.onClick = [this] { processor_.stopPreview(); };
         previewPosition_.setSliderStyle(juce::Slider::LinearHorizontal);
         previewPosition_.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        // The waveform overview is painted underneath; the slider only shows
+        // its thumb over it.
+        previewPosition_.setColour(juce::Slider::trackColourId, juce::Colours::transparentBlack);
+        previewPosition_.setColour(juce::Slider::backgroundColourId, juce::Colours::transparentBlack);
         previewPosition_.setRange(0.0, 1.0, 0.0001);
         previewPosition_.onDragEnd = [this] {
             processor_.setPreviewPosition(previewPosition_.getValue());
@@ -4804,9 +4808,12 @@ private:
             g.fillRoundedRectangle(fileChip_.toFloat(), 6.0f);
             g.setColour(outline);
             g.drawRoundedRectangle(fileChip_.toFloat().reduced(0.5f), 6.0f, 1.0f);
-        } else if (footerDivider_ > 0) {
-            g.setColour(outline);
-            g.fillRect(12, footerDivider_, designWidth() - 24, 1);
+        } else {
+            if (footerDivider_ > 0) {
+                g.setColour(outline);
+                g.fillRect(12, footerDivider_, designWidth() - 24, 1);
+            }
+            paintWaveformOverview(g);
         }
         const auto dotColour = statusTone_ == 1 ? juce::Colour(HtfxLookAndFeel::kAccent)
                              : statusTone_ == 2 ? juce::Colour(HtfxLookAndFeel::kSuccess)
@@ -4817,6 +4824,64 @@ private:
                                          statusBounds.getCentreY() - 5.0f, 10.0f, 10.0f);
         g.setColour(dotColour);
         g.fillEllipse(dot);
+    }
+
+    // The separated clip's envelope behind the preview position slider: the
+    // played part in the accent colour, the rest muted. Peaks are rebuilt by
+    // timerCallback() whenever the preview result changes.
+    void paintWaveformOverview(juce::Graphics& g) {
+        const auto area = previewPosition_.getBounds().toFloat().reduced(6.0f, 1.0f);
+        if (overviewPeaks_.empty() || area.getWidth() < 8.0f || !previewPosition_.isVisible()) {
+            return;
+        }
+        const auto accent = juce::Colour(HtfxLookAndFeel::kAccent);
+        const auto rest = juce::Colour(HtfxLookAndFeel::kTextMuted).withAlpha(0.55f);
+        const float playedX = area.getX() + area.getWidth() *
+                                               static_cast<float>(previewPosition_.getValue());
+        const float mid = area.getCentreY();
+        const float half = area.getHeight() * 0.5f;
+        const float columnWidth = area.getWidth() / static_cast<float>(overviewPeaks_.size());
+        for (std::size_t i = 0; i < overviewPeaks_.size(); ++i) {
+            const float x = area.getX() + columnWidth * static_cast<float>(i);
+            const float h = (std::max)(1.0f, half * overviewPeaks_[i]);
+            g.setColour(x < playedX ? accent : rest);
+            g.fillRect(x, mid - h, (std::max)(1.0f, columnWidth - 0.5f), 2.0f * h);
+        }
+    }
+
+    // Column peaks of the original mix, normalised so the loudest column
+    // fills the slider height.
+    void rebuildOverviewPeaks(const auto& result) {  // SeparationResult (private type)
+        overviewPeaks_.clear();
+        // A fixed column count: the result may arrive while the simple panel
+        // is showing (the slider has no bounds yet), and the painter maps
+        // columns onto whatever width the slider has when it is visible.
+        constexpr std::size_t columns = 480;
+        const auto samples = static_cast<std::size_t>(result.sampleCount);
+        if (columns == 0 || samples == 0 || result.originalLeft.size() < samples ||
+            result.originalRight.size() < samples) {
+            return;
+        }
+        overviewPeaks_.resize(columns, 0.0f);
+        float loudest = 0.0f;
+        for (std::size_t c = 0; c < columns; ++c) {
+            const auto from = samples * c / columns;
+            const auto to = (std::max)(from + 1, samples * (c + 1) / columns);
+            float peak = 0.0f;
+            // sparse scan: enough for a picture, cheap for a 20-minute clip
+            const std::size_t step = (to - from) / 64 > 0 ? (to - from) / 64 : 1;
+            for (auto i = from; i < to; i += step) {
+                peak = (std::max)(peak, (std::max)(std::abs(result.originalLeft[i]),
+                                                   std::abs(result.originalRight[i])));
+            }
+            overviewPeaks_[c] = peak;
+            loudest = (std::max)(loudest, peak);
+        }
+        if (loudest > 0.0f) {
+            for (auto& v : overviewPeaks_) {
+                v /= loudest;
+            }
+        }
     }
 
     // While files are dragged over the window: dim everything, frame it in
@@ -5679,6 +5744,20 @@ private:
         gpuSlider_.setEnabled(
             configurationEnabled && computeBox_.getSelectedItemIndex() == 1);
 
+        {
+            const auto result = processor_.getPreviewResult();
+            if (result.get() != overviewSource_) {
+                overviewSource_ = result.get();
+                if (result != nullptr) {
+                    rebuildOverviewPeaks(*result);
+                } else {
+                    overviewPeaks_.clear();
+                }
+                scaledContent_.repaint();
+            } else if (advancedPanel_ && !overviewPeaks_.empty() && processor_.isPreviewPlaying()) {
+                scaledContent_.repaint(previewPosition_.getBounds());
+            }
+        }
         const double previewDuration = processor_.getPreviewDurationSeconds();
         const double previewPosition = processor_.getPreviewPositionSeconds();
         if (!previewPosition_.isMouseButtonDown()) {
@@ -5791,6 +5870,8 @@ private:
     bool dragOver_ = false;
     juce::String notice_;
     juce::uint32 noticeUntil_ = 0;
+    std::vector<float> overviewPeaks_;
+    const void* overviewSource_ = nullptr;
     StepState stepImport_ = StepState::active;
     StepState stepSeparate_ = StepState::pending;
     StepState stepExport_ = StepState::pending;

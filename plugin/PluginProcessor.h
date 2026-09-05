@@ -277,6 +277,16 @@ private:
         std::vector<std::string> stemLabels;
     };
 
+public:
+    // The result behind the preview, or null before a separation finishes.
+    // The editor reads the original mix from it to draw the overview (the
+    // type stays private; callers hold it through auto).
+    [[nodiscard]] std::shared_ptr<const SeparationResult> getPreviewResult() const noexcept {
+        return previewResult_.load(std::memory_order_acquire);
+    }
+
+private:
+
     struct MixSettings {
         std::array<float, kMaxSources> stemGains{};
         float outputTrim = 1.0f;
