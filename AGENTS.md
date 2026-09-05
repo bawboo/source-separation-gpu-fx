@@ -79,9 +79,10 @@ GitHub：`bawboo/source-separation-gpu-fx`（private）
   段落匯入幾個檔案（預設 3）。測試媒體以 `tools/make_test_media.sh` 用 ffmpeg 產生 30 秒
   合成訊號，改動匯入／匯出路徑後 CPU 與 GPU 各跑一次；要驗 CPU 版實際體感，另設
   `HTFX_WORKER_EXECUTABLE` 指向 `build/standalone-runtime-cpu-dist` 的 worker。
-- **介面截圖**：`htdemucs_ui_snapshot.exe "<輸出資料夾>" [媒體檔]` —— 不開 App 直接把
-  編輯器繪成 PNG（一般／進階面板、中英文、匯入前後、分離中／完成）。改版面、配色或
-  字串後先看圖再跑 `ui_configuration_smoke`；兩種語言都要看。
+- **介面截圖**：`htdemucs_ui_snapshot.exe "<輸出資料夾>" [媒體檔...]` —— 不開 App 直接把
+  編輯器繪成 PNG（一般／進階面板、中英文、匯入前後、分離中／完成、匯出後、拖曳中；給
+  兩個以上媒體檔會再拍多檔批次狀態）。改版面、配色或字串後先看圖再跑
+  `ui_configuration_smoke`；兩種語言都要看。
 - **端到端驗收**：`htdemucs_goal_check.exe "<某首歌.wav>"` — 對真實歌曲跑完
   HTDemucs 4/6 軌與兩個 RoFormer 類別的「匯入→分離→匯出人聲→匯出伴奏」。
 - **跑測試時不可同時開著 App**（會搶同一份模型快取，症狀是假的 Access violation）。

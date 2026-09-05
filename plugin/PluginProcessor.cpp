@@ -2459,7 +2459,8 @@ HTDemucsGpuFXAudioProcessor::ClipInfo HTDemucsGpuFXAudioProcessor::getClipInfo(
     info.name = clip.name;
     info.selected = clip.selected;
     info.separated = clip.result != nullptr;
-    info.status = clip.status;
+    // Stored as a string-table key so the list follows a language switch.
+    info.status = htfx::tr(clip.status);
     info.seconds = static_cast<double>(clip.left.size()) / kSampleRate;
     return info;
 }
@@ -2569,7 +2570,7 @@ bool HTDemucsGpuFXAudioProcessor::beginMultiMediaImport(
                 clip.left = std::move(left);
                 clip.right = std::move(right);
                 clip.fromVideo = video;
-                clip.status = htfx::tr("clip.statusPending");
+                clip.status = juce::String("clip.statusPending");
                 {
                     const juce::ScopedLock lock(clipsLock_);
                     clips_.push_back(std::move(clip));
@@ -2650,14 +2651,14 @@ void HTDemucsGpuFXAudioProcessor::batchSeparationLoop(std::stop_token stopToken)
             const juce::ScopedLock lock(clipsLock_);
             if (index < static_cast<int>(clips_.size())) {
                 clips_[static_cast<std::size_t>(index)].status =
-                    htfx::tr("clip.statusSeparating");
+                    juce::String("clip.statusSeparating");
             }
         }
         if (!beginSeparation()) {
             const juce::ScopedLock lock(clipsLock_);
             if (index < static_cast<int>(clips_.size())) {
                 clips_[static_cast<std::size_t>(index)].status =
-                    htfx::tr("clip.statusFailed");
+                    juce::String("clip.statusFailed");
             }
             continue;
         }
@@ -2675,8 +2676,8 @@ void HTDemucsGpuFXAudioProcessor::batchSeparationLoop(std::stop_token stopToken)
         if (index < static_cast<int>(clips_.size())) {
             auto& clip = clips_[static_cast<std::size_t>(index)];
             clip.result = result;
-            clip.status = result != nullptr ? htfx::tr("clip.statusDone")
-                                            : htfx::tr("clip.statusFailed");
+            clip.status = result != nullptr ? juce::String("clip.statusDone")
+                                            : juce::String("clip.statusFailed");
         }
     }
     setSeparationMessage(htfx::tr("clip.batchSeparationFinished"));
@@ -2773,8 +2774,8 @@ void HTDemucsGpuFXAudioProcessor::batchExportLoop(
                     auto& clip = clips_[static_cast<std::size_t>(index)];
                     clip.result = produced;
                     clip.status = produced != nullptr
-                                      ? htfx::tr("clip.statusDone")
-                                      : htfx::tr("clip.statusFailed");
+                                      ? juce::String("clip.statusDone")
+                                      : juce::String("clip.statusFailed");
                 }
             }
             if (produced == nullptr) {

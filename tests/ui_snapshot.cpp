@@ -153,6 +153,11 @@ int main(int argc, char** argv) {
                 if (processor->beginQuickExport(exported, Processor::QuickExportKind::accompaniment)) {
                     waitUntil([&] { return !processor->isMediaBusy(); }, 300);
                     ok = snapshot(*editor, outDir.getChildFile("05b-general-exported-zh.png")) && ok;
+                    if (language != nullptr) {
+                        language->onClick();
+                        ok = snapshot(*editor, outDir.getChildFile("05c-general-exported-en.png")) && ok;
+                        language->onClick();
+                    }
                 }
             }
         } else {
@@ -173,6 +178,11 @@ int main(int argc, char** argv) {
             ok = snapshot(*editor, outDir.getChildFile("10-general-batch-zh.png")) && ok;
             std::cout << "  clips=" << processor->getClipCount()
                       << " editor=" << editor->getWidth() << "x" << editor->getHeight() << std::endl;
+            if (language != nullptr) {
+                language->onClick();
+                ok = snapshot(*editor, outDir.getChildFile("10b-general-batch-en.png")) && ok;
+                language->onClick();
+            }
         }
     }
 

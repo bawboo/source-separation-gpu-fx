@@ -61,3 +61,4 @@
 - SIGN (2026-09-06): 用合成訊號跑 `full_feature_check` 時，「export vocals」會因為訊號裡沒有人聲而被靜音門檻（1e-4，給真實歌曲用）判失敗；判讀時只看每個模式的 `separate` 行。全新快取（清空 RoformerModels）下 10 個模式全部下載＋分離成功，30 秒片段的 GPU 牆鐘時間：guitar 23 s、dereverb 72 s、其餘 110–140 s，aspiration 458 s（含 797 MB 下載）。
 - SIGN (2026-09-06): 30 秒片段在 CPU（`--backend cpu`）的牆鐘時間：HTDemucs 6 軌 43 s、guitar RoFormer 249 s、kim-vocals RoFormer 605 s——換算整首 5 分鐘歌約 100 分鐘，證實目錄把 vocals 類標成 GPU 專用是對的。
 - SIGN (2026-09-06): 同一個 30 秒片段的 HTDemucs 4 軌，在 CUDA runtime 選 CPU 後端約 43 s，在 CPU 凍結 runtime（`standalone-runtime-cpu-dist`）卻要 85–100 s。CPU 版使用者拿到的是後者，`--backend cpu` 的數字不能直接代表 CPU 版體感；要量 CPU 版就設 `HTFX_WORKER_EXECUTABLE` 指向 CPU dist。
+- SIGN (2026-09-06, ui_snapshot EN): 動態狀態訊息（「已匯出伴奏：路徑」「已匯入 N 個檔案」）是在事件發生當下用 `htfx::tr()` 組好的字串，之後切換語言不會重譯；剪輯列的「待分離／完成」也曾如此，已改成存字串表的 key、在 `getClipInfo()` 讀取時才翻譯。其餘 setMediaMessage 呼叫點很多，仍是「以設定當下的語言顯示」——要徹底解決得改成存 key＋參數。
