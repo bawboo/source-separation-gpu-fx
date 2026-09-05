@@ -5837,6 +5837,11 @@ private:
         updateRoformerStatus();
         openOutputButton_.setVisible(processor_.getLastExportedFile().exists());
         openOutputButton_.setEnabled(!mediaBusy);
+        // Long status lines (an export path, an FFmpeg error) get cut off in
+        // the label; hovering shows the whole text.
+        if (status_.getTooltip() != status_.getText()) {
+            status_.setTooltip(status_.getText());
+        }
         if (juce::Time::getMillisecondCounter() < noticeUntil_) {
             status_.setText(notice_, juce::dontSendNotification);
         } else {
