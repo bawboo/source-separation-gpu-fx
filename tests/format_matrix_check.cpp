@@ -644,6 +644,134 @@ int main(int argc, char** argv) {
         }
     }
 
+    // ── interaction edge cases ─────────────────────────────────────────────
+    // Things a user does out of order: import while the preview plays, a
+    // second import while the first is still decoding, a batch that
+    // contains a file that is not media, and a batch through a RoFormer
+    // model rather than HTDemucs.
+    {
+        std::cout << "\n[interaction edge cases]" << std::endl;
+        juce::File good, other, bogus;
+        for (const auto& f : inputs) {
+            const auto e = expectationFor(f);
+            if (e.mustReject && f.getFileName().startsWith("bogus")) {
+                bogus = f;
+            } else if (!e.mustReject && e.seconds == 30.0 && !e.maySilent &&
+                       f.getFullPathName().length() <= 259) {
+                if (good == juce::File{}) good = f;
+                else if (other == juce::File{}) other = f;
+            }
+        }
+        if (good.existsAsFile() && other.existsAsFile()) {
+            // import while the preview is playing
+            if (processor->beginMediaImport(good) &&
+                waitForMedia(*processor, std::chrono::seconds(300)) &&
+                (processor->beginSeparation() || processor->isModelDownloadBusy())) {
+                waitUntil([&] { return !processor->isModelDownloadBusy(); }, std::chrono::seconds(1800));
+                waitForSeparation(*processor, stallTimeout);
+                if (processor->hasPreview()) {
+                    processor->togglePreviewPlayback();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+                    const bool playing = processor->isPreviewPlaying();
+                    const bool imported = processor->beginMediaImport(other) &&
+                                          waitForMedia(*processor, std::chrono::seconds(300));
+                    report("import while preview plays",
+                           playing && imported && !processor->isPreviewPlaying() &&
+                               processor->getRecordedSeconds() > 1.0,
+                           std::string(playing ? "" : "preview did not start; ") +
+                               (imported ? "imported " : "import failed ") +
+                               std::to_string(processor->getRecordedSeconds()) + " s");
+                } else {
+                    report("import while preview plays: setup", false,
+                           processor->getRecordStatusText().toStdString());
+                }
+            }
+            // a second import while the first is still decoding
+            if (processor->beginMediaImport(good)) {
+                const bool second = processor->beginMediaImport(other);
+                const auto message = processor->getMediaStatusText();
+                waitForMedia(*processor, std::chrono::seconds(300));
+                report("second import while decoding is refused with a message",
+                       !second && message.isNotEmpty(),
+                       (second ? "accepted " : "refused ") + message.toStdString().substr(0, 80));
+            }
+            // a batch with a file that is not media
+            if (bogus.existsAsFile()) {
+                if (!processor->beginMultiMediaImport({good, bogus, other})) {
+                    report("batch with a bogus file: import starts", false);
+                } else {
+                    waitForMedia(*processor, std::chrono::seconds(600));
+                    const int clips = processor->getClipCount();
+                    int usable = 0;
+                    for (int i = 0; i < clips; ++i) {
+                        if (processor->getClipInfo(i).seconds > 1.0) ++usable;
+                    }
+                    report("batch with a bogus file: the good clips survive",
+                           usable == 2 && processor->getMediaStatusText().isNotEmpty(),
+                           std::to_string(clips) + " clips, " + std::to_string(usable) +
+                               " usable; " + processor->getMediaStatusText().toStdString().substr(0, 80));
+                    if (usable == 2 && processor->beginBatchSeparation()) {
+                        waitUntil([&] { return !processor->isBatchBusy() && !processor->isMediaBusy(); },
+                                  std::chrono::hours(1));
+                        int separated = 0;
+                        for (int i = 0; i < processor->getClipCount(); ++i) {
+                            if (processor->getClipInfo(i).separated) ++separated;
+                        }
+                        report("batch with a bogus file: the good clips separate", separated == 2,
+                               std::to_string(separated) + " separated");
+                    }
+                }
+            }
+            // a batch through a RoFormer model
+            const auto models = processor->getRoformerModels();
+            if (!models.empty()) {
+                juce::String pick = models.front().id;
+                for (const auto& m : models) {
+                    if (m.category == "vocals") { pick = m.id; break; }
+                }
+                const bool selected = processor->selectRoformerModel(pick);
+                processor->applyUserConfiguration();
+                if (!selected || !processor->beginMultiMediaImport({good, other})) {
+                    report("RoFormer batch: setup", false, pick.toStdString());
+                } else {
+                    waitForMedia(*processor, std::chrono::seconds(600));
+                    bool ok = processor->beginBatchSeparation();
+                    if (ok && !processor->isBatchBusy() && processor->isModelDownloadBusy()) {
+                        waitUntil([&] { return !processor->isModelDownloadBusy(); }, std::chrono::seconds(1800));
+                        ok = processor->beginBatchSeparation();
+                    }
+                    waitUntil([&] { return !processor->isBatchBusy() && !processor->isMediaBusy() &&
+                                           !processor->isModelDownloadBusy(); },
+                              std::chrono::hours(1));
+                    int separated = 0;
+                    for (int i = 0; i < processor->getClipCount(); ++i) {
+                        if (processor->getClipInfo(i).separated) ++separated;
+                    }
+                    const auto batchDir = outputDir.getChildFile("batch-roformer");
+                    batchDir.deleteRecursively();
+                    batchDir.createDirectory();
+                    int files = 0;
+                    if (separated == 2 && processor->beginBatchExport(batchDir, Kind::vocals)) {
+                        waitUntil([&] { return !processor->isBatchBusy() && !processor->isMediaBusy(); },
+                                  std::chrono::minutes(30));
+                        juce::Array<juce::File> found;
+                        batchDir.findChildFiles(found, juce::File::findFiles, false, "*.wav");
+                        files = found.size();
+                    }
+                    report("RoFormer batch (" + pick.toStdString() + "): separate + export",
+                           ok && separated == 2 && files == 2,
+                           std::to_string(separated) + " separated, " + std::to_string(files) + " files; " +
+                               processor->getRecordStatusText().toStdString().substr(0, 80));
+                }
+                processor->clearRoformerModel();
+                setChoice(*processor, "model", 0);
+                processor->applyUserConfiguration();
+            }
+        } else {
+            std::cout << "  (needs two 30 s inputs; skipped)" << std::endl;
+        }
+    }
+
     // ── cancel an import part-way ──────────────────────────────────────────
     {
         juce::File big;
