@@ -471,13 +471,47 @@ bool runFfmpeg(
     return true;
 }
 
+}  // namespace
+
+namespace htfx {
+
+namespace {
+bool endsWithAnyExtension(const juce::String& path, const char* const* first, std::size_t count) {
+    for (std::size_t i = 0; i < count; ++i) {
+        if (path.endsWithIgnoreCase(first[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+}  // namespace
+
+bool isVideoExtension(const juce::String& path) {
+    return endsWithAnyExtension(path, kVideoExtensions.data(), kVideoExtensions.size());
+}
+
+bool isAcceptedMediaPath(const juce::String& path) {
+    return endsWithAnyExtension(path, kAudioExtensions.data(), kAudioExtensions.size()) ||
+           isVideoExtension(path);
+}
+
+juce::String acceptedMediaWildcards() {
+    juce::StringArray patterns;
+    for (const auto* extension : kAudioExtensions) {
+        patterns.add(juce::String("*") + extension);
+    }
+    for (const auto* extension : kVideoExtensions) {
+        patterns.add(juce::String("*") + extension);
+    }
+    return patterns.joinIntoString(";");
+}
+
+}  // namespace htfx
+
+namespace {
+
 bool hasVideoExtension(const juce::File& file) {
-    const auto extension = file.getFileExtension().toLowerCase();
-    static constexpr std::array<const char*, 8> extensions{
-        ".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".wmv", ".mpeg"};
-    return std::ranges::any_of(
-        extensions,
-        [&extension](const char* candidate) { return extension == candidate; });
+    return htfx::isVideoExtension(file.getFullPathName());
 }
 
 bool readAudioFileAtProjectRate(
@@ -4224,14 +4258,7 @@ public:
 };
 
 bool isAcceptedMediaName(const juce::String& path) {
-    const auto extension = juce::File(path).getFileExtension().toLowerCase();
-    for (const auto* accepted : {".wav", ".flac", ".aif", ".aiff", ".mp3", ".ogg", ".m4a",
-                                 ".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".wmv", ".mpeg"}) {
-        if (extension == accepted) {
-            return true;
-        }
-    }
-    return false;
+    return htfx::isAcceptedMediaPath(path);
 }
 
 class HTDemucsGpuFXEditor final : public juce::AudioProcessorEditor,
@@ -5190,7 +5217,7 @@ private:
         mediaChooser_ = std::make_unique<juce::FileChooser>(
             htfx::tr("filechooser.importMediaTitle"),
             juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
-            "*.wav;*.flac;*.aif;*.aiff;*.mp3;*.ogg;*.m4a;*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v;*.wmv;*.mpeg");
+            htfx::acceptedMediaWildcards());
         juce::Component::SafePointer<HTDemucsGpuFXEditor> safeThis(this);
         mediaChooser_->launchAsync(
             juce::FileBrowserComponent::openMode |

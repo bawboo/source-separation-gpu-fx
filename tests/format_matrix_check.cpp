@@ -229,19 +229,11 @@ juce::String probeStreams(const juce::File& ffprobe, const juce::File& media) {
 }
 
 bool isVideoName(const juce::File& file) {
-    const auto ext = file.getFileExtension().toLowerCase();
-    for (const auto* v : {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".wmv", ".mpeg"}) {
-        if (ext == v) return true;
-    }
-    return false;
+    return htfx::isVideoExtension(file.getFullPathName());
 }
 
 bool isAcceptedName(const juce::File& file) {
-    const auto ext = file.getFileExtension().toLowerCase();
-    for (const auto* a : {".wav", ".flac", ".aif", ".aiff", ".mp3", ".ogg", ".m4a"}) {
-        if (ext == a) return true;
-    }
-    return isVideoName(file);
+    return htfx::isAcceptedMediaPath(file.getFullPathName());
 }
 
 struct Expectation {

@@ -14,6 +14,23 @@
 #include <thread>
 #include <vector>
 
+namespace htfx {
+
+// The media the app accepts. One list feeds the file chooser, the
+// drag-and-drop target, the import path and the acceptance tests, so a new
+// format is added here and nowhere else.
+inline constexpr std::array<const char*, 7> kAudioExtensions{
+    ".wav", ".flac", ".aif", ".aiff", ".mp3", ".ogg", ".m4a"};
+inline constexpr std::array<const char*, 8> kVideoExtensions{
+    ".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".wmv", ".mpeg"};
+
+[[nodiscard]] bool isVideoExtension(const juce::String& path);
+[[nodiscard]] bool isAcceptedMediaPath(const juce::String& path);
+// "*.wav;*.flac;..." for juce::FileChooser.
+[[nodiscard]] juce::String acceptedMediaWildcards();
+
+}  // namespace htfx
+
 class HTDemucsGpuFXAudioProcessor final : public juce::AudioProcessor {
 public:
     static constexpr int kSampleRate = 44'100;
