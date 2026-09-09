@@ -168,7 +168,21 @@ begin
 end;
 
 function InstallCudaRuntime: Boolean;
+var
+  Forced: String;
 begin
+  { /RUNTIME=cpu|cuda|auto for silent and scripted installs. }
+  Forced := Lowercase(ExpandConstant('{param:RUNTIME|auto}'));
+  if Forced = 'cpu' then
+  begin
+    Result := False;
+    Exit;
+  end;
+  if Forced = 'cuda' then
+  begin
+    Result := True;
+    Exit;
+  end;
   if not Assigned(RuntimePage) then
   begin
     Result := CudaUsable;
@@ -211,13 +225,75 @@ begin
       '將安裝 CPU runtime / Installing the CPU runtime.');
 end;
 
+{ Runs the worker's self-test with its output captured to LogPath, so a
+  failure has a reason the user can read (the bare exit code told nobody
+  anything). Returns True when the worker reported success. }
+function RunSelfTest(const WorkerPath, ModelPath, ReportPath, LogPath, Device: String;
+  var ExitCode: Integer): Boolean;
+var
+  CommandLine: String;
+begin
+  DeleteFile(ReportPath);
+  CommandLine := '/C ""' + WorkerPath + '" --self-test-json "' + ReportPath +
+    '" --models-dir "' + ModelPath + '" --model htdemucs --device ' + Device +
+    ' > "' + LogPath + '" 2>&1"';
+  Result := Exec(ExpandConstant('{cmd}'), CommandLine, '', SW_HIDE,
+    ewWaitUntilTerminated, ExitCode) and (ExitCode = 0);
+end;
+
+{ The reason a self-test failed: the "error" field of the report when the
+  worker got far enough to write one, otherwise the last lines it printed. }
+function SelfTestReason(const ReportPath, LogPath: String; ExitCode: Integer): String;
+var
+  Document: AnsiString;
+  Lines: TArrayOfString;
+  Index, Start, Finish, Shown: Integer;
+begin
+  Result := '';
+  if LoadStringFromFile(ReportPath, Document) and (Pos('"status": "fail"', Document) > 0) then
+  begin
+    Start := Pos('"error": "', Document);
+    if Start > 0 then
+    begin
+      Start := Start + Length('"error": "');
+      Finish := Start;
+      while (Finish <= Length(Document)) and (Document[Finish] <> #34) do
+        Finish := Finish + 1;
+      Result := String(Copy(Document, Start, Finish - Start));
+    end;
+  end;
+  if (Result = '') and LoadStringsFromFile(LogPath, Lines) then
+  begin
+    Shown := 0;
+    Index := GetArrayLength(Lines) - 1;
+    while (Index >= 0) and (Shown < 4) do
+    begin
+      if Trim(Lines[Index]) <> '' then
+      begin
+        if Result = '' then
+          Result := Trim(Lines[Index])
+        else
+          Result := Trim(Lines[Index]) + #13#10 + Result;
+        Shown := Shown + 1;
+      end;
+      Index := Index - 1;
+    end;
+  end;
+  if Result = '' then
+    Result := 'the worker produced no output (exit code ' + IntToStr(ExitCode) +
+      '); it may have been blocked by antivirus software, or the runtime files are incomplete';
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   WorkerPath: String;
   ModelPath: String;
   ReportPath: String;
-  Arguments: String;
+  LogPath: String;
+  Device: String;
+  Reason: String;
   ExitCode: Integer;
+  Passed: Boolean;
 begin
   if CurStep <> ssPostInstall then
     Exit;
@@ -225,13 +301,41 @@ begin
     '{app}\Resources\sidecar\Runtime\htdemucs-worker\htdemucs-worker.exe');
   ModelPath := ExpandConstant('{localappdata}\{#AppName}\Models');
   ReportPath := ExpandConstant('{localappdata}\{#AppName}\Logs\install-self-test.json');
+  LogPath := ExpandConstant('{localappdata}\{#AppName}\Logs\install-self-test.log');
   ForceDirectories(ExtractFileDir(ReportPath));
-  Arguments := '--self-test-json "' + ReportPath + '" --models-dir "' +
-    ModelPath + '" --model htdemucs --device ' + SelectedDeviceArgument;
-  if not Exec(WorkerPath, Arguments, '', SW_HIDE, ewWaitUntilTerminated, ExitCode) or
-      (ExitCode <> 0) then
-    RaiseException(
-      'The post-install PyTorch/HTDemucs self-test failed. Setup will not be marked as successful.');
+  { /SELFTESTDEVICE=cpu|cuda:0 overrides the device for diagnosis. }
+  Device := ExpandConstant('{param:SELFTESTDEVICE|' + SelectedDeviceArgument + '}');
+  Passed := RunSelfTest(WorkerPath, ModelPath, ReportPath, LogPath, Device, ExitCode);
+  if (not Passed) and (Device <> 'cpu') then
+  begin
+    { A GPU that PyTorch cannot use (driver too old, no memory, a laptop
+      switching adapters) must not brick the installation: the CUDA runtime
+      runs on the CPU as well, and the app picks the CPU by itself. }
+    Reason := SelfTestReason(ReportPath, LogPath, ExitCode);
+    Passed := RunSelfTest(WorkerPath, ModelPath, ReportPath, LogPath, 'cpu', ExitCode);
+    if Passed then
+      MsgBox(
+        'GPU 自我測試失敗，但 CPU 自我測試通過；App 會先用 CPU 運算。' + #13#10 +
+        '更新 NVIDIA 驅動程式後重新執行安裝程式即可改用 GPU。' + #13#10 + #13#10 +
+        'The GPU self-test failed but the CPU self-test passed; the app will run on the CPU.' + #13#10 +
+        'Update the NVIDIA driver and run Setup again to use the GPU.' + #13#10 + #13#10 +
+        'GPU error: ' + Reason + #13#10 +
+        'Log: ' + LogPath,
+        mbInformation, MB_OK);
+  end;
+  if not Passed then
+  begin
+    Reason := SelfTestReason(ReportPath, LogPath, ExitCode);
+    if MsgBox(
+        '安裝後的自我測試失敗 / The post-install self-test failed:' + #13#10 +
+        Reason + #13#10 + #13#10 +
+        '詳細記錄 / Details: ' + LogPath + #13#10 + #13#10 +
+        '仍要完成安裝嗎？（問題解決前 App 可能無法分離。）' + #13#10 +
+        'Finish the installation anyway? (The app may not separate until this is resolved.)',
+        mbError, MB_YESNO) = IDNO then
+      RaiseException(
+        'The post-install PyTorch/HTDemucs self-test failed: ' + Reason);
+  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

@@ -27,6 +27,12 @@ GPU 加速，**不需要安裝 Python、CUDA toolkit 或任何其他東西**，�
 > 執行檔沒有經過程式碼簽章，Windows SmartScreen 首次執行會跳警告。
 > 點「其他資訊」→「仍要執行」即可。
 
+安裝結束前會跑一次 PyTorch／HTDemucs 自我測試。GPU 自我測試失敗時（常見原因是
+NVIDIA 驅動太舊）安裝程式會自動改測 CPU，通過就以 CPU 完成安裝並說明原因；兩者都
+失敗才會詢問是否仍要完成安裝。詳細記錄在 `%LOCALAPPDATA%\Music SSP FX\Logs\install-self-test.log`
+與同目錄的 `install-self-test.json`，回報問題時請附上。靜默安裝可用
+`/VERYSILENT /RUNTIME=cpu|cuda|auto`。
+
 ## 系統需求
 
 - Windows 10 22H2 以上（64 位元）

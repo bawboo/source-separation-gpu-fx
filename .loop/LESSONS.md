@@ -65,3 +65,5 @@
 - SIGN (2026-09-06): 把 `HTFX_WORKER_EXECUTABLE` 指向 `standalone-runtime-cpu-dist` 的 worker，主程式會讀到旁邊的 `runtime-manifest.json`（flavor=cpu），目錄過濾隨之生效——`full_feature_check --modes quick` 在這個設定下只跑 6 軌與 guitar，vocals 自動消失。這是驗證「CPU 版使用者實際看到的模式清單」的正確方法，不必另外打包安裝。
 - SIGN (2026-09-06, code review): 多檔匯入在啟動時把 `separationState_` 設成 loading，只有「第一個成功的檔案」會把它推進；全部失敗時狀態就永遠停在 loading，UI 全部停用、取消無效。**任何在迴圈前先設「進行中」狀態的流程，都要有「一個都沒成功」的出口。** 這條是審查找到的，矩陣測試原本只測「夾一個壞檔」沒測「全是壞檔」。
 - SIGN (2026-09-06, code review): 10 Hz timer 裡不要做會阻塞的系統呼叫——`File::exists()` 對斷線的網路磁碟會卡住訊息執行緒；判斷「有沒有匯出」用路徑是否為空，真的要驗證存在時在使用者按下時才查。同樣道理，捷徑鍵要看 `isShowing()` 不能只看 `isEnabled()`（簡易面板的預覽按鈕隱藏但仍 enabled，空白鍵會暗中播放）。
+- SIGN (2026-09-10): 0.0.5 安裝程式的「安裝後自我測試」只看結束碼，失敗時 stderr 被 Inno 的 Exec 丟掉，使用者只看到「self-test failed」。**任何在安裝程式裡跑的子程序都要把輸出導到記錄檔**（`cmd /C "... > log 2>&1"`），worker 端失敗也要寫報告；而且 GPU 自測失敗不該讓整個安裝失敗——CUDA runtime 也能跑 CPU，退回去測一次 CPU 就好。
+- SIGN (2026-09-10): 測試安裝程式時 `/DIR` 不要指到 scratchpad 那種很深的路徑——runtime 解壓後的 torch 路徑會超過 260 字元，Inno 報 MoveFile code 3「找不到路徑」；而且 `/VERYSILENT /SUPPRESSMSGBOXES` **不會**壓掉檔案錯誤的「Select action」對話框，它會直接跳在使用者桌面上。用 `build\itest` 之類的短路徑。

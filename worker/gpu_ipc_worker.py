@@ -4,6 +4,7 @@ import argparse
 import ctypes
 import hashlib
 import json
+import traceback
 import os
 import ssl
 import sys
@@ -219,15 +220,70 @@ def runtime_self_test(
     model_name: str,
     device_name: str,
 ) -> int:
-    """Validate the selected runtime, model registry and accelerator without IPC."""
+    """Validate the selected runtime, model registry and accelerator without IPC.
 
+    A failure is written to ``output_path`` as well (status "fail", the stage
+    that failed and the error text), so an installer that only sees the exit
+    code can still tell the user what went wrong.
+    """
+
+    stage = "device"
+    try:
+        return _runtime_self_test_stages(
+            output_path, models_directory, model_name, device_name, lambda s: _set_stage(s)
+        )
+    except Exception as exc:  # noqa: BLE001 - reported, then re-raised for the exit code
+        stage = _current_self_test_stage
+        _write_self_test_report(
+            output_path,
+            {
+                "schema_version": 1,
+                "status": "fail",
+                "stage": stage,
+                "device_requested": device_name,
+                "model": model_name,
+                "error": f"{type(exc).__name__}: {exc}",
+                "torch_version": getattr(torch, "__version__", "unknown"),
+                "torch_cuda_version": getattr(torch.version, "cuda", None),
+                "cuda_available": bool(torch.cuda.is_available()),
+                "traceback": traceback.format_exc(),
+            },
+        )
+        raise
+
+
+_current_self_test_stage = "device"
+
+
+def _set_stage(stage: str) -> None:
+    global _current_self_test_stage
+    _current_self_test_stage = stage
+
+
+def _write_self_test_report(output_path: Path, report: dict[str, object]) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output_path.with_suffix(output_path.suffix + ".partial")
+    temporary.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    temporary.replace(output_path)
+
+
+def _runtime_self_test_stages(
+    output_path: Path,
+    models_directory: Path,
+    model_name: str,
+    device_name: str,
+    set_stage,
+) -> int:
+    set_stage("device")
     device = resolve_device(device_name)
+    set_stage("tensor")
     probe = torch.arange(64, dtype=torch.float32, device=device).reshape(8, 8)
     probe_result = probe @ probe.transpose(0, 1)
     synchronize_device(device)
     if not bool(torch.isfinite(probe_result).all().item()):
         raise RuntimeError("the runtime tensor self-test produced non-finite values")
 
+    set_stage("model")
     model = load_demucs_registry_model(
         model_name,
         models_directory,
@@ -243,9 +299,11 @@ def runtime_self_test(
         raise RuntimeError(
             f"model {model_name} channels {model.audio_channels} != {p.CHANNELS}"
         )
+    set_stage("model-to-device")
     model.to(device)
     synchronize_device(device)
 
+    set_stage("report")
     report = {
         "schema_version": 1,
         "status": "pass",

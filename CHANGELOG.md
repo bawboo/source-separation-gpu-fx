@@ -54,6 +54,13 @@
 
 ### 修正
 
+- **安裝程式的「安裝後自我測試失敗」不再是死路**：0.0.5 的安裝程式只看 worker 的結束碼，
+  失敗時只顯示「self-test failed」就中止安裝，使用者無從得知原因。現在（1）worker 失敗
+  時也會寫出報告（狀態、失敗階段、錯誤訊息、torch／CUDA 版本），安裝程式把 worker 的
+  輸出存到 `%LOCALAPPDATA%\Music SSP FX\Logs\install-self-test.log`；（2）GPU 自測失敗
+  會自動改測 CPU，通過就以 CPU 完成安裝並說明原因（例如驅動太舊），不會整個安裝失敗；
+  （3）兩者都失敗才詢問是否仍要完成安裝，訊息包含實際錯誤與記錄檔路徑。另新增
+  `/RUNTIME=cpu|cuda|auto` 與 `/SELFTESTDEVICE=` 命令列參數供靜默安裝與診斷
 - **WebM／WMV／MPEG 來源的影片無法回填成 MP4**：混音回填一律對影片串流做 stream
   copy，而 MP4 容器裝不下 VP8、WMV2、MPEG-1 這些編碼，ffmpeg 直接失敗。現在 stream
   copy 失敗時自動改為重新編碼影片（先 OpenH264，再退到內建的 MPEG-4 編碼器，兩者都在
