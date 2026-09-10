@@ -3,7 +3,7 @@
 本專案的版本紀錄。格式依循 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)，
 版本號依循 [語意化版本](https://semver.org/lang/zh-TW/)。
 
-## [Unreleased]
+## [0.0.6] - 2026-09-10
 
 ### 變更
 
