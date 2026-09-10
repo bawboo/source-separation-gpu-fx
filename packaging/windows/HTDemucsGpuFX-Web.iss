@@ -295,6 +295,16 @@ var
   ExitCode: Integer;
   Passed: Boolean;
 begin
+  if CurStep = ssInstall then
+  begin
+    // The runtime archive is extracted over the app directory. A runtime
+    // left by an earlier install of the other flavour (a CUDA torch under a
+    // CPU one, or the reverse) leaves DLLs the new torch then tries to load
+    // and fails on (WinError 127 on c10_cuda.dll) - which is exactly how the
+    // 0.0.5 self-test failed. Start from an empty runtime directory.
+    DelTree(ExpandConstant('{app}\Resources\sidecar\Runtime'), True, True, True);
+    Exit;
+  end;
   if CurStep <> ssPostInstall then
     Exit;
   WorkerPath := ExpandConstant(

@@ -54,6 +54,10 @@
 
 ### 修正
 
+- **在舊安裝上換另一種 runtime 會讓自我測試必定失敗**（0.0.5 安裝失敗的真正原因）：
+  安裝程式把 runtime 壓縮檔直接解壓到安裝目錄，先前另一種版本留下的檔案（例如 CUDA 版的
+  `c10_cuda.dll`）沒有清掉，新的 CPU 版 torch 啟動時載入到舊 DLL 就以 WinError 127
+  失敗。現在安裝前先清空 `Resources\sidecar\Runtime`
 - **安裝程式的「安裝後自我測試失敗」不再是死路**：0.0.5 的安裝程式只看 worker 的結束碼，
   失敗時只顯示「self-test failed」就中止安裝，使用者無從得知原因。現在（1）worker 失敗
   時也會寫出報告（狀態、失敗階段、錯誤訊息、torch／CUDA 版本），安裝程式把 worker 的
