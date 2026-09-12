@@ -43,9 +43,21 @@ foreach ($flavor in @('cpu', 'cuda')) {
     $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding utf8 |
         ConvertFrom-Json
     $archives = @($manifest.archives)
-    $expectedArchiveCount = if ($flavor -eq 'cpu') { 1 } else { 2 }
-    if ($archives.Count -ne $expectedArchiveCount) {
-        throw "$flavor runtime must contain $expectedArchiveCount release archive(s)"
+    # The CUDA runtime is split into as many archives as the 2 GiB asset limit
+    # needs, so its count is not fixed -- what must hold is the shape the
+    # installer generator relies on: exactly one core archive plus at least one
+    # library archive. Pinning it to two failed as soon as the runtime grew.
+    if ($flavor -eq 'cpu') {
+        if ($archives.Count -ne 1) {
+            throw 'cpu runtime must contain exactly one release archive'
+        }
+    } else {
+        if ($archives.Count -lt 2) {
+            throw 'cuda runtime must contain a core archive and at least one library archive'
+        }
+        if (@($archives | Where-Object role -eq 'core').Count -ne 1) {
+            throw 'cuda runtime must contain exactly one core archive'
+        }
     }
     if ($manifest.worker_manifest.flavor -ne $flavor) {
         throw "$flavor runtime contains the wrong worker flavor"
