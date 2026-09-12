@@ -209,6 +209,35 @@ begin
   RuntimePage.SelectedValueIndex := 0;
 end;
 
+function InstallCudaRuntime: Boolean;
+var
+  Forced: String;
+begin
+  { /RUNTIME=cpu|cuda|auto for silent and scripted installs. }
+  Forced := Lowercase(ExpandConstant('{param:RUNTIME|auto}'));
+  if Forced = 'cpu' then
+  begin
+    Result := False;
+    Exit;
+  end;
+  if Forced = 'cuda' then
+  begin
+    Result := True;
+    Exit;
+  end;
+  if not Assigned(RuntimePage) then
+  begin
+    Result := CudaUsable;
+    Exit;
+  end;
+  case RuntimePage.SelectedValueIndex of
+    1: Result := False;
+    2: Result := True;
+  else
+    Result := CudaUsable;
+  end;
+end;
+
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
   CudaSize: String;
@@ -243,35 +272,6 @@ begin
       'Setup will download ' + CudaSize + ' for the CUDA runtime. Continue?',
       mbConfirmation,
       MB_YESNO) = IDYES;
-end;
-
-function InstallCudaRuntime: Boolean;
-var
-  Forced: String;
-begin
-  { /RUNTIME=cpu|cuda|auto for silent and scripted installs. }
-  Forced := Lowercase(ExpandConstant('{param:RUNTIME|auto}'));
-  if Forced = 'cpu' then
-  begin
-    Result := False;
-    Exit;
-  end;
-  if Forced = 'cuda' then
-  begin
-    Result := True;
-    Exit;
-  end;
-  if not Assigned(RuntimePage) then
-  begin
-    Result := CudaUsable;
-    Exit;
-  end;
-  case RuntimePage.SelectedValueIndex of
-    1: Result := False;
-    2: Result := True;
-  else
-    Result := CudaUsable;
-  end;
 end;
 
 function InstallCpuRuntime: Boolean;
