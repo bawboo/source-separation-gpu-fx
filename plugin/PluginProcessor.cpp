@@ -6123,13 +6123,24 @@ private:
                     HTDemucsGpuFXAudioProcessor::SeparationState::previewReady &&
                 processor_.hasPreview() && !mediaBusy) {
                 const auto pending = *pendingQuickExport_;
-                if (processor_.beginQuickExport(pending.outputFile, pending.kind)) {
-                    pendingQuickExport_.reset();
-                }
+                // Either it starts now or it never will: every refusal left in
+                // beginQuickExport is permanent (a result that is neither a
+                // 2-stem pair nor a 4/6-stem one, an output path that would
+                // overwrite the imported file), and it reports its own reason.
+                processor_.beginQuickExport(pending.outputFile, pending.kind);
+                pendingQuickExport_.reset();
             } else if (
                 separationState == HTDemucsGpuFXAudioProcessor::SeparationState::error ||
                 separationState ==
                     HTDemucsGpuFXAudioProcessor::SeparationState::cancelled) {
+                pendingQuickExport_.reset();
+            } else if (!busy) {
+                // Nothing is running and no preview is on its way -- the
+                // separation never started, or a new import replaced the clip
+                // it was waiting for. Import is not gated on this flag, so a
+                // request left pending here disabled both quick exports and
+                // the panel switch for the rest of the session, which looked
+                // exactly like "the buttons stopped working after I imported".
                 pendingQuickExport_.reset();
             }
         }
@@ -6152,11 +6163,17 @@ private:
             : recordMode ? (mediaStatus.isNotEmpty() ? mediaStatus
                                                      : processor_.getRecordStatusText())
                          : processor_.getBridgeStatusText();
-        if (statusText != status_.getText()) {
-            status_.setText(statusText, juce::dontSendNotification);
+        const auto statusLine =
+            (!noticeActive() && recordMode && !busy && !recording &&
+             separationState == HTDemucsGpuFXAudioProcessor::SeparationState::recorded)
+                ? statusText + htfx::tr(advancedPanel_ ? "hint.pressSeparate"
+                                                       : "hint.pressQuickExport")
+                : statusText;
+        if (statusLine != status_.getText()) {
+            status_.setText(statusLine, juce::dontSendNotification);
             // Long status lines (an export path, an FFmpeg error) get cut
             // off in the label; hovering shows the whole text.
-            status_.setTooltip(statusText);
+            status_.setTooltip(statusLine);
         }
         const int latency = processor_.getActiveLatencySamples();
         metrics_.setText(

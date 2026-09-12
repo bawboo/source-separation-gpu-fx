@@ -318,6 +318,27 @@ int run() {
                 !exportMedia->isVisible(),
             "general panel control visibility mismatch");
 
+    // The general panel has no Separate button, so the two quick exports are
+    // the only way to run anything at all: they must become usable as soon as
+    // a clip is imported. Nothing covered this at the UI level -- the feature
+    // checks drive the processor directly and never see the buttons.
+    if (!waitUntil(
+            [&] { return exportVocals->isEnabled() && exportAccompany->isEnabled(); },
+            std::chrono::seconds(3))) {
+        std::cout << "  quick export stayed disabled:"
+                  << " mediaBusy=" << processor->isMediaBusy()
+                  << " batchBusy=" << processor->isBatchBusy()
+                  << " modelBusy=" << processor->isModelDownloadBusy()
+                  << " state=" << static_cast<int>(processor->getSeparationState())
+                  << " seconds=" << processor->getRecordedSeconds()
+                  << " imported="
+                  << (processor->getImportedMediaFile().existsAsFile() ? 1 : 0)
+                  << " htdemucs="
+                  << (processor->isModelInstalled("htdemucs") ? 1 : 0) << std::endl;
+        require(false,
+                "the general panel's quick export buttons stay disabled after an import");
+    }
+
     require(mode->getSelectedItemIndex() == 0, "Record mode is not selected");
     require(mode->getItemText(1) == htfx::tr("combo.modeRealtime"),
             "Realtime mode label mismatch");
@@ -847,6 +868,44 @@ int run() {
                 "file-drop interest does not follow the accepted media list");
     }
 
+    juce::String statusHintSummary;
+    {
+        // The call to action has to name a button the panel actually has. The
+        // general panel has no Separate button, so "press Separate" sent the
+        // user looking for a control that is not there.
+        require(processor->beginMediaImport(fixture), "status-hint import did not start");
+        waitForMedia(*processor);
+        const auto findStatus = [&]() -> juce::Label* {
+            std::vector<juce::Component*> current;
+            collectComponents(*editor, current);
+            for (auto* component : current) {
+                if (auto* label = dynamic_cast<juce::Label*>(component);
+                    label != nullptr &&
+                    label->getText().contains(htfx::tr("status.importedPrefix"))) {
+                    return label;
+                }
+            }
+            return nullptr;
+        };
+        const auto waitForHint = [&](const juce::String& hint) {
+            return waitUntil(
+                [&] {
+                    auto* label = findStatus();
+                    return label != nullptr && label->getText().endsWith(hint);
+                },
+                std::chrono::seconds(3));
+        };
+        require(waitForHint(htfx::tr("hint.pressQuickExport")),
+                "the general panel does not tell the user to press the quick exports");
+        panelSwitch->onClick();  // -> advanced panel, which does have Separate
+        require(waitForHint(htfx::tr("hint.pressSeparate")),
+                "the advanced panel does not tell the user to press Separate");
+        panelSwitch->onClick();  // back to the general panel
+        require(waitForHint(htfx::tr("hint.pressQuickExport")),
+                "the hint did not follow the switch back to the general panel");
+        statusHintSummary = "per-panel";
+    }
+
     std::unique_ptr<juce::AudioProcessorEditor> reopenedEditor(processor->createEditor());
     require(reopenedEditor != nullptr, "editor could not be reopened");
     std::vector<juce::Component*> reopenedComponents;
@@ -870,6 +929,7 @@ int run() {
                  " separation_mode_all_categories_verified=true"
                  " startup_default_mode=htdemucs4"
                  " stem_slider_relabels=true"
+                 " status_hint=" << statusHintSummary <<
                  " roformer_stem_labels=" << roformerStemLabelSummary <<
                  " roformer_stem_label_categories=8 roformer_export_naming=true"
                  " language_default=zh-TW language_toggle=true"
