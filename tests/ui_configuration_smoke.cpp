@@ -354,6 +354,7 @@ int run() {
     require(separationMode != nullptr, "Separation mode selector was not found");
     require(separationMode->isVisible(),
             "Separation mode selector is hidden in the advanced panel");
+    juce::String roformerStemLabelSummary;
     int expectedVocalsMode = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
         if (separationMode->getItemText(index) == "Vocals") {
@@ -361,9 +362,12 @@ int run() {
             break;
         }
     }
-    require(expectedVocalsMode >= 2, "Vocals mode entry missing for startup default");
-    require(separationMode->getSelectedItemIndex() == expectedVocalsMode,
-            "L4: startup did not preselect the Vocals separation mode");
+    require(expectedVocalsMode >= 2, "Vocals mode entry missing from the mode list");
+    // The startup default is HTDemucs 4-stem on every runtime; the RoFormer
+    // categories are opt-in from the mode list.
+    require(separationMode->getSelectedItemIndex() == 0,
+            "startup did not preselect 4-stem separation");
+    separationMode->setSelectedItemIndex(expectedVocalsMode, juce::sendNotificationSync);
     require(separationMode->getItemText(0) == htfx::tr("combo.separationMode4Stem") &&
                 separationMode->getItemText(1) == htfx::tr("combo.separationMode6Stem") &&
                                 separationMode->getNumItems() == 2 + roformerCategoryCount,
@@ -425,7 +429,7 @@ int run() {
             "L4: startup Vocals preselect should enable the RoFormer browser "
             "and 2-stem sliders while keeping the Demucs combo inert");
     require(processor->getSelectedRoformerModel().isNotEmpty(),
-            "L4: startup Vocals preselect did not select a default model");
+            "L4: choosing the Vocals mode did not select a default model");
 
     separationMode->setSelectedItemIndex(0, juce::sendNotificationSync);
     require(waitUntil(
@@ -525,9 +529,38 @@ int run() {
     auto* stemSliderLabel1 = findNamedComponent<juce::Label>(components, "stemLabel1");
     require(stemSliderLabel0 != nullptr && stemSliderLabel1 != nullptr,
             "stem slider labels were not found by name");
-    require(stemSliderLabel0->getText() == "Vocals" && stemSliderLabel1->getText() == "Instrumental",
-            "RoFormer Vocals mode left the stem slider labels on the HTDemucs "
-            "names instead of relabeling to Vocals/Instrumental");
+    // The fader labels must name the stems they actually control. The worker
+    // writes one file per stem and the processor labels each stem from its
+    // filename, so the order is the filesystem's ("<song>_instrumental.wav"
+    // sorts before "<song>_vocals.wav"). Labelling by category instead used to
+    // put "Vocals" on fader 0, which was the instrumental: pulling the other
+    // fader down left the full backing track and the mode looked like it had
+    // not separated at all.
+    {
+        const auto result = processor->getPreviewResult();
+        const bool haveStemIds = result != nullptr && result->stemLabels.size() == 2 &&
+                                 juce::String(result->modelName.c_str()) ==
+                                     processor->getSelectedRoformerModel();
+        require(haveStemIds,
+                "no RoFormer result to check the stem fader labels against");
+        const juce::String stem0(result->stemLabels[0].c_str());
+        const juce::String stem1(result->stemLabels[1].c_str());
+        require(waitUntil(
+                    [&] {
+                        return stemSliderLabel0->getText().equalsIgnoreCase(stem0) &&
+                               stemSliderLabel1->getText().equalsIgnoreCase(stem1);
+                    },
+                    std::chrono::seconds(3)),
+                "the stem faders are not labelled with the stems they control");
+        juce::StringArray shown{stemSliderLabel0->getText().toLowerCase(),
+                                stemSliderLabel1->getText().toLowerCase()};
+        shown.sort(false);
+        require(shown.joinIntoString("/") == "instrumental/vocals",
+                "a Vocals separation must present a vocals and an instrumental fader");
+        roformerStemLabelSummary =
+            stemSliderLabel0->getText().toLowerCase() + "/" +
+            stemSliderLabel1->getText().toLowerCase();
+    }
 
     int guitarModeIndex = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
@@ -835,9 +868,9 @@ int run() {
                  " separation_mode_gate=true separation_modes=" << (2 + roformerCategoryCount) <<
                  " separation_mode_defaults=true separation_mode_stem_gating=true"
                  " separation_mode_all_categories_verified=true"
-                 " startup_default_mode=vocals"
+                 " startup_default_mode=htdemucs4"
                  " stem_slider_relabels=true"
-                 " roformer_stem_labels=vocals/instrumental"
+                 " roformer_stem_labels=" << roformerStemLabelSummary <<
                  " roformer_stem_label_categories=8 roformer_export_naming=true"
                  " language_default=zh-TW language_toggle=true"
                  " language_persist_reopen=true PASS\n";

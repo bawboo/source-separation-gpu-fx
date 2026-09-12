@@ -107,7 +107,10 @@ $defines = @(
     "/DCudaRuntimeFilesIss=$cudaFilesIss",
     "/DCpuRuntimeUrl=$baseUrl/$($cpuRuntime.archive)",
     "/DCpuRuntimeBytes=$($cpuRuntime.bytes)",
-    "/DCpuRuntimeSha256=$($cpuRuntime.sha256)"
+    "/DCpuRuntimeSha256=$($cpuRuntime.sha256)",
+    # The wizard quotes the real download size of each choice, so it has to
+    # follow the archives rather than a number typed into the .iss.
+    "/DCudaRuntimeBytes=$(($cudaArchives | Measure-Object -Property bytes -Sum).Sum)"
 )
 & $Iscc @defines $iss
 if ($LASTEXITCODE -ne 0) {

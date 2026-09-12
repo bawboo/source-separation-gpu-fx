@@ -6,12 +6,15 @@
     "category exists only when it produces a genuinely different effect, not",
     "a quality tier of the same one. The manifest stays complete so that",
     "checkpoints, URLs and SHA-256 values remain verifiable.",
-    "cpu: whether the CPU runtime offers the model. Measured 2026-09-04/05 on",
-    "a laptop CPU (RTX 4050 machine, CPU runtime, 5-minute song, full run):",
-    "guitar (45 MB) ~8 min of inference; de-reverb-big (456 MB) estimated",
-    "~4 hours; the 913 MB class is slower still. Only the guitar model is",
-    "usable on CPU; the rest are GPU-only. Stem separation on CPU is served by",
-    "HTDemucs 4/6-stem (about 2 minutes per song)."
+    "cpu: every category is offered on both runtimes. Measured 2026-09-12 on a",
+    "14-core laptop with the frozen CPU runtime and a 30-second clip, warm",
+    "cache: RoFormer models took 4 to 14 minutes, and checkpoint size barely",
+    "moved the number (guitar is 43 MB, aspiration 797 MB, and they land in",
+    "the same band) because the cost is the transformer's sequence length,",
+    "not its parameter count. Call it 10 to 30 times real time, so a 5-minute",
+    "song is tens of minutes on CPU. Slow, but the same order as the guitar",
+    "model that was already offered there, so hiding the rest was arbitrary;",
+    "the editor warns about the wait instead."
   ],
   "dropped_categories": {
     "general": "General-purpose vocal models; same two-stem vocal/instrumental effect as the vocals category.",
@@ -21,17 +24,17 @@
     {
       "id": "melband-roformer-kim-vocals",
       "category": "vocals",
-      "cpu": false
+      "cpu": true
     },
     {
       "id": "melband-roformer-inst-gabox-bv2",
       "category": "instrumental",
-      "cpu": false
+      "cpu": true
     },
     {
       "id": "melband-roformer-karaoke-gabox",
       "category": "karaoke",
-      "cpu": false
+      "cpu": true
     },
     {
       "id": "roformer-model-melband-roformer-guitar-by-becruily",
@@ -41,28 +44,28 @@
     {
       "id": "roformer-model-melband-roformer-de-reverb-big-by-sucial",
       "category": "dereverb",
-      "cpu": false
+      "cpu": true
     },
     {
       "id": "roformer-model-mel-roformer-denoise-aufr33",
       "category": "denoise",
-      "cpu": false
+      "cpu": true
     },
     {
       "id": "roformer-model-melband-roformer-bleed-suppressor-v1-by-unwa-97chris",
       "category": "denoise",
-      "cpu": false,
+      "cpu": true,
       "effect": "bleed suppression rather than noise removal"
     },
     {
       "id": "roformer-model-mel-roformer-crowd-aufr33-viperx",
       "category": "crowd",
-      "cpu": false
+      "cpu": true
     },
     {
       "id": "roformer-model-melband-roformer-aspiration-by-sucial",
       "category": "aspiration",
-      "cpu": false
+      "cpu": true
     }
   ]
 }

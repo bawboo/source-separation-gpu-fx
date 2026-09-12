@@ -47,6 +47,36 @@ public:
         realtime = 1,
     };
 
+    // What the media thread is doing right now. The editor labels the shared
+    // progress bar with it: without this it can only see "busy" and cannot
+    // tell an import from an export, so a bar that starts again after a
+    // separation looks like the same job running twice.
+    enum class MediaTask : int {
+        none = 0,
+        import_,
+        quickExportVocals,
+        quickExportAccompaniment,
+        stemExport,
+        mixExport,
+        mixExportVideo,
+        batchSeparate,
+        batchExport,
+    };
+
+    [[nodiscard]] MediaTask getMediaTask() const noexcept {
+        return mediaTask_.load(std::memory_order_acquire);
+    }
+
+    // Which clip a batch is on, 1-based, and how many there are. The shared
+    // progress bar restarts at 0 for every clip, so the count is what tells
+    // the user the run is advancing rather than repeating.
+    [[nodiscard]] int getBatchClipIndex() const noexcept {
+        return batchIndex_.load(std::memory_order_acquire);
+    }
+    [[nodiscard]] int getBatchClipTotal() const noexcept {
+        return batchTotal_.load(std::memory_order_acquire);
+    }
+
     enum class SeparationState : int {
         idle = 0,
         recording,
@@ -436,6 +466,9 @@ private:
     std::atomic<double> previewCursor_{0.0};
     std::atomic<bool> previewPlaying_{false};
     std::atomic<double> playbackSampleRate_{static_cast<double>(kSampleRate)};
+    std::atomic<MediaTask> mediaTask_{MediaTask::none};
+    std::atomic<int> batchIndex_{0};
+    std::atomic<int> batchTotal_{0};
     std::atomic<bool> mediaBusy_{false};
     std::atomic<bool> batchBusy_{false};
     std::atomic<double> mediaProgress_{0.0};

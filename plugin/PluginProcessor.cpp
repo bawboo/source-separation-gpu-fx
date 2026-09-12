@@ -2555,6 +2555,7 @@ bool HTDemucsGpuFXAudioProcessor::beginMultiMediaImport(
         setMediaMessage(htfx::tr("status.mediaBusyRetryLater"));
         return false;
     }
+    mediaTask_.store(MediaTask::import_, std::memory_order_release);
     recording_.store(false, std::memory_order_release);
     stopRecordingThread();
     stopSeparationThread();
@@ -2693,6 +2694,9 @@ bool HTDemucsGpuFXAudioProcessor::beginBatchSeparation() {
 }
 
 void HTDemucsGpuFXAudioProcessor::batchSeparationLoop(std::stop_token stopToken) {
+    mediaTask_.store(MediaTask::batchSeparate, std::memory_order_release);
+    batchIndex_.store(0, std::memory_order_release);
+    batchTotal_.store(getClipCount(), std::memory_order_release);
     // Hold the batch flag for the whole loop, whichever way it exits.
     struct BatchGuard {
         std::atomic<bool>& flag;
@@ -2713,6 +2717,7 @@ void HTDemucsGpuFXAudioProcessor::batchSeparationLoop(std::stop_token stopToken)
         }
         // Route through the existing single-clip separation path by making the
         // target clip active, then waiting for its result.
+        batchIndex_.store(index + 1, std::memory_order_release);
         setActiveClip(index);
         {
             const juce::ScopedLock lock(clipsLock_);
@@ -2777,6 +2782,9 @@ bool HTDemucsGpuFXAudioProcessor::beginBatchExport(
 
 void HTDemucsGpuFXAudioProcessor::batchExportLoop(
     std::stop_token stopToken, juce::File folder, QuickExportKind kind) {
+    mediaTask_.store(MediaTask::batchExport, std::memory_order_release);
+    batchIndex_.store(0, std::memory_order_release);
+    batchTotal_.store(getClipCount(), std::memory_order_release);
     // Hold the batch flag for the whole loop, whichever way it exits.
     struct BatchGuard {
         std::atomic<bool>& flag;
@@ -2819,6 +2827,7 @@ void HTDemucsGpuFXAudioProcessor::batchExportLoop(
 
         // Make this clip active so the existing single-clip export path, which
         // reads previewResult_ plus the live mixer parameters, operates on it.
+        batchIndex_.store(index + 1, std::memory_order_release);
         setActiveClip(index);
 
         if (!hasResult) {
@@ -2912,6 +2921,7 @@ bool HTDemucsGpuFXAudioProcessor::beginMediaImport(const juce::File& mediaFile) 
         return false;
     }
 
+    mediaTask_.store(MediaTask::import_, std::memory_order_release);
     recording_.store(false, std::memory_order_release);
     stopRecordingThread();
     stopSeparationThread();
@@ -3047,6 +3057,7 @@ bool HTDemucsGpuFXAudioProcessor::beginStemExport(
         const juce::ScopedLock lock(mediaMetadataLock_);
         baseName = importedBaseName_;
     }
+    mediaTask_.store(MediaTask::stemExport, std::memory_order_release);
     mediaProgress_.store(0.0, std::memory_order_release);
     setMediaMessage(htfx::tr("status.exportingOriginalVolumeStems"));
     mediaThread_ = std::jthread(
@@ -3158,6 +3169,9 @@ bool HTDemucsGpuFXAudioProcessor::beginQuickExport(
     }
 
     mediaProgress_.store(0.0, std::memory_order_release);
+    mediaTask_.store(kind == QuickExportKind::vocals ? MediaTask::quickExportVocals
+                                                     : MediaTask::quickExportAccompaniment,
+                     std::memory_order_release);
     setMediaMessage(
         kind == QuickExportKind::vocals
             ? htfx::tr("status.exportingVocalsOriginalLevel")
@@ -3307,6 +3321,8 @@ bool HTDemucsGpuFXAudioProcessor::beginMixExport(
         return false;
     }
     const auto settings = currentMixSettings();
+    mediaTask_.store(replaceVideoAudio ? MediaTask::mixExportVideo : MediaTask::mixExport,
+                     std::memory_order_release);
     mediaProgress_.store(0.0, std::memory_order_release);
     setMediaMessage(
         replaceVideoAudio ? htfx::tr("status.mixingReplacingVideoAudio")
@@ -4192,7 +4208,20 @@ public:
     void drawProgressBar(juce::Graphics& g, juce::ProgressBar& bar, int width, int height,
                          double progress, const juce::String& textToShow) override {
         if (progress < 0.0 || progress > 1.0) {
-            LookAndFeel_V4::drawProgressBar(g, bar, width, height, progress, textToShow);
+            // Indeterminate: the stock stripes run behind the text and swallow
+            // it, so dim them under a scrim before writing the phase name.
+            LookAndFeel_V4::drawProgressBar(g, bar, width, height, progress, {});
+            if (textToShow.isNotEmpty()) {
+                const auto bounds = juce::Rectangle<int>(0, 0, width, height).toFloat();
+                g.setColour(juce::Colour(kBackground).withAlpha(0.55f));
+                g.fillRoundedRectangle(bounds, bounds.getHeight() * 0.5f);
+                g.setFont(juce::FontOptions{static_cast<float>(height) * 0.7f, juce::Font::bold});
+                g.setColour(juce::Colours::black.withAlpha(0.5f));
+                g.drawText(textToShow, bounds.translated(0.0f, 1.0f).toNearestInt(),
+                           juce::Justification::centred, false);
+                g.setColour(juce::Colour(kText));
+                g.drawText(textToShow, bounds.toNearestInt(), juce::Justification::centred, false);
+            }
             return;
         }
         const auto bounds = juce::Rectangle<int>(0, 0, width, height).toFloat();
@@ -5111,6 +5140,50 @@ private:
         g.drawText(hint, pill.toNearestInt(), juce::Justification::centred, false);
     }
 
+    // What the shared progress bar is currently measuring. One bar serves the
+    // model download, the import, the separation and every export, so without
+    // a name on it a run that moves on to the next stage looks like the same
+    // job starting over.
+    juce::String currentProgressPhase(bool modelBusy, bool mediaBusy,
+                                      bool separationBusy, bool recording) const {
+        using Task = HTDemucsGpuFXAudioProcessor::MediaTask;
+        using State = HTDemucsGpuFXAudioProcessor::SeparationState;
+        if (recording) {
+            return htfx::tr("phase.recording");
+        }
+        if (modelBusy) {
+            return htfx::tr("phase.downloadModel");
+        }
+        const auto task = processor_.getMediaTask();
+        if (processor_.isBatchBusy()) {
+            const auto name = task == Task::batchExport ? htfx::tr("phase.batchExport")
+                                                        : htfx::tr("phase.batchSeparate");
+            const int index = processor_.getBatchClipIndex();
+            const int total = processor_.getBatchClipTotal();
+            if (index > 0 && total > 0) {
+                return name + " " + juce::String(index) + "/" + juce::String(total);
+            }
+            return name;
+        }
+        if (mediaBusy) {
+            switch (task) {
+                case Task::import_: return htfx::tr("phase.import");
+                case Task::quickExportVocals: return htfx::tr("phase.exportVocals");
+                case Task::quickExportAccompaniment: return htfx::tr("phase.exportAccompaniment");
+                case Task::stemExport: return htfx::tr("phase.exportStems");
+                case Task::mixExport: return htfx::tr("phase.exportMix");
+                case Task::mixExportVideo: return htfx::tr("phase.exportVideo");
+                default: return htfx::tr("phase.import");
+            }
+        }
+        if (separationBusy) {
+            return processor_.getSeparationState() == State::loading
+                       ? htfx::tr("phase.loadingModel")
+                       : htfx::tr("phase.separating");
+        }
+        return {};
+    }
+
     // Re-applies every localized static string from the current language
     // (see Localization.h). Called once at construction and again whenever
     // languageButton_ toggles the language, so the switch takes effect
@@ -5609,16 +5682,15 @@ private:
             if (categoryIndex >= 0) target = 2 + categoryIndex;
         }
         if (target < 0) {
-            // default startup mode: vocal separation (user-requested default)
-            for (int index = 0; index < separationModeCategories_.size(); ++index) {
-                if (separationModeCategories_[index].equalsIgnoreCase("vocals")) {
-                    target = 2 + index;
-                    break;
-                }
-            }
+            // Default startup mode: HTDemucs 4-stem. It is the mode the simple
+            // panel's quick exports were built around, it needs no download
+            // beyond the checkpoint the installer already fetched, and it is
+            // the same on both runtimes -- the CPU build filters the RoFormer
+            // categories, so a RoFormer default silently meant one thing on a
+            // GPU machine and another on a CPU one.
+            target = 0;
             modelId.clear();
         }
-        if (target < 0) target = 0;
         separationModeBox_.setSelectedItemIndex(target, juce::sendNotificationSync);
         if (target >= 2 && modelId.isNotEmpty()) {
             for (std::size_t index = 0; index < visibleRoformerIds_.size(); ++index) {
@@ -5736,6 +5808,26 @@ private:
         return {"Target", "Residual"};
     }
 
+    // The display name for one stem id as the worker reported it
+    // ("vocals", "instrumental", "dry", "noise", ...).
+    static juce::String roformerStemDisplayName(const juce::String& stemId) {
+        const auto id = stemId.toLowerCase();
+        if (id == "vocals") return "Vocals";
+        if (id == "instrumental" || id == "inst" || id == "music") return "Instrumental";
+        if (id == "karaoke") return "Karaoke";
+        if (id == "guitar") return "Guitar";
+        if (id == "other" || id == "residual" || id == "rest") return "Residual";
+        if (id == "clean" || id == "denoised") return "Clean";
+        if (id == "noise") return "Noise";
+        if (id == "dry" || id == "noreverb") return "Dry";
+        if (id == "reverb" || id == "echo") return "Reverb";
+        if (id == "aspiration" || id == "breath") return "Aspiration";
+        if (id == "crowd") return "Crowd";
+        if (id == "bleed") return "Bleed";
+        if (id.isEmpty()) return {};
+        return stemId.substring(0, 1).toUpperCase() + stemId.substring(1);
+    }
+
     // Rebuilds the clip rows when the number of imported files changes, and
     // refreshes their text/state on every timer tick.
     void refreshClipRows() {
@@ -5777,8 +5869,27 @@ private:
             defaultStemNames{"Drums", "Bass", "Other", "Vocals", "Guitar", "Piano"};
         if (roformerMode) {
             const auto names = roformerStemDisplayNames(separationModeBox_.getText());
-            stemLabels_[0].setText(names.first, juce::dontSendNotification);
-            stemLabels_[1].setText(names.second, juce::dontSendNotification);
+            juce::String first(names.first);
+            juce::String second(names.second);
+            // Prefer the separated result's own stem ids: they are the only
+            // record of which stem is which, and their order is whatever the
+            // worker's output files enumerated as.
+            const auto selectedModel = processor_.getSelectedRoformerModel();
+            if (const auto result = processor_.getPreviewResult();
+                result != nullptr && result->stemLabels.size() >= 2 &&
+                selectedModel.isNotEmpty() &&
+                juce::String(result->modelName.c_str()) == selectedModel) {
+                const auto fromResult0 =
+                    roformerStemDisplayName(juce::String(result->stemLabels[0].c_str()));
+                const auto fromResult1 =
+                    roformerStemDisplayName(juce::String(result->stemLabels[1].c_str()));
+                if (fromResult0.isNotEmpty() && fromResult1.isNotEmpty()) {
+                    first = fromResult0;
+                    second = fromResult1;
+                }
+            }
+            stemLabels_[0].setText(first, juce::dontSendNotification);
+            stemLabels_[1].setText(second, juce::dontSendNotification);
         } else {
             for (std::size_t index = 0; index < stemLabels_.size(); ++index) {
                 stemLabels_[index].setText(
@@ -5895,6 +6006,27 @@ private:
                              ? processor_.getModelDownloadProgress()
                              : (mediaBusy ? processor_.getMediaProgress()
                                           : processor_.getSeparationProgress());
+        {
+            const auto phase =
+                currentProgressPhase(modelBusy, mediaBusy, separationBusy, recording);
+            juce::String barText;
+            if (phase.isNotEmpty()) {
+                barText = progressValue_ >= 0.0 && progressValue_ <= 1.0
+                              ? phase + "  " +
+                                    juce::String(juce::roundToInt(progressValue_ * 100.0)) + "%"
+                              : phase + "...";
+            }
+            if (barText != progressBarText_) {
+                progressBarText_ = barText;
+                // setTextToDisplay() turns the percentage off for good, so the
+                // idle bar has to ask for it back explicitly.
+                if (barText.isEmpty()) {
+                    progressBar_.setPercentageDisplay(true);
+                } else {
+                    progressBar_.setTextToDisplay(barText);
+                }
+            }
+        }
         recordButton_.setButtonText(
             recording ? htfx::tr("button.stopRecording") : htfx::tr("button.record"));
         recordButton_.setEnabled(!mediaBusy && !separationBusy);
@@ -6126,6 +6258,7 @@ private:
     juce::TextButton cancelButton_;
     double progressValue_ = 0.0;
     juce::ProgressBar progressBar_;
+    juce::String progressBarText_;
     juce::GroupComponent previewGroup_;
     juce::TextButton previewPlayButton_;
     juce::TextButton previewStopButton_;
