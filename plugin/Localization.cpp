@@ -59,6 +59,9 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"status.readyToSeparate", StringPair{u8"音訊已就緒", u8"Audio ready"}},
         // Which button to press next, chosen by the panel that is showing.
         {"hint.pressSeparate", StringPair{u8" — 請按下「分離」", u8" - press Separate"}},
+        {"hint.downloadsModelFirst",
+         StringPair{u8"（第一次會先自動下載 84 MB 的預設模型）",
+                    u8" (the 84 MB default model is downloaded first)"}},
         {"hint.pressQuickExport",
          StringPair{u8" — 請按下「僅匯出人聲」或「僅匯出伴奏」",
                     u8" - press Export Vocals or Export Accompaniment"}},
@@ -186,13 +189,6 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"alert.importMediaFirstMessage",
          StringPair{u8"請先選擇音訊或影片檔案再匯出。",
                     u8"Choose an audio or video file before exporting."}},
-        {"alert.defaultModelMissingTitle",
-         StringPair{u8"缺少預設模型", u8"Default model is missing"}},
-        {"alert.defaultModelMissingMessage",
-         StringPair{u8"一般面板需要 htdemucs 模型。請重新執行安裝程式，或開啟進階面板下載該模型。",
-                    u8"The general panel requires the htdemucs model. Re-run "
-                    "the installer or open the Advanced panel to install "
-                    "it."}},
         {"alert.nothingToExportTitle",
          StringPair{u8"沒有可匯出的內容", u8"Nothing to export"}},
         {"alert.nothingToExportMessage",

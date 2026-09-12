@@ -2364,8 +2364,8 @@ void HTDemucsGpuFXAudioProcessor::modelDownloadLoop(
     if (exitCode == 0 && isModelInstalled(modelName)) {
         modelDownloadProgress_.store(1.0, std::memory_order_release);
         setModelDownloadMessage(modelName + " installed and ready");
-        modelDownloadBusy_.store(false, std::memory_order_release);
         resumeSeparationAfterModelDownload(modelName);
+        modelDownloadBusy_.store(false, std::memory_order_release);
         return;
     } else {
         auto diagnostics = juce::String::fromUTF8(
@@ -5320,17 +5320,6 @@ private:
                 htfx::tr("alert.importMediaFirstMessage"));
             return;
         }
-        // RoFormer checkpoints are fetched on demand by the worker, so only a
-        // missing HTDemucs checkpoint is a hard stop here.
-        const auto roformerModel = processor_.getSelectedRoformerModel();
-        if (roformerModel.isEmpty() && !processor_.isModelInstalled("htdemucs")) {
-            juce::AlertWindow::showMessageBoxAsync(
-                juce::MessageBoxIconType::WarningIcon,
-                htfx::tr("alert.defaultModelMissingTitle"),
-                htfx::tr("alert.defaultModelMissingMessage"));
-            return;
-        }
-
         auto base = juce::File::createLegalFileName(
             imported.getFileNameWithoutExtension());
         if (base.isEmpty()) {
@@ -5389,7 +5378,10 @@ private:
 
         // Otherwise separate first; the timer picks the export back up when
         // the preview becomes ready.
-        if (!processor_.beginSeparation()) {
+        if (!processor_.beginSeparation() && !processor_.isModelDownloadBusy()) {
+            // beginSeparation() also returns false when it has started
+            // downloading a missing checkpoint and will resume by itself, so
+            // only a real refusal drops the request.
             pendingQuickExport_.reset();
         }
     }
@@ -6034,8 +6026,7 @@ private:
         const bool quickExportReady =
             !recording && !busy && !pendingQuickExport_.has_value() &&
             processor_.getImportedMediaFile().existsAsFile() &&
-            processor_.getRecordedSeconds() > 0.0 &&
-            processor_.isModelInstalled("htdemucs");
+            processor_.getRecordedSeconds() > 0.0;
         vocalsOnlyButton_.setEnabled(quickExportReady);
         accompanyOnlyButton_.setEnabled(quickExportReady);
         panelSwitchButton_.setEnabled(!busy && !pendingQuickExport_.has_value());
@@ -6163,12 +6154,17 @@ private:
             : recordMode ? (mediaStatus.isNotEmpty() ? mediaStatus
                                                      : processor_.getRecordStatusText())
                          : processor_.getBridgeStatusText();
-        const auto statusLine =
-            (!noticeActive() && recordMode && !busy && !recording &&
-             separationState == HTDemucsGpuFXAudioProcessor::SeparationState::recorded)
-                ? statusText + htfx::tr(advancedPanel_ ? "hint.pressSeparate"
-                                                       : "hint.pressQuickExport")
-                : statusText;
+        auto statusLine = statusText;
+        if (!noticeActive() && recordMode && !busy && !recording &&
+            separationState == HTDemucsGpuFXAudioProcessor::SeparationState::recorded) {
+            statusLine += htfx::tr(advancedPanel_ ? "hint.pressSeparate"
+                                                  : "hint.pressQuickExport");
+            // Say so rather than letting the first press look like a hang:
+            // the run starts by fetching the checkpoint.
+            if (!roformerModeActive && !selectedModelInstalled) {
+                statusLine += htfx::tr("hint.downloadsModelFirst");
+            }
+        }
         if (statusLine != status_.getText()) {
             status_.setText(statusLine, juce::dontSendNotification);
             // Long status lines (an export path, an FFmpeg error) get cut

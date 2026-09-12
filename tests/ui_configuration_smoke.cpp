@@ -906,6 +906,52 @@ int run() {
         statusHintSummary = "per-panel";
     }
 
+    juce::String missingModelSummary;
+    {
+        // A machine without the default checkpoint must still be able to use
+        // the general panel: it has no model controls, so gating its only two
+        // buttons on an installed checkpoint made it a dead end with nothing
+        // on screen to explain it. Pressing them downloads what is missing.
+        const auto emptyModels =
+            juce::File::getSpecialLocation(juce::File::tempDirectory)
+                .getChildFile("htfx-no-models-" + juce::Uuid().toString());
+        require(emptyModels.createDirectory().wasOk(), "could not stage an empty models dir");
+        emptyModels.getChildFile("model-manifest.json")
+            .replaceWithText(R"({"models":{},"artifacts":{}})");
+        _wputenv_s(L"HTFX_MODELS_DIR", emptyModels.getFullPathName().toWideCharPointer());
+
+        juce::AudioProcessor::setTypeOfNextNewPlugin(
+            juce::AudioProcessor::wrapperType_Standalone);
+        auto bare = std::make_unique<HTDemucsGpuFXAudioProcessor>();
+        juce::AudioProcessor::setTypeOfNextNewPlugin(
+            juce::AudioProcessor::wrapperType_Undefined);
+        bare->prepareToPlay(44'100.0, 256);
+        require(!bare->isModelInstalled("htdemucs"),
+                "the staged models directory still reports htdemucs as installed");
+        std::unique_ptr<juce::AudioProcessorEditor> bareEditor(bare->createEditor());
+        require(bareEditor != nullptr, "editor could not be created without a checkpoint");
+        require(bare->beginMediaImport(fixture), "import did not start without a checkpoint");
+        require(waitUntil([&] { return !bare->isMediaBusy(); }, std::chrono::seconds(30)),
+                "import timed out without a checkpoint");
+        std::vector<juce::Component*> bareComponents;
+        collectComponents(*bareEditor, bareComponents);
+        auto* bareVocals = findButton(bareComponents, htfx::tr("button.exportVocalsOnly"));
+        auto* bareAccompany =
+            findButton(bareComponents, htfx::tr("button.exportAccompanyOnly"));
+        require(bareVocals != nullptr && bareAccompany != nullptr,
+                "the quick export buttons are missing without a checkpoint");
+        require(waitUntil(
+                    [&] { return bareVocals->isEnabled() && bareAccompany->isEnabled(); },
+                    std::chrono::seconds(3)),
+                "the quick exports are disabled when the default checkpoint is missing");
+        bareEditor.reset();
+        bare->releaseResources();
+        bare.reset();
+        _wputenv_s(L"HTFX_MODELS_DIR", L"");
+        emptyModels.deleteRecursively();
+        missingModelSummary = "usable";
+    }
+
     std::unique_ptr<juce::AudioProcessorEditor> reopenedEditor(processor->createEditor());
     require(reopenedEditor != nullptr, "editor could not be reopened");
     std::vector<juce::Component*> reopenedComponents;
@@ -930,6 +976,7 @@ int run() {
                  " startup_default_mode=htdemucs4"
                  " stem_slider_relabels=true"
                  " status_hint=" << statusHintSummary <<
+                 " no_checkpoint=" << missingModelSummary <<
                  " roformer_stem_labels=" << roformerStemLabelSummary <<
                  " roformer_stem_label_categories=8 roformer_export_naming=true"
                  " language_default=zh-TW language_toggle=true"
