@@ -6,13 +6,29 @@
     # The app only shells out to FFmpeg to decode into PCM, so the LGPL build
     # covers every use and keeps binary releases clear of the GPL
     # corresponding-source obligation. See build/ffmpeg-lgpl/BUILD_INFO.txt.
-    [string]$Ffmpeg = ''
+    [string]$Ffmpeg = '',
+    [string]$SevenZip = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrWhiteSpace($Ffmpeg)) {
     $Ffmpeg = Join-Path $projectRoot 'build\ffmpeg-lgpl\bin\ffmpeg.exe'
+}
+if ([string]::IsNullOrWhiteSpace($SevenZip)) {
+    $found = Get-Command 7z.exe -ErrorAction SilentlyContinue
+    $SevenZip = if ($null -ne $found) {
+        $found.Source
+    } else {
+        @((Join-Path $env:ProgramFiles '7-Zip\7z.exe'),
+          (Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe')) |
+            Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+            Select-Object -First 1
+    }
+}
+if ([string]::IsNullOrWhiteSpace($SevenZip) -or
+    -not (Test-Path -LiteralPath $SevenZip -PathType Leaf)) {
+    throw '7z.exe was not found. Install 7-Zip or pass -SevenZip.'
 }
 $buildRoot = Join-Path $projectRoot 'build\windows-web'
 $distRoot = Join-Path $projectRoot 'dist\windows-web'
@@ -61,7 +77,7 @@ $archiveSpecs = @()
 if ($Flavor -eq 'cpu') {
     $archiveSpecs = @(
         [ordered]@{
-            name = "runtime-win-x64-cpu-$Version.zip"
+            name = "runtime-win-x64-cpu-$Version.7z"
             role = 'runtime'
             files = @(Get-ChildItem -LiteralPath $stageRoot -File -Recurse)
         }
@@ -70,7 +86,7 @@ if ($Flavor -eq 'cpu') {
     # GitHub Release assets must each stay below 2 GiB. Splitting on hard-coded
     # DLL names breaks whenever the CUDA/cuDNN major version changes, so pack
     # greedily by size instead: largest first into buckets capped well under the
-    # limit (uncompressed, so the resulting ZIP is always smaller). Paths are
+    # limit (uncompressed, so the resulting archive is always smaller). Paths are
     # preserved in every archive, so Inno Setup extracts them all into the same
     # application folder.
     $bucketLimit = 1.7GB
@@ -102,11 +118,11 @@ if ($Flavor -eq 'cpu') {
     for ($i = 0; $i -lt $buckets.Count; $i++) {
         if ($i -eq 0) {
             $role = 'core'
-            $name = "runtime-win-x64-cuda-core-$Version.zip"
+            $name = "runtime-win-x64-cuda-core-$Version.7z"
         } else {
             $role = if ($i -eq 1) { 'cuda-libraries' } else { "cuda-libraries-$i" }
             $suffix = if ($i -eq 1) { '' } else { "-$i" }
-            $name = "runtime-win-x64-cuda-libraries$suffix-$Version.zip"
+            $name = "runtime-win-x64-cuda-libraries$suffix-$Version.7z"
         }
         $archiveSpecs += [ordered]@{
             name = $name
@@ -136,9 +152,20 @@ foreach ($spec in $archiveSpecs) {
 
     Push-Location $stageRoot
     try {
-        & "$env:SystemRoot\System32\tar.exe" --format zip -c -f $partialPath -T $listPath
+        # LZMA2 instead of ZIP deflate: ~35% smaller, which is about a gigabyte
+        # off the CUDA download. Inno Setup extracts .7z natively (is7z.dll).
+        #
+        # -ms=off is not optional. Inno extracts the archive one entry at a
+        # time, and in a solid archive every entry re-decompresses its whole
+        # block: a solid build of this runtime took 0.62 s per file and turned
+        # a 20-second download into a 16-minute install, which Inno itself
+        # warns about in its log ("Archive is solid; extraction performance may
+        # degrade"). Non-solid costs ~9% in size and takes per-file extraction
+        # from 0.498 s to 0.052 s.
+        & $SevenZip a -t7z -m0=LZMA2 -mx=9 -ms=off -mmt=on -y -bso0 -bsp0 `
+            $partialPath "@$listPath" | Out-Null
         if ($LASTEXITCODE -ne 0) {
-            throw "tar.exe failed with exit code $LASTEXITCODE"
+            throw "7z.exe failed with exit code $LASTEXITCODE"
         }
     } finally {
         Pop-Location

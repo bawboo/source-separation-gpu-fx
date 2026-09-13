@@ -11,6 +11,11 @@
 #ifndef CpuRuntimeUrl
   #error CpuRuntimeUrl is required.
 #endif
+; The local file name Setup downloads into. Its extension picks the extractor,
+; so it follows whatever the packager produced (.7z today, .zip before).
+#ifndef CpuRuntimeDestName
+  #error CpuRuntimeDestName is required.
+#endif
 #ifndef CpuRuntimeBytes
   #error CpuRuntimeBytes is required.
 #endif
@@ -75,7 +80,7 @@ Source: "{#PayloadRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdir
 Source: "{#PayloadRoot}\htfx_hardware_probe.exe"; Flags: dontcopy
 
 ; Runtime archives contain a Resources tree and are extracted directly into {app}.
-Source: "{#CpuRuntimeUrl}"; DestDir: "{app}"; DestName: "runtime-win-x64-cpu.zip"; ExternalSize: {#CpuRuntimeBytes}; Hash: "{#CpuRuntimeSha256}"; Flags: external download extractarchive ignoreversion recursesubdirs createallsubdirs; Check: InstallCpuRuntime
+Source: "{#CpuRuntimeUrl}"; DestDir: "{app}"; DestName: "{#CpuRuntimeDestName}"; ExternalSize: {#CpuRuntimeBytes}; Hash: "{#CpuRuntimeSha256}"; Flags: external download extractarchive ignoreversion recursesubdirs createallsubdirs; Check: InstallCpuRuntime
 #include CudaRuntimeFilesIss
 
 ; Model metadata lives with per-user weights and survives uninstall/reinstall.
@@ -251,19 +256,19 @@ begin
     obeying. }
   if (RuntimePage.SelectedValueIndex = 2) and not CudaUsable then
   begin
-    Result := MsgBox(
+    Result := SuppressibleMsgBox(
       '這台電腦目前偵測不到可用的 NVIDIA CUDA 顯示卡。' + #13#10 +
       '仍要下載 GPU (CUDA) 版嗎？要下載 ' + CudaSize + '（' +
       DownloadEstimate(TotalDownloadBytes(True)) + '），而且可能無法啟動。' + #13#10 + #13#10 +
       'No usable NVIDIA CUDA GPU was detected. Install the CUDA runtime anyway?',
       mbConfirmation,
-      MB_YESNO) = IDYES;
+      MB_YESNO, IDYES) = IDYES;
     Exit;
   end;
   { A multi-gigabyte download is worth one explicit confirmation even when the
     GPU is there, so nobody starts it thinking it is a quick install. }
   if InstallCudaRuntime then
-    Result := MsgBox(
+    Result := SuppressibleMsgBox(
       '接下來會下載 GPU (CUDA) runtime，共 ' + CudaSize + '。' + #13#10 +
       '預估時間：' + DownloadEstimate(TotalDownloadBytes(True)) + '。' + #13#10 +
       '這段期間請保持網路連線；中途失敗時按「Try again」會從中斷處續傳。' + #13#10 + #13#10 +
@@ -271,7 +276,7 @@ begin
       '），之後再重新執行安裝程式換成 GPU 版。' + #13#10 + #13#10 +
       'Setup will download ' + CudaSize + ' for the CUDA runtime. Continue?',
       mbConfirmation,
-      MB_YESNO) = IDYES;
+      MB_YESNO, IDYES) = IDYES;
 end;
 
 function InstallCpuRuntime: Boolean;
@@ -405,25 +410,25 @@ begin
     Reason := SelfTestReason(ReportPath, LogPath, ExitCode);
     Passed := RunSelfTest(WorkerPath, ModelPath, ReportPath, LogPath, 'cpu', ExitCode);
     if Passed then
-      MsgBox(
+      SuppressibleMsgBox(
         'GPU 自我測試失敗，但 CPU 自我測試通過；App 會先用 CPU 運算。' + #13#10 +
         '更新 NVIDIA 驅動程式後重新執行安裝程式即可改用 GPU。' + #13#10 + #13#10 +
         'The GPU self-test failed but the CPU self-test passed; the app will run on the CPU.' + #13#10 +
         'Update the NVIDIA driver and run Setup again to use the GPU.' + #13#10 + #13#10 +
         'GPU error: ' + Reason + #13#10 +
         'Log: ' + LogPath,
-        mbInformation, MB_OK);
+        mbInformation, MB_OK, IDOK);
   end;
   if not Passed then
   begin
     Reason := SelfTestReason(ReportPath, LogPath, ExitCode);
-    if MsgBox(
+    if SuppressibleMsgBox(
         '安裝後的自我測試失敗 / The post-install self-test failed:' + #13#10 +
         Reason + #13#10 + #13#10 +
         '詳細記錄 / Details: ' + LogPath + #13#10 + #13#10 +
         '仍要完成安裝嗎？（問題解決前 App 可能無法分離。）' + #13#10 +
         'Finish the installation anyway? (The app may not separate until this is resolved.)',
-        mbError, MB_YESNO) = IDNO then
+        mbError, MB_YESNO, IDNO) = IDNO then
       RaiseException(
         'The post-install PyTorch/HTDemucs self-test failed: ' + Reason);
   end;
@@ -433,11 +438,11 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    if MsgBox(
+    if SuppressibleMsgBox(
       'Also delete downloaded models, settings, cache, and local logs?' + #13#10 +
       'Exported audio and video files will not be deleted.',
       mbConfirmation,
-      MB_YESNO) = IDYES then
+      MB_YESNO, IDNO) = IDYES then
       DelTree(ExpandConstant('{localappdata}\{#AppName}'), True, True, True);
   end;
 end;

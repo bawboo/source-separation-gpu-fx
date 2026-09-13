@@ -66,32 +66,37 @@ git tag -a v0.1.0 -m "HTDemucs GPU FX v0.1.0"
 git push origin v0.1.0
 ```
 
-## 4. Create a draft release and upload runtimes
+## 4. Upload the runtime to the download host
 
-Using GitHub CLI keeps the large uploads resumable from a terminal and avoids
-accidentally putting binaries into Git history.
+**The runtime does not go on the GitHub release.** Measured from a 80 Mbit
+line, GitHub release downloads run at ~0.46 MB/s while a CDN gives ~9 MB/s —
+the difference between an hour and five minutes on the CUDA runtime, and it is
+the same for any repository, so it is GitHub's serving, not ours. The runtime
+archives and the portable packages live on Hugging Face:
+
+`https://huggingface.co/BAM/music-ssp-fx-runtime`
+
+Files go under a version directory, which is what pins an installer to the
+runtime it was built against (together with the SHA-256 baked into the
+installer, which every download is verified against).
 
 ```powershell
-gh auth login
-git ls-remote --exit-code --tags origin refs/tags/v0.1.0
-
-gh release create v0.1.0 --draft `
-  --title "HTDemucs GPU FX v0.1.0" `
-  --notes-file .\docs\release-notes-v0.1.0.md
-
-gh release upload v0.1.0 `
-  .\dist\windows-web\runtime-win-x64-cpu-0.1.0.zip `
-  .\dist\windows-web\runtime-win-x64-cuda-core-0.1.0.zip `
-  .\dist\windows-web\runtime-win-x64-cuda-libraries-0.1.0.zip `
-  .\dist\windows-web\runtime-win-x64-cpu-0.1.0.json `
-  .\dist\windows-web\runtime-win-x64-cuda-0.1.0.json `
-  .\dist\windows-web\release-manifest.json
+hf auth whoami   # a token with write permission is required
+hf upload BAM/music-ssp-fx-runtime `
+  .\dist\windows-web\runtime-win-x64-cpu-0.1.0.7z v0.1.0/runtime-win-x64-cpu-0.1.0.7z
 ```
+
+Upload every runtime archive named in the two `runtime-win-x64-*-0.1.0.json`
+manifests, plus the portable packages from `dist\portable\`.
+
+The GitHub release still exists, and is what people link to: it carries the
+Setup, `SHA256SUMS.txt` and the notes, and the notes link to the portable
+downloads.
 
 ## 5. Compile the final web installer
 
-The URL must use the exact tag, not `latest`, so an old installer can never
-silently download a newer incompatible runtime.
+The base URL must name the exact version, never `latest`, so an old installer
+can never silently download a newer incompatible runtime.
 
 The standard Inno Setup install does not ship a Traditional Chinese `.isl`
 file. The current build uses Inno's built-in English wizard language while
@@ -99,7 +104,7 @@ retaining the project's Traditional Chinese GPU/CPU and error messages. A full
 Traditional Chinese wizard must vendor its reviewed `.isl` file in this repo.
 
 ```powershell
-$releaseBaseUrl = 'https://github.com/OWNER/REPOSITORY/releases/download/v0.1.0'
+$releaseBaseUrl = 'https://huggingface.co/BAM/music-ssp-fx-runtime/resolve/main/v0.1.0'
 powershell -ExecutionPolicy Bypass -File .\tools\build_windows_web_installer.ps1 `
   -ReleaseBaseUrl $releaseBaseUrl `
   -Version 0.1.0
@@ -107,16 +112,16 @@ powershell -ExecutionPolicy Bypass -File .\tools\build_windows_web_installer.ps1
 
 The result is:
 
-`dist/windows-web/installer/HTDemucs_GPU_FX_Setup_x64.exe`
+`dist/windows-web/installer/Music_SSP_FX_Setup_x64.exe`
 
-Regenerate checksums so the final Setup is included, then upload both files to
-the same draft release:
+Regenerate checksums so the final Setup is included, then upload it and the
+checksums to the release:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\check_public_repo.ps1 `
   -Version 0.1.0
 gh release upload v0.1.0 `
-  .\dist\windows-web\installer\HTDemucs_GPU_FX_Setup_x64.exe `
+  .\dist\windows-web\installer\Music_SSP_FX_Setup_x64.exe `
   .\dist\windows-web\SHA256SUMS.txt
 ```
 

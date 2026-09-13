@@ -53,13 +53,17 @@ $releaseUri = $null
 if (-not [Uri]::TryCreate($baseUrl, [UriKind]::Absolute, [ref]$releaseUri)) {
     throw "ReleaseBaseUrl is not an absolute URL: $baseUrl"
 }
-$expectedPathSuffix = "/releases/download/v$Version"
+# What this guards is that an installer can never be pointed at "latest" and
+# silently pull a runtime it was not built against: the path must name this
+# exact version, and every download is verified against the SHA-256 baked in
+# below. It used to also require github.com, which ruled out hosting the
+# runtime anywhere faster -- GitHub release downloads measured ~0.46 MB/s here
+# against ~9 MB/s from a CDN, which is over an hour of waiting on the CUDA
+# runtime.
 if (-not $AllowNonGitHubUrlForCompileTest -and
     ($releaseUri.Scheme -ne 'https' -or
-     $releaseUri.Host -ne 'github.com' -or
-     -not $releaseUri.AbsolutePath.EndsWith(
-        $expectedPathSuffix, [StringComparison]::OrdinalIgnoreCase))) {
-    throw "ReleaseBaseUrl must be an exact GitHub tag URL ending in $expectedPathSuffix"
+     -not ($releaseUri.AbsolutePath -match "(^|/)v?$([regex]::Escape($Version))(/|$)"))) {
+    throw "ReleaseBaseUrl must be an https URL whose path names version $Version"
 }
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $distRoot 'installer'
@@ -90,7 +94,8 @@ $lines = @(
 )
 $index = 0
 foreach ($archive in $cudaArchives) {
-    $destName = "runtime-win-x64-cuda-$index.zip"
+    # Keep the packager's extension: Inno picks the extractor from it.
+    $destName = "runtime-win-x64-cuda-$index$([IO.Path]::GetExtension($archive.archive))"
     $lines += ('Source: "{0}/{1}"; DestDir: "{{app}}"; DestName: "{2}"; ' +
         'ExternalSize: {3}; Hash: "{4}"; Flags: external download extractarchive ' +
         'ignoreversion recursesubdirs createallsubdirs; Check: InstallCudaRuntime') -f
@@ -106,6 +111,7 @@ $defines = @(
     "/DOutputDirectory=$OutputDirectory",
     "/DCudaRuntimeFilesIss=$cudaFilesIss",
     "/DCpuRuntimeUrl=$baseUrl/$($cpuRuntime.archive)",
+    "/DCpuRuntimeDestName=runtime-win-x64-cpu$([IO.Path]::GetExtension($cpuRuntime.archive))",
     "/DCpuRuntimeBytes=$($cpuRuntime.bytes)",
     "/DCpuRuntimeSha256=$($cpuRuntime.sha256)",
     # The wizard quotes the real download size of each choice, so it has to

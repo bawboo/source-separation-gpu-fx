@@ -3,7 +3,19 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.IO.Compression.FileSystem
+$found = Get-Command 7z.exe -ErrorAction SilentlyContinue
+$SevenZip = if ($null -ne $found) {
+    $found.Source
+} else {
+    @((Join-Path $env:ProgramFiles '7-Zip\7z.exe'),
+      (Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe')) |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+        Select-Object -First 1
+}
+if ([string]::IsNullOrWhiteSpace($SevenZip) -or
+    -not (Test-Path -LiteralPath $SevenZip -PathType Leaf)) {
+    throw '7z.exe was not found; it is needed to inspect the runtime archives.'
+}
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $distRoot = Join-Path $projectRoot 'dist\windows-web'
 $payloadRoot = Join-Path $projectRoot 'build\windows-web\payload'
@@ -86,25 +98,43 @@ foreach ($flavor in @('cpu', 'cuda')) {
             throw "$flavor runtime SHA-256 mismatch: $($archiveMetadata.archive)"
         }
 
-        $archive = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
-        try {
-            $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\','/') })
-            if ($names | Where-Object {
-                $_.StartsWith('/') -or $_ -match '(^|/)\.\.(/|$)'
-            }) {
-                throw "$flavor runtime archive contains an unsafe path"
-            }
-            if ($names | Where-Object { $_.EndsWith('.th') }) {
-                throw "$flavor runtime archive contains model weights"
-            }
-            $duplicates = @($names | Where-Object { $_ -in $allNames })
-            if ($duplicates) {
-                throw "$flavor runtime archives contain duplicate paths: $($duplicates -join ', ')"
-            }
-            $allNames += $names
-        } finally {
-            $archive.Dispose()
+        # Listed with 7-Zip rather than System.IO.Compression: the runtime is
+        # packed as .7z now, and 7z reads the old .zip too, so this keeps
+        # working either way.
+        $listing = & $SevenZip l -ba -slt $archivePath
+        if ($LASTEXITCODE -ne 0) {
+            throw "7z.exe could not list $($archiveMetadata.archive)"
         }
+        $entryPaths = @()
+        $currentPath = $null
+        foreach ($line in $listing) {
+            if ($line -match '^Path = (.+)$') {
+                $currentPath = $Matches[1]
+            } elseif ($line -match '^Attributes = (.*)$') {
+                # Directory entries carry a D attribute and hold no content.
+                if ($null -ne $currentPath -and $Matches[1] -notmatch 'D') {
+                    $entryPaths += $currentPath
+                }
+                $currentPath = $null
+            }
+        }
+        if ($entryPaths.Count -eq 0) {
+            throw "$flavor runtime archive listed no files: $($archiveMetadata.archive)"
+        }
+        $names = @($entryPaths | ForEach-Object { $_.Replace('\','/') })
+        if ($names | Where-Object {
+            $_.StartsWith('/') -or $_ -match '(^|/)\.\.(/|$)'
+        }) {
+            throw "$flavor runtime archive contains an unsafe path"
+        }
+        if ($names | Where-Object { $_.EndsWith('.th') }) {
+            throw "$flavor runtime archive contains model weights"
+        }
+        $duplicates = @($names | Where-Object { $_ -in $allNames })
+        if ($duplicates) {
+            throw "$flavor runtime archives contain duplicate paths: $($duplicates -join ', ')"
+        }
+        $allNames += $names
         $releaseAssets += [ordered]@{
             file = $archiveMetadata.archive
             role = $archiveMetadata.role
