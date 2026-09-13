@@ -40,34 +40,51 @@ if ($violations) {
 
 $textExtensions = @('.cpp', '.h', '.py', '.ps1', '.cmd', '.iss', '.md', '.txt', '.json', '.yaml', '.yml', '.xml')
 $identityPattern = '(?i)C:[\\/]+Users[\\/]+[^\\/]+(?:[\\/]|$)|/Users/[^/]+(?:/|$)|Documents[\\/]+Codex|AppData[\\/]+Local[\\/]+Temp'
+# A regex that looks for user paths necessarily contains one, so the packaging
+# scripts that run this same guard -- and this file -- matched themselves and
+# the audit could never pass. Skip lines that are a character class rather than
+# a path, and vendored third-party trees, which are upstream's to sanitise.
+$patternDefinition = '\[\\{1,2}/\]'
 $identityHits = @()
 foreach ($relative in $candidates) {
     $path = Join-Path $projectRoot $relative
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         continue
     }
+    if ($relative.Replace([char]92, '/').StartsWith('third_party/')) {
+        continue
+    }
     if ([IO.Path]::GetExtension($path).ToLowerInvariant() -notin $textExtensions) {
         continue
     }
-    $match = Select-String -LiteralPath $path -Pattern $identityPattern -List
-    if ($match) {
-        $identityHits += $relative
+    $matches = @(Select-String -LiteralPath $path -Pattern $identityPattern |
+        Where-Object { $_.Line -notmatch $patternDefinition })
+    if ($matches.Count -gt 0) {
+        $identityHits += "$relative : $($matches[0].Line.Trim())"
     }
 }
 if ($identityHits) {
     throw "Machine-identifying text found:`n$($identityHits -join [Environment]::NewLine)"
 }
 
-$expectedAssets = @(
-    "runtime-win-x64-cpu-$Version.zip",
-    "runtime-win-x64-cuda-core-$Version.zip",
-    "runtime-win-x64-cuda-libraries-$Version.zip",
+# The runtime archives come from the manifests rather than a hand-written list:
+# the CUDA runtime is split into as many volumes as the 2 GiB asset limit needs,
+# and a fixed list silently stopped covering the third one.
+$archiveNames = @()
+foreach ($flavor in @('cpu', 'cuda')) {
+    $manifestName = "runtime-win-x64-$flavor-$Version.json"
+    $manifestPath = Join-Path $distRoot $manifestName
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+        throw "Expected release asset is missing: $manifestPath"
+    }
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding utf8 | ConvertFrom-Json
+    $archiveNames += @($manifest.archives | ForEach-Object { $_.archive })
+}
+$requiredNames = @($archiveNames) + @(
     "runtime-win-x64-cpu-$Version.json",
     "runtime-win-x64-cuda-$Version.json",
-    'release-manifest.json'
-)
-$assetPaths = @()
-foreach ($name in $expectedAssets) {
+    'release-manifest.json')
+foreach ($name in $requiredNames) {
     $path = Join-Path $distRoot $name
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Expected release asset is missing: $path"
@@ -75,18 +92,32 @@ foreach ($name in $expectedAssets) {
     if ((Get-Item -LiteralPath $path).Length -ge 2GB) {
         throw "Release asset exceeds GitHub's 2 GiB per-file limit: $path"
     }
-    $assetPaths += $path
 }
-$installerPath = Join-Path $distRoot 'installer\HTDemucs_GPU_FX_Setup_x64.exe'
-if (Test-Path -LiteralPath $installerPath -PathType Leaf) {
-    $assetPaths += $installerPath
+
+# Checksum what is actually published: the runtime archives, the installer and
+# the portable packages. The manifests are build inputs, not download targets.
+$assetPaths = @($archiveNames | ForEach-Object { Join-Path $distRoot $_ })
+$installerPath = Join-Path $distRoot 'installer\Music_SSP_FX_Setup_x64.exe'
+if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
+    throw "Expected release asset is missing: $installerPath"
+}
+$assetPaths += $installerPath
+$portableRoot = Join-Path $projectRoot 'dist\portable'
+if (Test-Path -LiteralPath $portableRoot -PathType Container) {
+    $assetPaths += @(Get-ChildItem -LiteralPath $portableRoot -File `
+        -Filter "Music_SSP_FX_Portable_win64_*-$Version*.zip" | ForEach-Object FullName)
+}
+foreach ($path in $assetPaths) {
+    if ((Get-Item -LiteralPath $path).Length -ge 2GB) {
+        throw "Release asset exceeds GitHub's 2 GiB per-file limit: $path"
+    }
 }
 
 $checksumPath = Join-Path $distRoot 'SHA256SUMS.txt'
 $checksumLines = @($assetPaths | ForEach-Object {
     $hash = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
     "$hash  $([IO.Path]::GetFileName($_))"
-})
+} | Sort-Object)
 $checksumLines | Set-Content -LiteralPath $checksumPath -Encoding ascii
 
 Write-Output 'public_repo_audit=PASS'
