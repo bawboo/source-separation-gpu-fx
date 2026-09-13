@@ -6030,9 +6030,13 @@ private:
         vocalsOnlyButton_.setEnabled(quickExportReady);
         accompanyOnlyButton_.setEnabled(quickExportReady);
         panelSwitchButton_.setEnabled(!busy && !pendingQuickExport_.has_value());
+        // Not gated on an installed checkpoint, for the same reason the quick
+        // exports are not: beginSeparation() fetches a missing HTDemucs one and
+        // resumes by itself, and a RoFormer mode does not use this combo's
+        // model at all -- so the check disabled the button over a file the run
+        // would never have opened. Pressing it either starts or says why.
         separateButton_.setEnabled(
-            !recording && !busy && processor_.getRecordedSeconds() > 0.0 &&
-            processor_.isModelInstalled(modelBox_.getText()));
+            !recording && !busy && processor_.getRecordedSeconds() > 0.0);
         exportButton_.setEnabled(!recording && !busy && processor_.hasPreview());
         // Only the advanced panel lays the Cancel button out; the simple
         // panel cancels with Esc.

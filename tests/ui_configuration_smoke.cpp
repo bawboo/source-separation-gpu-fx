@@ -944,6 +944,16 @@ int run() {
                     [&] { return bareVocals->isEnabled() && bareAccompany->isEnabled(); },
                     std::chrono::seconds(3)),
                 "the quick exports are disabled when the default checkpoint is missing");
+        // Same for the advanced panel's Separate button: it starts the run that
+        // downloads the checkpoint, so gating it on that checkpoint left the
+        // panel with nothing to press either.
+        auto* barePanelSwitch = findButton(bareComponents, htfx::tr("button.advancedPanel"));
+        require(barePanelSwitch != nullptr, "the panel switch is missing without a checkpoint");
+        barePanelSwitch->onClick();
+        auto* bareSeparate = findButton(bareComponents, htfx::tr("button.separate"));
+        require(bareSeparate != nullptr, "the Separate button is missing without a checkpoint");
+        require(waitUntil([&] { return bareSeparate->isEnabled(); }, std::chrono::seconds(3)),
+                "Separate is disabled when the default checkpoint is missing");
         bareEditor.reset();
         bare->releaseResources();
         bare.reset();
