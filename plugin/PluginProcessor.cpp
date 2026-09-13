@@ -3261,6 +3261,18 @@ void HTDemucsGpuFXAudioProcessor::quickExportLoop(
             }
         }
 
+        // Apply the output gain the preview is already playing through, so
+        // what the user heard is what lands in the file. The stem faders stay
+        // out of it: a vocals-only export is one stem, not the mix those
+        // faders describe. At the default 0 dB this changes nothing.
+        const float trim = currentMixSettings().outputTrim;
+        if (trim != 1.0f) {
+            for (std::size_t sample = 0; sample < sampleCount; ++sample) {
+                outputLeft[sample] *= trim;
+                outputRight[sample] *= trim;
+            }
+        }
+
         juce::String error;
         if (!writeFloatWav(
                 outputFile,
@@ -4381,7 +4393,8 @@ public:
         separationModeCategories_ = separationModeCategories;
         for (const auto& category : separationModeCategories) {
             separationModeBox_.addItem(
-                category.substring(0, 1).toUpperCase() + category.substring(1),
+                htfx::glossed(category.substring(0, 1).toUpperCase() +
+                              category.substring(1)),
                 separationModeBox_.getNumItems() + 1);
         }
         separationModeBox_.onChange = [this] { onSeparationModeChanged(); };
@@ -4413,7 +4426,8 @@ public:
         constexpr std::array<const char*, HTDemucsGpuFXAudioProcessor::kMaxSources>
             stemIds{"drumsGain", "bassGain", "otherGain", "vocalsGain", "guitarGain", "pianoGain"};
         for (std::size_t index = 0; index < stemSliders_.size(); ++index) {
-            stemLabels_[index].setText(stemNames[index], juce::dontSendNotification);
+            stemLabels_[index].setText(
+                htfx::glossed(stemNames[index]), juce::dontSendNotification);
             stemLabels_[index].setName("stemLabel" + juce::String(static_cast<int>(index)));
             stemLabels_[index].setJustificationType(juce::Justification::centredRight);
             stemSliders_[index].setSliderStyle(juce::Slider::LinearHorizontal);
@@ -4854,7 +4868,7 @@ public:
                 continue;
             }
             auto row = area.removeFromTop(28);
-            stemLabels_[index].setBounds(row.removeFromLeft(100));
+            stemLabels_[index].setBounds(row.removeFromLeft(160));
             stemSliders_[index].setBounds(row);
         }
         auto outputRow = area.removeFromTop(28);
@@ -5239,6 +5253,22 @@ private:
         };
         relabel(separationModeBox_, {{1, htfx::tr("combo.separationMode4Stem")},
                                      {2, htfx::tr("combo.separationMode6Stem")}});
+        // The RoFormer categories carry a Chinese gloss in the Chinese UI, so
+        // they have to be rewritten on a language change like everything else.
+        {
+            const int selectedId = separationModeBox_.getSelectedId();
+            for (int index = 0; index < separationModeCategories_.size(); ++index) {
+                const auto& category = separationModeCategories_[index];
+                separationModeBox_.changeItemText(
+                    index + 3,
+                    htfx::glossed(category.substring(0, 1).toUpperCase() +
+                                  category.substring(1)));
+            }
+            if (selectedId != 0) {
+                separationModeBox_.setSelectedId(0, juce::dontSendNotification);
+                separationModeBox_.setSelectedId(selectedId, juce::dontSendNotification);
+            }
+        }
         relabel(modeBox_, {{1, htfx::tr("combo.modeRecord")},
                            {2, htfx::tr("combo.modeRealtime")}});
         relabel(roformerCategoryBox_, {{1, htfx::tr("combo.roformerAllCategories")}});
@@ -5860,7 +5890,14 @@ private:
         constexpr std::array<const char*, HTDemucsGpuFXAudioProcessor::kMaxSources>
             defaultStemNames{"Drums", "Bass", "Other", "Vocals", "Guitar", "Piano"};
         if (roformerMode) {
-            const auto names = roformerStemDisplayNames(separationModeBox_.getText());
+            // The combo shows a glossed name ("Vocals（人聲）"); the category
+            // is the untranslated one this row was built from.
+            const int categoryIndex = separationModeBox_.getSelectedItemIndex() - 2;
+            const auto category =
+                categoryIndex >= 0 && categoryIndex < separationModeCategories_.size()
+                    ? separationModeCategories_[categoryIndex]
+                    : juce::String{};
+            const auto names = roformerStemDisplayNames(category);
             juce::String first(names.first);
             juce::String second(names.second);
             // Prefer the separated result's own stem ids: they are the only
@@ -5880,12 +5917,12 @@ private:
                     second = fromResult1;
                 }
             }
-            stemLabels_[0].setText(first, juce::dontSendNotification);
-            stemLabels_[1].setText(second, juce::dontSendNotification);
+            stemLabels_[0].setText(htfx::glossed(first), juce::dontSendNotification);
+            stemLabels_[1].setText(htfx::glossed(second), juce::dontSendNotification);
         } else {
             for (std::size_t index = 0; index < stemLabels_.size(); ++index) {
                 stemLabels_[index].setText(
-                    defaultStemNames[index], juce::dontSendNotification);
+                    htfx::glossed(defaultStemNames[index]), juce::dontSendNotification);
             }
         }
         for (std::size_t index = 0; index < stemSliders_.size(); ++index) {

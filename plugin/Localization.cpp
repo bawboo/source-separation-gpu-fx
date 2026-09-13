@@ -378,12 +378,14 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
          StringPair{u8"請選擇不同的輸出檔名；匯入的來源檔案受保護",
                     u8"Choose a different output name; the imported source "
                     "is protected"}},
+        // The quick exports write the separated stem with the output gain
+        // applied, so the file matches what the preview plays.
         {"status.exportingVocalsOriginalLevel",
-         StringPair{u8"正在以 Demucs 原始音量匯出人聲",
-                    u8"Exporting vocals at original Demucs level"}},
+         StringPair{u8"正在匯出人聲（套用輸出增益）",
+                    u8"Exporting vocals (output gain applied)"}},
         {"status.exportingAccompanyOriginalLevel",
-         StringPair{u8"正在以 Demucs 原始音量匯出伴奏",
-                    u8"Exporting accompaniment at original Demucs level"}},
+         StringPair{u8"正在匯出伴奏（套用輸出增益）",
+                    u8"Exporting accompaniment (output gain applied)"}},
         {"status.quickExportCancelled",
          StringPair{u8"快速匯出已取消", u8"Quick export cancelled"}},
         {"status.separateBeforeExportingMix",
@@ -501,6 +503,61 @@ void Localization::setLanguage(Language language) {
     const auto file = settingsFile();
     file.getParentDirectory().createDirectory();
     file.replaceWithText(tagFromLanguage(language));
+}
+
+namespace {
+
+// English separation-mode and stem names to their Chinese meaning. Keyed on
+// the lowercased English name so both the mode list and the fader labels --
+// which derive their names independently, one from the catalogue's category
+// and one from the stem ids the worker reports -- resolve through one table.
+const std::unordered_map<std::string, juce::String>& glossTable() {
+    static const std::unordered_map<std::string, juce::String> table{
+        // separation modes / RoFormer categories
+        {"vocals", u8"人聲"},
+        {"instrumental", u8"伴奏"},
+        {"karaoke", u8"卡拉 OK"},
+        {"guitar", u8"吉他"},
+        {"denoise", u8"去噪"},
+        {"dereverb", u8"去混響"},
+        {"aspiration", u8"氣音"},
+        {"crowd", u8"群聲"},
+        // stems that only appear on the faders
+        {"residual", u8"其餘"},
+        {"target", u8"目標"},
+        {"clean", u8"乾淨"},
+        {"noise", u8"雜訊"},
+        {"dry", u8"無混響"},
+        {"reverb", u8"混響"},
+        {"bleed", u8"串音"},
+        // HTDemucs stems
+        {"drums", u8"鼓"},
+        {"bass", u8"貝斯"},
+        {"other", u8"其他"},
+        {"piano", u8"鋼琴"},
+    };
+    return table;
+}
+
+}  // namespace
+
+juce::String glossFor(const juce::String& englishName) {
+    if (Localization::instance().getLanguage() != Language::zhTW) {
+        return {};
+    }
+    const auto& table = glossTable();
+    const auto entry = table.find(englishName.trim().toLowerCase().toStdString());
+    return entry == table.end() ? juce::String{} : entry->second;
+}
+
+juce::String glossOpen() {
+    return juce::String(u8"（");
+}
+
+juce::String glossed(const juce::String& englishName) {
+    const auto gloss = glossFor(englishName);
+    return gloss.isEmpty() ? englishName
+                           : englishName + glossOpen() + gloss + juce::String(u8"）");
 }
 
 juce::String Localization::tr(const juce::String& key) const {

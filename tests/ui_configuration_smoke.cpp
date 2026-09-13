@@ -378,7 +378,7 @@ int run() {
     juce::String roformerStemLabelSummary;
     int expectedVocalsMode = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
-        if (separationMode->getItemText(index) == "Vocals") {
+        if (separationMode->getItemText(index) == htfx::glossed("Vocals")) {
             expectedVocalsMode = index;
             break;
         }
@@ -500,7 +500,7 @@ int run() {
 
     int vocalsModeIndex = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
-        if (separationMode->getItemText(index) == "Vocals") {
+        if (separationMode->getItemText(index) == htfx::glossed("Vocals")) {
             vocalsModeIndex = index;
             break;
         }
@@ -566,15 +566,25 @@ int run() {
                 "no RoFormer result to check the stem fader labels against");
         const juce::String stem0(result->stemLabels[0].c_str());
         const juce::String stem1(result->stemLabels[1].c_str());
+        // Labels carry the Chinese meaning after the English name, e.g.
+        // "Vocals（人聲）"; the English half is what names the stem.
+        const auto englishOf = [](const juce::String& label) {
+            return label.upToFirstOccurrenceOf(htfx::glossOpen(), false, false).trim();
+        };
         require(waitUntil(
                     [&] {
-                        return stemSliderLabel0->getText().equalsIgnoreCase(stem0) &&
-                               stemSliderLabel1->getText().equalsIgnoreCase(stem1);
+                        return englishOf(stemSliderLabel0->getText()).equalsIgnoreCase(stem0) &&
+                               englishOf(stemSliderLabel1->getText()).equalsIgnoreCase(stem1);
                     },
                     std::chrono::seconds(3)),
                 "the stem faders are not labelled with the stems they control");
-        juce::StringArray shown{stemSliderLabel0->getText().toLowerCase(),
-                                stemSliderLabel1->getText().toLowerCase()};
+        // The meaning is appended, never substituted: an English reader must
+        // still see the model's own name for the stem.
+        require(stemSliderLabel0->getText() ==
+                    htfx::glossed(englishOf(stemSliderLabel0->getText())),
+                "the stem label is not the glossed form of its English name");
+        juce::StringArray shown{englishOf(stemSliderLabel0->getText()).toLowerCase(),
+                                englishOf(stemSliderLabel1->getText()).toLowerCase()};
         shown.sort(false);
         require(shown.joinIntoString("/") == "instrumental/vocals",
                 "a Vocals separation must present a vocals and an instrumental fader");
@@ -585,7 +595,7 @@ int run() {
 
     int guitarModeIndex = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
-        if (separationMode->getItemText(index) == "Guitar") {
+        if (separationMode->getItemText(index) == htfx::glossed("Guitar")) {
             guitarModeIndex = index;
             break;
         }
@@ -610,7 +620,8 @@ int run() {
     require(!model->isEnabled() && !model->isVisible(),
             "D2: RoFormer Guitar mode did not keep the Demucs model combo "
             "disabled/hidden");
-    require(stemSliderLabel0->getText() == "Guitar" && stemSliderLabel1->getText() == "Residual",
+    require(stemSliderLabel0->getText() == htfx::glossed("Guitar") &&
+                stemSliderLabel1->getText() == htfx::glossed("Residual"),
             "RoFormer Guitar mode did not relabel the stem sliders to "
             "Guitar/Residual");
 
@@ -626,7 +637,8 @@ int run() {
                 !guitarSlider->isVisible() && !pianoSlider->isVisible(),
             "B3: returning to 4-stem separation did not restore its four stem "
             "sliders and re-hide the 6-stem-only pair");
-    require(stemSliderLabel0->getText() == "Drums" && stemSliderLabel1->getText() == "Bass",
+    require(stemSliderLabel0->getText() == htfx::glossed("Drums") &&
+                stemSliderLabel1->getText() == htfx::glossed("Bass"),
             "returning to 4-stem separation did not restore the Drums/Bass "
             "stem slider labels");
     require(waitUntil(
@@ -678,7 +690,11 @@ int run() {
     // uniform 2-stem slider gating are verified for all ten categories, not
     // just the two hand-picked ones.
     for (int modeIndex = 2; modeIndex < separationMode->getNumItems(); ++modeIndex) {
-        const auto category = separationMode->getItemText(modeIndex);
+        // The mode list shows "Vocals（人聲）"; the browser's own category
+        // filter keeps the catalogue's raw id, so compare the English half.
+        const auto category = separationMode->getItemText(modeIndex)
+                                  .upToFirstOccurrenceOf(htfx::glossOpen(), false, false)
+                                  .trim();
         separationMode->setSelectedItemIndex(modeIndex, juce::sendNotificationSync);
         require(waitUntil(
                     [&] {

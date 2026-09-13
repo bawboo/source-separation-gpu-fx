@@ -142,11 +142,29 @@ int run(bool cpu) {
     setParameter(processor->parameters(), "bypass", 1.0f);
     const double bypassEnergy = renderPreview();
 
+    // The output gain has to be audible in the preview, otherwise there is no
+    // way to tell what an export will come out at before making it.
+    setParameter(processor->parameters(), "bypass", 0.0f);
+    for (const auto* id : stemIds) {
+        setParameter(processor->parameters(), id, 0.0f);
+    }
+    const double unityTrimEnergy = renderPreview();
+    setParameter(processor->parameters(), "outputTrim", -12.0f);
+    const double trimmedEnergy = renderPreview();
+    setParameter(processor->parameters(), "outputTrim", 0.0f);
+    // -12 dB is x0.251 in amplitude, so x0.063 in energy. Allow a wide band:
+    // what matters is that the fader moves the preview at roughly its own size.
+    const bool outputTrimPassed =
+        unityTrimEnergy > 1.0e-8 &&
+        trimmedEnergy < unityTrimEnergy * 0.12 &&
+        trimmedEnergy > unityTrimEnergy * 0.02;
+
     const bool mixControlsPassed =
         fullMixEnergy > 1.0e-8 &&
         mutedStemEnergy < fullMixEnergy * 0.10 &&
         bypassEnergy > mutedStemEnergy * 5.0;
-    const bool passed = mixControlsPassed && !processor->isPreviewPlaying() &&
+    const bool passed = mixControlsPassed && outputTrimPassed &&
+                        !processor->isPreviewPlaying() &&
                         processor->getInputOverruns() == 0 &&
                         processor->getOutputUnderruns() == 0;
     std::cout << "backend=" << (cpu ? "cpu" : "auto")
@@ -157,7 +175,10 @@ int run(bool cpu) {
               << " full_mix_energy=" << fullMixEnergy
               << " muted_stem_energy=" << mutedStemEnergy
               << " bypass_original_energy=" << bypassEnergy
-              << " mix_controls=" << std::boolalpha << mixControlsPassed
+              << " unity_trim_energy=" << unityTrimEnergy
+              << " trimmed_energy=" << trimmedEnergy
+              << " output_trim_follows_preview=" << std::boolalpha << outputTrimPassed
+              << " mix_controls=" << mixControlsPassed
               << " status=" << processor->getRecordStatusText()
               << " PASS=" << std::boolalpha << passed << '\n';
     processor->releaseResources();
