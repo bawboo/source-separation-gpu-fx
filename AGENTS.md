@@ -17,7 +17,8 @@ worker 中執行，不在 audio callback 內跑模型。
   worker（不走 IPC），按需下載並驗證 SHA-256（checkpoint 與 config 都驗），
   滾動快取上限 3 個。**新增模型先進 manifest，再決定是否進目錄。**
 
-GitHub：`bawboo/source-separation-gpu-fx`（private）
+GitHub：`bawboo/source-separation-gpu-fx`（**public**）。Release 資產必須能被未登入的
+使用者直接下載——安裝程式就是靠這點抓 runtime，不帶任何認證。
 
 ## 重要目錄
 
@@ -29,8 +30,8 @@ GitHub：`bawboo/source-separation-gpu-fx`（private）
 | `tests/` | smoke tests 與端到端驗收工具（`goal_check`） |
 | `tools/` | 建置、封裝、驗證腳本 |
 | `third_party/JUCE` | vendored JUCE 8.0.13，**已套用** `patches/juce-8.0.13-htfx.patch` |
-| `assets/models/*.th` | **私人**預訓練權重（僅本機使用） |
-| `dist/windows-web/*.zip` | **私人**CPU/CUDA runtime |
+| `assets/models/*.th` | 預訓練權重，**不散布**（僅本機使用） |
+| `dist/windows-web/`、`dist/portable/` | 發行資產（runtime 封存檔、安裝檔、免安裝包），不進 Git 但會上傳 Release |
 | `.loop/` | 自主開發迴圈的計畫、逐輪紀錄與教訓（`LESSONS.md` 必讀） |
 
 ## 發行體積的硬性原則
@@ -48,8 +49,13 @@ GitHub：`bawboo/source-separation-gpu-fx`（private）
 
 ## 不可任意變更的部分
 
-- **私人資產禁令**：`assets/models/*.th` 與 `dist/windows-web/*.zip` 禁止加入
-  Git history、上傳 GitHub 或任何公開空間。Release 資產也不得包含它們。
+- **權重不散布**：`assets/models/*.th` 禁止加入 Git history、上傳 GitHub 或任何公開
+  空間，Release 資產也不得包含（見 `THIRD_PARTY_NOTICES.md`，此項已由「一律不散布」
+  結案）。模型一律由 App 首次使用時下載並驗 SHA-256。
+- **建置產物不進 Git**：`dist/`、`build/` 由 `.gitignore` 擋住，不得繞過。其中
+  `dist/windows-web/*.zip` 與 `dist/portable/*.zip` 是**發行資產**，發 Release 時就是要
+  上傳它們（web 安裝程式從 release 下載 runtime，這是設計的一部分）；它們不進 Git 是
+  因為體積，不是因為保密。
 - 未經使用者明確指示，不得 push、設定 git remote、建立公開 repo 或發佈 Release。
 - 不覆蓋 `third_party/JUCE`、`third_party/demucs`、模型與 runtime；JUCE patch 狀態
   由 `tools/apply_dependency_patches.ps1` 冪等維護。
