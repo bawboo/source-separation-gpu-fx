@@ -266,8 +266,15 @@ may degrade」——要看安裝日誌，它已經把答案告訴你了。`-ms=o
   （清單對、敘述錯），作者自己讀不出來，因為會自動用對的那一半去理解錯的那一半。
 - SIGN (macos, 文件驗證): 本機建置的 `.app` **沒有 quarantine 旗標**，所以雙擊直接開、
   Gatekeeper 那一步在開發機上**完全不會發生**——照著走會得到「這步通過」但其實沒被測到。
-  要驗它必須手動模擬從網路收到：
+  要模擬從網路收到：
   `xattr -w com.apple.quarantine "0083;$(printf %x $(date +%s));Safari;" <app>`，
-  之後 `spctl -a -vv` 應回 `rejected`、`open` 應被擋。驗完 `xattr -d com.apple.quarantine` 還原。
-  但**「系統設定」裡的實際措辭與位置仍然驗不到**（需要 GUI），那部分只能標成未驗證，
-  不要憑印象寫進給使用者的文件。
+  驗完 `xattr -d com.apple.quarantine` 還原。
+  **但「被擋下來」這個預期本身在 macOS 26 上不成立**：全新安裝、從未開啟、開啟前就標記 quarantine，
+  `spctl -a -vv` 回 `rejected`，`open` 仍然**啟動成功**——macOS 走 **App Translocation**，
+  把它複製到 `/private/var/folders/.../AppTranslocation/<uuid>/d/` 這個隨機唯讀路徑再執行，
+  而且 quarantine 旗標不會被移除（代表沒有經過任何核可）。
+  **連帶的坑：用 `pgrep -f "<原路徑>"` 判斷「有沒有啟動」會漏掉被搬移的程序**，
+  於是看到空結果就誤判成「被擋下來了」——本輪我就是這樣錯了一次，
+  要用 `ps -Ao pid,command | grep <app 名稱>` 這種不綁路徑的方式找。
+  Finder 雙擊是否與 `open(1)` 一致仍未驗（需要 GUI）。所以**給使用者的文件不要斷言會被擋**，
+  要寫成「如果被擋…如果直接開起來就跳過」，兩種結果都讓他知道自己在正軌上。
