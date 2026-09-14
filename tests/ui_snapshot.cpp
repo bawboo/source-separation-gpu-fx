@@ -18,6 +18,7 @@
 #endif
 
 #include <chrono>
+#include <cstdlib>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -82,6 +83,32 @@ bool snapshot(juce::Component& editor, const juce::File& file) {
     return ok;
 }
 
+void setEnvironmentVariable(const char* name, const juce::String& value) {
+#ifdef _WIN32
+    _wputenv_s(juce::String(name).toWideCharPointer(), value.toWideCharPointer());
+#else
+    ::setenv(name, value.toRawUTF8(), 1);
+#endif
+}
+
+// Point the persisted UI preferences at throwaway files. Without this the
+// snapshots render whatever the developer last left in the real app: the
+// first run of this tool on the Mac came back with High quality selected,
+// because someone had tried Karaoke by hand and ui-startup.txt remembered it.
+// A screenshot tool that reports the machine's state instead of the default
+// state cannot be used to review a default.
+void isolateUiPreferences() {
+    const auto temp = juce::File::getSpecialLocation(juce::File::tempDirectory);
+    setEnvironmentVariable(
+        "HTFX_UI_LANGUAGE_FILE",
+        temp.getChildFile("htfx-snapshot-language-" + juce::Uuid().toString() + ".txt")
+            .getFullPathName());
+    setEnvironmentVariable(
+        "HTFX_UI_STARTUP_FILE",
+        temp.getChildFile("htfx-snapshot-startup-" + juce::Uuid().toString() + ".txt")
+            .getFullPathName());
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -110,6 +137,9 @@ int main(int argc, char** argv) {
     const juce::File outDir{args[0]};
     outDir.createDirectory();
     const juce::File media = args.size() > 1 ? juce::File{args[1]} : juce::File{};
+
+    // Before the processor is built and before the first Localization access.
+    isolateUiPreferences();
 
     juce::AudioProcessor::setTypeOfNextNewPlugin(juce::AudioProcessor::wrapperType_Standalone);
     auto processor = std::make_unique<Processor>();
