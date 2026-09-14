@@ -42,7 +42,29 @@ numpy<2         ; sys_platform == "darwin" and platform_machine == "x86_64"
 
 一台 Apple Silicon Mac 就能產出兩份——x86_64 那份透過 Rosetta 2 建置與測試，不需要 Intel 機器。
 
-## 步驟
+## 最快的做法：一個指令
+
+```bash
+git submodule update --init --recursive
+tools/macos_build_everything.sh
+```
+
+它會依序檢查工具、建立兩個 Python 環境、建置 LGPL FFmpeg、凍結並封裝兩份 runtime、
+最後建出 `.app` 並簽章。缺什麼會直接告訴你要執行哪一行安裝指令；中斷後重跑會跳過
+已完成的步驟。
+
+只想先做 Apple Silicon（比較快、不需要 Rosetta）：
+
+```bash
+tools/macos_build_everything.sh --arm64-only
+```
+
+完成後 App 在
+`build/macos/HTDemucsGpuFX_artefacts/Release/Music SSP FX.app`，雙擊即可執行。
+
+下面是同樣流程的逐步版本，只有在上面那支腳本中途失敗、需要單獨重跑某一步時才會用到。
+
+## 逐步（故障排除用）
 
 ### 1. 工具
 
@@ -83,10 +105,20 @@ tools/build_standalone_runtime_macos.sh --python "$(conda run -n htfx-macos-x86 
 腳本從直譯器本身判斷架構，並強制檢查該架構該有的條件（arm64 必須 MPS 可用；x86_64 必須
 torch<2.3 且 numpy<2），因為這兩點錯了都會安靜地產出一個不能用的 runtime。
 
+### 3.5 LGPL FFmpeg
+
+```bash
+tools/build_ffmpeg_lgpl_macos.sh --arch arm64
+tools/build_ffmpeg_lgpl_macos.sh --arch x86_64   # 在 M 系列上交叉編譯
+```
+
+從原始碼建置（FFmpeg 不加 `--enable-gpl` 就是 LGPL），並驗證下載的 tarball 雜湊。
+產物在 `build/ffmpeg-lgpl-macos-<arch>/bin/`。
+
 ### 4. 封裝 runtime
 
 ```bash
-tools/package_macos_runtime.sh --arch arm64 --version 0.0.9 --ffmpeg /path/to/lgpl-ffmpeg/bin
+tools/package_macos_runtime.sh --arch arm64 --version 0.0.9 --ffmpeg build/ffmpeg-lgpl-macos-arm64/bin
 ```
 
 **FFmpeg 必須是 LGPL 的靜態建置**，腳本會擋兩件事：
