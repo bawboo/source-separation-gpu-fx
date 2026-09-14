@@ -16,6 +16,9 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# 與 Windows runtime 內的 melband-roformer-infer 0.1.6 同一個 commit。
+# PyPI 上只發布到 0.1.5，所以這個套件只能從 GitHub 裝。
+ROFORMER_COMMIT=77ff05e6ce533d85439d1e7a52d8316a2987c1b9
 arches=(arm64 x86_64)
 version="dev"
 while [ $# -gt 0 ]; do
@@ -70,11 +73,13 @@ for arch in "${arches[@]}"; do
         conda run -n "$env_name" python -m pip install \
             torch numpy demucs einops soundfile librosa ml_collections beartype
     fi
-    conda run -n "$env_name" python -c 'import mel_band_roformer' 2>/dev/null || {
+    echo "安裝 RoFormer 推論套件（釘住 commit）..."
+    conda run -n "$env_name" python -m pip install \
+        "git+https://github.com/openmirlab/melband-roformer-infer.git@$ROFORMER_COMMIT"
+    conda run -n "$env_name" python -c 'import mel_band_roformer' >/dev/null 2>&1 || {
         echo
-        echo "注意：$env_name 裡沒有 mel_band_roformer（RoFormer 推論套件）。"
+        echo "注意：$env_name 裡的 mel_band_roformer 無法 import。"
         echo "HTDemucs 4/6 軌不受影響，但 RoFormer 的分離模式會無法使用。"
-        echo "取得該套件後，在這個環境裡 pip install 它，再重跑本腳本即可。"
     }
 done
 
