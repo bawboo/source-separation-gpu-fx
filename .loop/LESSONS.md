@@ -135,3 +135,68 @@ may degrade」——要看安裝日誌，它已經把答案告訴你了。`-ms=o
 人按。實測一個「確認下載 1.7 GB 嗎」的對話框把靜默安裝卡了 460 秒。一律用
 `SuppressibleMsgBox` 並想清楚預設答案：會造成損失的預設「否」（刪資料、放行壞掉的安裝），
 純粹確認的預設「是」。
+
+## macOS 移植（2026-09-14，Apple Silicon M1 / macOS 26.2）
+
+- SIGN (macos): `tools/*.sh` 在 Git index 裡是 `100644`（Windows 那邊 commit 時沒帶 exec bit），
+  而 `macos_build_everything.sh` 是用**直接路徑**呼叫其他腳本的，所以第一次執行就 Permission denied。
+  `.gitattributes` 已經防了 CRLF 卻沒防這個。新增 `.sh` 時一併 `git update-index --chmod=+x`。
+- SIGN (macos): PyInstaller 的 torch hook **不收 `torch/bin`**，而 `torch/__init__.py` 在**非 Windows**
+  平台 import 時會呼叫 `_manager_path()` 檢查 `torch/bin/torch_shm_manager`，不存在就 raise
+  （Windows 走 early-return，所以 Windows 腳本可以整個 `rm -rf torch/bin`）。macOS 必須用
+  `--add-binary "<torch>/bin/torch_shm_manager:torch/bin"` **主動加進去**。把 Windows 的刪除行照抄
+  過來是 no-op，不是根因。
+- SIGN (macos): 頂層 `project(... LANGUAGES CXX)` 在 macOS 會讓 CMake **configure 成功、generate 失敗**，
+  錯誤是 `Missing variable is: CMAKE_C_COMPILE_OBJECT`。JUCE 模組在 macOS 帶進 C 來源，而
+  `third_party/JUCE` 自己的 `project(JUCE ... LANGUAGES C CXX)` 只在**它自己的目錄範圍**啟用 C。
+  頂層要宣告 `LANGUAGES C CXX`。Windows 全是 `.cpp` 所以碰不到。
+- SIGN (macos): `std::atomic<std::shared_ptr<T>>`（C++20 P0718 特化）**MSVC STL 有、Apple libc++ 沒有**，
+  於是退回主樣板、以 `is_trivially_copyable` 靜態斷言失敗，並讓整個類別定義失效、連帶噴出 9 個
+  看起來毫不相干的錯（「無法從 X* 初始化 juce::AudioProcessor*」之類）。**只看第一個錯誤**。
+  修法是 `plugin/AtomicSharedPtr.h`：用 `juce::SpinLock` 包一層、保留 `load(order)`/`store(v, order)`
+  介面，呼叫端一行都不用改。不可以用 `std::mutex`——`processBlock` → `processRecordMode` 會讀它。
+- SIGN (macos): macOS 是 **LP64**（`size_t` = `unsigned long`），Windows x64 是 **LLP64**
+  （`size_t` = `unsigned long long`）。所以 `std::min(size_t, uint64_t)` 在 Windows 推導得出來
+  （同一型別）、在 macOS 推導不出來。混用 `size_t` 與 `uint64_t` 的 min/max 一律顯式轉型。
+- SIGN (macos): `juce::File f; f = {};` 在 clang 下對三個 `operator=`（`const String&`／`const File&`／
+  `File&&`）不明確，MSVC 放行。寫 `f = juce::File{}`。
+- SIGN (macos): `torch.device("mps")` 的 index 是 `None`，但**放在 mps 上的張量回報的是 `mps:0`**，
+  而 `torch.device` 比對含 index，所以兩者永遠不相等——`engine.py` 的合約檢查會噴
+  `hop is on mps:0, expected mps`。CUDA 不會，因為 auto 路徑本來就回傳 `cuda:0`；CPU 沒有 index。
+  `resolve_device()` 要把 MPS 正規化成 `torch.device("mps", 0)`。
+- SIGN (macos): 凍結腳本原本只檢查 `--help` 與 `roformer --help`，那**只驗證參數解析**——
+  `--exclude-module cloudpickle` 讓 RoFormer 整條 import 鏈（librosa → joblib → loky →
+  `from cloudpickle import dumps, loads`）在凍結後才斷掉，而兩個 help 檢查照樣通過。
+  已在 `worker_main.py` 加 `--import-check`（實際 import 兩個後端的相依樹），凍結腳本必跑。
+  找「哪些排除的模組其實會被載入」的方法：在 env 裡 import 一次整條鏈，再比對 `sys.modules`。
+- SIGN (macos): POSIX 的 `multiprocessing.resource_tracker` 會用
+  `sys.executable -B -S -I -c "from multiprocessing.resource_tracker import main;main(fd)"`
+  重新啟動自己；凍結後 `sys.executable` 就是 worker，那些參數會撞上我們的 argparse，
+  tracker 死掉、semaphore 洩漏。**`multiprocessing.freeze_support()` 救不了**——它第一行就是
+  `if sys.platform == 'win32'`，非 Windows 直接 return；而 Windows 根本沒有 resource_tracker，
+  所以這個問題只在 macOS/Linux 出現。`worker_main.py` 要自己認出 `-c <含 multiprocessing 的程式碼>`
+  並 exec 它。
+- SIGN (macos): JUCE 把每種格式放進各自的子資料夾，standalone 的 `.app` 在
+  `Release/**Standalone**/<name>.app`，不是 `Release/<name>.app`。
+- SIGN (macos): `macos_build_everything.sh` 原本用「執行檔存在」判斷凍結是否完成，但**失敗的凍結也會
+  留下執行檔**，於是重跑會跳過重凍、拿壞掉的 runtime 去封裝。改用 `runtime-manifest.json`——
+  它是凍結腳本**所有檢查通過後**才寫的，才是誠實的完成標記。
+- SIGN (macos): `goal_check`／`full_feature_check`／`format_matrix_check`／`ui_snapshot` 四支驗收工具
+  對 Windows 的相依**只有**「`<windows.h>`＋`CommandLineToArgvW` 取 UTF-16 argv」那一段，而且四支
+  都已經有 UTF-8 fallback。用 `#ifdef _WIN32` 包起來就能在 macOS 建置執行，不需要改邏輯。
+  另外 `full_feature_check` 的 `bundledFfmpeg()` 寫死 `ffmpeg.exe`／`ffprobe.exe` 與
+  `build/ffmpeg-lgpl/`，macOS 要改成無副檔名並優先找 `Resources/sidecar/Runtime/ffmpeg/bin/ffmpeg`。
+- SIGN (macos): 把驗收工具**複製到 `.app/Contents/MacOS/` 再執行**，`bundledSidecarPath()` 就會解析到
+  和 App 完全一樣的 worker／ffmpeg／sidecar／模型路徑，等於順便驗證了 bundle 的路徑解析，
+  比設一堆 `HTFX_*` 環境變數繞過去有價值。記得 `codesign --force --sign -` 一次。
+- SIGN (macos): 用 **MP4 當來源歌曲**跑 `full_feature_check` 時，所有 frame 數斷言會差固定的樣本數
+  （本例 882 @44.1k＝960 @48k＝20 ms）。**這不是管線缺陷**：App 用 ffmpeg 解碼，匯出長度與 ffmpeg
+  的解碼結果逐 sample 吻合；而測試的期望值是 `inspect()` 用 `juce::AudioFormatManager` 量的，
+  macOS 上那會註冊 `CoreAudioFormat`（所以才讀得了 MP4），兩個解碼器對 AAC 編碼器 padding 的處理不同。
+  換成 WAV 來源就是 17/17 全過。**不要為此放寬門檻**；要改就改成用同一支 ffmpeg 量來源。
+- SIGN (macos): MPS 與 CPU 的分離結果在本機實測**一致到 6 位有效數字**（4 軌與 6 軌皆是）。
+  懷疑 MPS 算錯時，先用 `--backend cpu` 跑同一個輸入對照，再去追 MPS。
+- SIGN (2026-09-14, 非平台相依): 快速匯出的伴奏加總迴圈寫死 `for (int source = 0; source < 4; ...)`，
+  6 軌模型的 guitar(4) 與 piano(5) 永遠不會被加進去。吉他主導的歌實測匯出只有 −48 dBFS，
+  而同一首歌的 4 軌伴奏是 −17 dBFS。改成 `source < result->sourceCount`（4 軌結果的
+  `sourceCount` 就是 4，行為不變）。這個 bug 與 macOS 無關，Windows 同樣存在。
