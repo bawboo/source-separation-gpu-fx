@@ -1228,7 +1228,7 @@ bool HTDemucsGpuFXAudioProcessor::beginRecording() {
         std::shared_ptr<const SeparationResult>{}, std::memory_order_release);
     {
         const juce::ScopedLock lock(mediaMetadataLock_);
-        importedMediaFile_ = {};
+        importedMediaFile_ = juce::File{};
         importedBaseName_ = "recording";
     }
     importedVideo_.store(false, std::memory_order_release);
@@ -1684,11 +1684,16 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
         workerConfig.readyTimeout = std::chrono::minutes(15);
         workerConfig.processTimeout = std::chrono::minutes(30);
 
+        // This names the device that was *asked* for, before the worker has
+        // resolved one. Auto is its own answer and must not claim CUDA: on a
+        // Mac auto resolves to Metal, so the old three-way mapping told every
+        // Apple Silicon user their model was loading on a CUDA GPU. The
+        // vocabulary matches getResolvedDeviceName().
         const auto requestedDevice =
-            configuration.backend == 2
-                ? juce::String{"CPU"}
-                : configuration.backend == 3 ? juce::String{"MPS"}
-                                             : juce::String{"CUDA GPU"};
+            configuration.backend == 1   ? juce::String{"CUDA GPU"}
+            : configuration.backend == 2 ? juce::String{"CPU"}
+            : configuration.backend == 3 ? juce::String{"Apple Metal (MPS)"}
+                                         : juce::String{"Auto"};
         setSeparationMessage(
             htfx::tr("status.loadingModelPrefix") +
             juce::String(configuration.modelName) +
@@ -1864,10 +1869,9 @@ void HTDemucsGpuFXAudioProcessor::processRecordMode(
         const float wet = wetMix_.getNextValue();
         if (playing && result->sampleCount > 0 &&
             cursor < static_cast<double>(result->sampleCount)) {
-            const auto first = (std::min)(
-                static_cast<std::size_t>(cursor),
-                result->sampleCount - 1);
-            const auto second = (std::min)(first + 1, result->sampleCount - 1);
+            const auto lastIndex = static_cast<std::size_t>(result->sampleCount - 1);
+            const auto first = (std::min)(static_cast<std::size_t>(cursor), lastIndex);
+            const auto second = (std::min)(first + 1, lastIndex);
             const float fraction =
                 static_cast<float>(cursor - static_cast<double>(first));
             const auto interpolate =
