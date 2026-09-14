@@ -72,10 +72,28 @@ GitHub：`bawboo/source-separation-gpu-fx`（**public**）。Release 資產必�
   `tools/build_macos.sh --bundle-runtime`。`.app` 產出在
   `build/macos/HTDemucsGpuFX_artefacts/Release/Standalone/Music SSP FX.app`——JUCE 每種格式
   各有子資料夾。`.app` 一律是 universal（`arm64;x86_64`），但裡面放的 runtime 只有本機架構的。
-- **macOS 驗收**：`goal_check`／`full_feature_check`／`format_matrix_check`／`ui_snapshot` 四支都能建。
-  **把它們複製到 `.app/Contents/MacOS/` 再執行**（並 `codesign --force --sign -`），
-  `bundledSidecarPath()` 才會解析到和 App 相同的 worker／ffmpeg／sidecar／模型路徑；
+- **macOS 驗收**：`goal_check`／`full_feature_check`／`format_matrix_check`／`ui_snapshot`／
+  `ui_configuration_smoke` 都能建。**把它們複製到 `.app/Contents/MacOS/` 再執行**，
+  `bundledSidecarPath()` 才會解析到和 App 相同的 worker／ffmpeg／sidecar／模型路徑。
+  完整流程是三步，**第三步不能省**：
+
+  ```bash
+  cp build/macos/<工具> "<App>/Contents/MacOS/"
+  codesign --force --sign - --timestamp=none "<App>/Contents/MacOS/<工具>"   # 讓它跑得起來
+  # ...跑驗收...
+  rm -f "<App>/Contents/MacOS/<工具>" && codesign --force --sign - --timestamp=none "<App>"
+  ```
+
+  只簽那支工具會讓**整包**的簽章失效——`codesign --verify --strict` 報
+  `nested code is modified or invalid`，而 `.app` 本身仍然跑得起來，所以不驗就看不出來。
+  交付前務必 `codesign --verify --strict` 確認一次。
   注意 `build_macos.sh` 不會重建這些工具，改完 `plugin/` 要自己 `cmake --build ... --target <工具>`。
+- **macOS 交付**：壓縮用 `ditto -c -k --keepParent "<App>" <name>.zip`——`zip` 指令不保留
+  簽章與延伸屬性，解開後的 `.app` 會是壞的。
+- **一次只能有一個 `.app`**：arm64 與 Intel 版**同名同路徑**
+  （`build/macos/HTDemucsGpuFX_artefacts/Release/Standalone/Music SSP FX.app`），
+  `tools/build_macos.sh --bundle-runtime --runtime-arch x86_64` 會直接覆蓋掉前一個。
+  做完一個要先搬走再做另一個。
   另有 `htdemucs_posix_ipc_check <worker> <models-dir> [model] [auto|mps|cpu]`，
   單獨驗 `cpp/GpuWorkerClientPosix.cpp` 的共享記憶體 IPC（Windows 的 `gpu_worker_smoke` 用
   `wmain`＋`<windows.h>`，在 macOS 建不起來）。
