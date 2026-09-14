@@ -886,9 +886,11 @@ void HTDemucsGpuFXAudioProcessor::loadRoformerModels() {
                 const bool cpuCapable =
                     !entry->hasProperty("cpu") ||
                     static_cast<bool>(entry->getProperty("cpu"));
-                if (cpuRuntime && !cpuCapable) {
-                    continue;
-                }
+                // Kept even when this runtime cannot use it: the mode list
+                // shows it greyed out with the reason, which tells a CPU user
+                // the feature exists and what it needs. Dropping it silently
+                // made the CPU and GPU builds look like different products.
+                juce::ignoreUnused(cpuRuntime);
                 for (const auto& model : loaded) {
                     if (model.id == id) {
                         auto kept = model;
@@ -4409,6 +4411,26 @@ public:
         addAndMakeVisible(vocalsOnlyButton_);
         addAndMakeVisible(accompanyOnlyButton_);
 
+        // The general panel's only separation choice. It is deliberately not a
+        // model picker: measured on this project's CPU runtime, HTDemucs runs
+        // a 3.5-minute song in 2.6 minutes and the karaoke RoFormer takes
+        // several times that, so what the user is choosing between is quality
+        // and waiting -- not "HTDemucs" and "MelBand RoFormer", which mean
+        // nothing on this panel.
+        qualityStandardButton_.setButtonText(htfx::tr("button.qualityStandard"));
+        qualityStandardButton_.onClick = [this] { selectQuality(false); };
+        qualityHighButton_.setButtonText(htfx::tr("button.qualityHigh"));
+        qualityHighButton_.onClick = [this] { selectQuality(true); };
+        for (auto* button : {&qualityStandardButton_, &qualityHighButton_}) {
+            button->setName(button == &qualityStandardButton_ ? "qualityStandard"
+                                                             : "qualityHigh");
+            addAndMakeVisible(*button);
+        }
+        qualityHint_.setJustificationType(juce::Justification::centredLeft);
+        qualityHint_.setFont(juce::FontOptions(12.0f));
+        qualityHint_.setName("qualityHint");
+        addAndMakeVisible(qualityHint_);
+
         addAndMakeVisible(separationModeLabel_);
         separationModeBox_.setName("Separation mode");
         separationModeBox_.setTextWhenNothingSelected(
@@ -4426,6 +4448,14 @@ public:
                 htfx::glossed(category.substring(0, 1).toUpperCase() +
                               category.substring(1)),
                 separationModeBox_.getNumItems() + 1);
+        }
+        // A category this runtime cannot run stays in the list, greyed out.
+        // Hiding it made the CPU build look like a different product with
+        // fewer features rather than the same product needing a GPU.
+        for (int index = 0; index < separationModeCategories_.size(); ++index) {
+            if (!categoryUsableHere(separationModeCategories_[index])) {
+                separationModeBox_.setItemEnabled(index + 3, false);
+            }
         }
         separationModeBox_.onChange = [this] { onSeparationModeChanged(); };
         addAndMakeVisible(separationModeBox_);
@@ -4832,7 +4862,22 @@ public:
             simpleFile_.setBounds(fileChip_);
             area.removeFromTop(6);
             importButton_.setBounds(area.removeFromTop(34));
-            area.removeFromTop(6);
+            area.removeFromTop(8);
+            auto quality = area.removeFromTop(30);
+            qualityStandardButton_.setBounds(quality.removeFromLeft(120));
+            quality.removeFromLeft(8);
+            qualityHighButton_.setBounds(quality.removeFromLeft(120));
+            quality.removeFromLeft(10);
+            // While something is running this row carries Cancel instead of
+            // the explanation: the general panel's only other way out was Esc,
+            // which nothing on screen mentions, so a run started by accident
+            // had no visible way to stop it.
+            if (cancelButton_.isVisible()) {
+                cancelButton_.setBounds(quality.removeFromRight(96));
+                quality.removeFromRight(8);
+            }
+            qualityHint_.setBounds(quality);
+            area.removeFromTop(8);
             auto exports = area.removeFromTop(38);
             vocalsOnlyButton_.setBounds(exports.removeFromLeft(256));
             exports.removeFromLeft(12);
@@ -4989,7 +5034,8 @@ private:
     [[nodiscard]] int designHeight() const noexcept {
         // Multi-file imports add one row per clip, up to eight; beyond that
         // the list scrolls, so the panel never outgrows the screen.
-        return (advancedPanel_ ? (advancedVisible_ ? 826 : 576) : 260) + clipListHeight();
+        // The general panel grew a quality row (buttons + one hint line).
+        return (advancedPanel_ ? (advancedVisible_ ? 826 : 576) : 306) + clipListHeight();
     }
 
     void layoutClipList(juce::Rectangle<int> listArea) {
@@ -5262,6 +5308,9 @@ private:
         languageButton_.setButtonText(htfx::tr("button.languageToggle"));
         vocalsOnlyButton_.setButtonText(htfx::tr("button.exportVocalsOnly"));
         accompanyOnlyButton_.setButtonText(htfx::tr("button.exportAccompanyOnly"));
+        qualityStandardButton_.setButtonText(htfx::tr("button.qualityStandard"));
+        qualityHighButton_.setButtonText(htfx::tr("button.qualityHigh"));
+        qualityHint_.setText({}, juce::dontSendNotification);  // 下一次 tick 重建
         importButton_.setButtonText(htfx::tr("button.import"));
         exportButton_.setButtonText(htfx::tr("button.export"));
         scaleButton_.setButtonText(htfx::tr("button.scaleUi"));
@@ -5469,6 +5518,9 @@ private:
 
     void setAdvancedPanel(bool advanced) {
         advancedPanel_ = advanced;
+        if (!advanced) {
+            snapToExpressibleQuality();
+        }
         updatePanelSwitchButtonText();
         updatePanelVisibility();
         updateVisibility();
@@ -5731,7 +5783,12 @@ private:
         } else if (modeKey.startsWith("category:")) {
             const auto category = modeKey.fromFirstOccurrenceOf(":", false, false);
             const auto categoryIndex = separationModeCategories_.indexOf(category);
-            if (categoryIndex >= 0) target = 2 + categoryIndex;
+            // A category this runtime cannot run must not come back just
+            // because it was the last one chosen elsewhere -- on the CPU
+            // build that would restore a mode whose own entry is greyed out.
+            if (categoryIndex >= 0 && categoryUsableHere(category)) {
+                target = 2 + categoryIndex;
+            }
         }
         if (target < 0) {
             // Default startup mode: HTDemucs 4-stem. It is the mode the simple
@@ -5753,6 +5810,59 @@ private:
                 }
             }
         }
+    }
+
+    // The general panel's quality switch. Both ends drive the same separation
+    // mode the advanced panel exposes, so the two panels can never disagree
+    // about what is about to run.
+    static constexpr const char* kHighQualityCategory = "karaoke";
+
+    [[nodiscard]] int highQualityModeIndex() const {
+        const int categoryIndex = separationModeCategories_.indexOf(kHighQualityCategory);
+        return categoryIndex >= 0 ? categoryIndex + 2 : -1;
+    }
+
+    // True when this runtime can actually run the category. On the CPU
+    // runtime every RoFormer model is around 24x realtime -- roughly an hour
+    // and a half for a four-minute song -- so the modes are shown but not
+    // selectable.
+    [[nodiscard]] bool categoryUsableHere(const juce::String& category) const {
+        for (const auto& model : processor_.getRoformerModels()) {
+            if (model.category.equalsIgnoreCase(category) && model.cpuCapable) {
+                return true;
+            }
+        }
+        return processor_.getRuntimeFlavor() != "cpu";
+    }
+
+    [[nodiscard]] bool highQualitySelected() const {
+        const int index = highQualityModeIndex();
+        return index >= 0 && separationModeBox_.getSelectedItemIndex() == index;
+    }
+
+    // The general panel can only say two things: Standard and High quality.
+    // Anything else chosen on the advanced panel would keep running here with
+    // nothing on screen to show it -- which is how a four-minute song quietly
+    // became a fifty-minute one after a visit to the advanced panel. If the
+    // active mode is not one this panel can express, it goes back to Standard.
+    void snapToExpressibleQuality() {
+        if (separationModeBox_.getSelectedItemIndex() == 0 || highQualitySelected()) {
+            return;
+        }
+        separationModeBox_.setSelectedItemIndex(0, juce::sendNotificationSync);
+    }
+
+    void selectQuality(bool high) {
+        if (high && !categoryUsableHere(kHighQualityCategory)) {
+            return;
+        }
+        const int target = high ? highQualityModeIndex() : 0;
+        if (target < 0) {
+            // The catalogue has no karaoke category on this runtime; leave the
+            // mode alone rather than silently choosing something else.
+            return;
+        }
+        separationModeBox_.setSelectedItemIndex(target, juce::sendNotificationSync);
     }
 
     void selectRoformerCategoryDefault(const juce::String& category) {
@@ -5830,6 +5940,69 @@ private:
         // Refine the coarse advancedPanel_ visibility above down to only the
         // stem sliders relevant to the currently chosen separation mode.
         updateSixSourceControls();
+    }
+
+    // Which of the two quality ends is active, and what it will cost. The
+    // estimates are measured on this project's own CPU runtime rather than
+    // guessed, and they are shown on the button row instead of after the fact,
+    // because the whole point of the switch is choosing whether to wait.
+    void updateQualityControls() {
+        if (!qualityStandardButton_.isVisible()) {
+            return;
+        }
+        const bool available = categoryUsableHere(kHighQualityCategory);
+        qualityHighButton_.setEnabled(available);
+        const bool high = highQualitySelected();
+        const bool onCpu =
+            computeBox_.getSelectedItemIndex() == 2 || processor_.resolvedToCpu();
+        // Apple Silicon is a third case, not a fast one: measured on an M1,
+        // HTDemucs takes about a minute and RoFormer about fifty. Folding MPS
+        // in with CUDA told a Mac user "3 minutes" for a fifty-minute run.
+        const bool onMps = !onCpu && processor_.getRuntimeFlavor() == "mps";
+        if (!available) {
+            // Shown, not hidden: a CPU user should be able to see the feature
+            // exists and what it would take to get it.
+            qualityStandardButton_.setColour(juce::TextButton::buttonColourId,
+                                             juce::Colour(HtfxLookAndFeel::kAccent));
+            qualityHighButton_.setColour(juce::TextButton::buttonColourId,
+                                         juce::Colour(HtfxLookAndFeel::kSurfaceRaised));
+            // The CPU build's advice is platform-specific: there is no NVIDIA
+            // card to go and get on a Mac.
+            const auto reason = htfx::tr(
+#if JUCE_MAC
+                "hint.qualityNeedsGpuMac"
+#else
+                "hint.qualityNeedsGpu"
+#endif
+            );
+            if (reason != qualityHint_.getText()) {
+                qualityHint_.setText(reason, juce::dontSendNotification);
+                qualityHint_.setTooltip(reason);
+            }
+            return;
+        }
+        qualityStandardButton_.setColour(
+            juce::TextButton::buttonColourId,
+            juce::Colour(high ? HtfxLookAndFeel::kSurfaceRaised : HtfxLookAndFeel::kAccent));
+        qualityHighButton_.setColour(
+            juce::TextButton::buttonColourId,
+            juce::Colour(high ? HtfxLookAndFeel::kAccent : HtfxLookAndFeel::kSurfaceRaised));
+        auto hint = htfx::tr(high ? "hint.qualityHigh" : "hint.qualityStandard");
+        const auto estimate = htfx::tr(
+            high ? (onCpu   ? "estimate.highCpu"
+                    : onMps ? "estimate.highMps"
+                            : "estimate.highGpu")
+                 : (onCpu   ? "estimate.standardCpu"
+                    : onMps ? "estimate.standardMps"
+                            : "estimate.standardGpu"));
+        if (estimate.isNotEmpty()) {
+            hint += " " + htfx::tr("hint.estimatePrefix") + estimate +
+                    htfx::tr("hint.estimateSuffix");
+        }
+        if (hint != qualityHint_.getText()) {
+            qualityHint_.setText(hint, juce::dontSendNotification);
+            qualityHint_.setTooltip(hint);
+        }
     }
 
     void updateCpuWarning() {
@@ -6022,10 +6195,17 @@ private:
             importButton_.setVisible(true);
             progressBar_.setVisible(true);
             status_.setVisible(true);
+            // The quality switch only exists here; the advanced panel has the
+            // full mode list instead.
+            const bool haveHighQuality = highQualityModeIndex() >= 0;
+            qualityStandardButton_.setVisible(haveHighQuality);
+            qualityHighButton_.setVisible(haveHighQuality);
+            qualityHint_.setVisible(haveHighQuality);
             recordButton_.setVisible(false);
             separateButton_.setVisible(false);
             exportButton_.setVisible(false);
-            cancelButton_.setVisible(false);
+            // Cancel is owned by the timer on both panels now, so it is not
+            // forced off here -- doing that would hide it mid-run.
             previewGroup_.setVisible(false);
             previewPlayButton_.setVisible(false);
             previewStopButton_.setVisible(false);
@@ -6034,6 +6214,9 @@ private:
             resetWorker_.setVisible(false);
             return;
         }
+        qualityStandardButton_.setVisible(false);
+        qualityHighButton_.setVisible(false);
+        qualityHint_.setVisible(false);
         const bool recordMode = modeBox_.getSelectedItemIndex() == 0;
         recordButton_.setVisible(recordMode);
         importButton_.setVisible(recordMode);
@@ -6105,10 +6288,18 @@ private:
         separateButton_.setEnabled(
             !recording && !busy && processor_.getRecordedSeconds() > 0.0);
         exportButton_.setEnabled(!recording && !busy && processor_.hasPreview());
-        // Only the advanced panel lays the Cancel button out; the simple
-        // panel cancels with Esc.
-        cancelButton_.setVisible(advancedPanel_ &&
-                                 ((recordMode && (separationBusy || mediaBusy)) || modelBusy));
+        // Both panels show Cancel while something is running. The general
+        // panel used to rely on Esc alone, which it never mentioned.
+        const bool cancellable =
+            (recordMode && (separationBusy || mediaBusy)) || modelBusy;
+        const bool wantsCancel = advancedPanel_ ? cancellable
+                                                : (cancellable || processor_.isBatchBusy());
+        if (wantsCancel != cancelButton_.isVisible()) {
+            cancelButton_.setVisible(wantsCancel);
+            if (!advancedPanel_) {
+                resized();  // the quality row gives up its hint area for it
+            }
+        }
         const bool configurationEnabled = !recording && !busy;
         const bool modeChosen = separationModeBox_.getSelectedItemIndex() >= 0;
         const bool roformerModeActive = roformerModeSelected();
@@ -6259,6 +6450,7 @@ private:
                 " MiB",
             juce::dontSendNotification);
         updateCpuWarning();
+        updateQualityControls();
         updateSixSourceControls();
 
         // Frame decoration: which step the user is on, and the tone of the
@@ -6313,6 +6505,9 @@ private:
     juce::Label simpleFile_;
     juce::TextButton vocalsOnlyButton_;
     juce::TextButton accompanyOnlyButton_;
+    juce::TextButton qualityStandardButton_;
+    juce::TextButton qualityHighButton_;
+    juce::Label qualityHint_;
     juce::Label separationModeLabel_;
     juce::ComboBox separationModeBox_;
     juce::StringArray separationModeCategories_;
