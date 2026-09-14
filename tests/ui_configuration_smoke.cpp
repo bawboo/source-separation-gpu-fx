@@ -283,7 +283,7 @@ int run() {
 
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditor());
     require(editor != nullptr, "custom editor was not created");
-    require(editor->getWidth() == 560 && editor->getHeight() == 260,
+    require(editor->getWidth() == 560 && editor->getHeight() == 306,
             "general panel size mismatch");
 
     std::vector<juce::Component*> components;
@@ -317,6 +317,22 @@ int run() {
                 exportAccompany->isVisible() && !record->isVisible() &&
                 !exportMedia->isVisible(),
             "general panel control visibility mismatch");
+
+    // The general panel's quality switch: two ends that drive the same
+    // separation mode the advanced panel exposes, so the panels cannot
+    // disagree about what is about to run.
+    auto* qualityStandard = findNamedComponent<juce::TextButton>(components, "qualityStandard");
+    auto* qualityHigh = findNamedComponent<juce::TextButton>(components, "qualityHigh");
+    auto* qualityHint = findNamedComponent<juce::Label>(components, "qualityHint");
+    require(qualityStandard != nullptr && qualityHigh != nullptr && qualityHint != nullptr,
+            "the general panel is missing its quality switch");
+    require(qualityStandard->isVisible() && qualityHigh->isVisible() &&
+                qualityHint->isVisible(),
+            "the quality switch is not shown on the general panel");
+    require(waitUntil([&] { return qualityHint->getText().isNotEmpty(); },
+                      std::chrono::seconds(3)),
+            "the quality switch shows no explanation of the trade-off");
+    juce::String qualitySummary;
 
     // The general panel has no Separate button, so the two quick exports are
     // the only way to run anything at all: they must become usable as soon as
@@ -375,6 +391,23 @@ int run() {
     require(separationMode != nullptr, "Separation mode selector was not found");
     require(separationMode->isVisible(),
             "Separation mode selector is hidden in the advanced panel");
+    {
+        qualityHigh->onClick();
+        const int karaokeMode = [&] {
+            for (int i = 0; i < separationMode->getNumItems(); ++i) {
+                if (separationMode->getItemText(i) == htfx::glossed("Karaoke")) return i;
+            }
+            return -1;
+        }();
+        require(karaokeMode >= 2, "Karaoke mode entry missing from the mode list");
+        require(separationMode->getSelectedItemIndex() == karaokeMode,
+                "High quality did not select the karaoke separation mode");
+        qualityStandard->onClick();
+        require(separationMode->getSelectedItemIndex() == 0,
+                "Standard did not select 4-stem separation");
+        qualitySummary = "standard/high";
+    }
+
     juce::String roformerStemLabelSummary;
     int expectedVocalsMode = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
@@ -764,7 +797,7 @@ int run() {
 
     panelSwitch->onClick();
     require(panelSwitch->getButtonText() == htfx::tr("button.advancedPanel") &&
-                editor->getWidth() == 560 && editor->getHeight() == 260,
+                editor->getWidth() == 560 && editor->getHeight() == 306,
             "general panel did not restore");
 
     auto* scaleToggle = dynamic_cast<juce::ToggleButton*>(scaleUi);
@@ -774,16 +807,16 @@ int run() {
     require(editor->isResizable(), "Scale UI did not enable host/user resizing");
     require(
         editor->getConstrainer() != nullptr &&
-            std::abs(editor->getConstrainer()->getFixedAspectRatio() - 28.0 / 13.0) <
+            std::abs(editor->getConstrainer()->getFixedAspectRatio() - 560.0 / 306.0) <
                 1.0e-6,
         "Scale UI did not enforce the general panel design aspect ratio");
     editor->setBoundsConstrained({0, 0, 1120, 520});
-    require(editor->getWidth() == 1120 && editor->getHeight() == 520,
+    require(editor->getWidth() == 1120 && editor->getHeight() == 612,
             "proportional editor resize mismatch");
     scaleToggle->setToggleState(false, juce::dontSendNotification);
     scaleToggle->onClick();
     require(!editor->isResizable(), "Scale UI did not disable resizing");
-    require(editor->getWidth() == 560 && editor->getHeight() == 260,
+    require(editor->getWidth() == 560 && editor->getHeight() == 306,
             "Scale UI did not restore design size");
 
     fullScreen->onClick();
@@ -791,7 +824,7 @@ int run() {
             "full-screen fallback did not enter");
     fullScreen->onClick();
     require(fullScreen->getButtonText() == htfx::tr("button.fullScreen") &&
-                editor->getWidth() == 560 && editor->getHeight() == 260,
+                editor->getWidth() == 560 && editor->getHeight() == 306,
             "full-screen fallback did not restore the editor");
 
     // L1: language infrastructure — string table default (zh-TW), the
@@ -1001,6 +1034,7 @@ int run() {
                  " separation_mode_all_categories_verified=true"
                  " startup_default_mode=htdemucs4"
                  " stem_slider_relabels=true"
+                 " quality_switch=" << qualitySummary <<
                  " status_hint=" << statusHintSummary <<
                  " no_checkpoint=" << missingModelSummary <<
                  " roformer_stem_labels=" << roformerStemLabelSummary <<
