@@ -31,8 +31,10 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_events/juce_events.h>
 
+#ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#endif
 
 #include <algorithm>
 #include <chrono>
@@ -480,6 +482,7 @@ int main(int argc, char** argv) {
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
 
     std::vector<juce::String> args;
+#ifdef _WIN32
     {
         int wideCount = 0;
         if (auto** wideArgv = CommandLineToArgvW(GetCommandLineW(), &wideCount);
@@ -490,6 +493,7 @@ int main(int argc, char** argv) {
             LocalFree(wideArgv);
         }
     }
+#endif
     if (args.empty()) {
         for (int i = 1; i < argc; ++i) {
             args.emplace_back(juce::String::fromUTF8(argv[i]));

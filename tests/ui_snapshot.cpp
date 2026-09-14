@@ -12,8 +12,10 @@
 #include <juce_events/juce_events.h>
 #include <juce_graphics/juce_graphics.h>
 
+#ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#endif
 
 #include <chrono>
 #include <functional>
@@ -85,6 +87,7 @@ bool snapshot(juce::Component& editor, const juce::File& file) {
 int main(int argc, char** argv) {
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
     std::vector<juce::String> args;
+#ifdef _WIN32
     {
         int wideCount = 0;
         if (auto** wideArgv = CommandLineToArgvW(GetCommandLineW(), &wideCount); wideArgv != nullptr) {
@@ -94,6 +97,7 @@ int main(int argc, char** argv) {
             LocalFree(wideArgv);
         }
     }
+#endif
     if (args.empty()) {
         for (int i = 1; i < argc; ++i) {
             args.emplace_back(juce::String::fromUTF8(argv[i]));
