@@ -115,9 +115,15 @@ for arch in "${arches[@]}"; do
         # vendored tree -- so the dependencies demucs actually uses are listed
         # directly instead. numba is pinned for the same reason: pip resolves
         # to versions that have no osx-64 wheel at all.
+        # scipy is pinned for the machines this build exists to serve. From
+        # 1.14 its wheels are stamped minos 14.0, which would put the floor at
+        # Sonoma -- and Sonoma dropped every Intel Mac older than 2018, so the
+        # Intel build would refuse to run on much of the hardware that still
+        # needs it. 1.13.1 is stamped 10.9 and librosa only asks for >=1.6.
         conda run -n "$env_name" python -m pip install \
-            'torch<2.3' 'numpy<2' 'numba<0.63' einops soundfile librosa \
-            ml_collections beartype tqdm julius lameenc openunmix dora-search
+            'torch<2.3' 'numpy<2' 'numba<0.63' 'scipy<1.14' einops soundfile \
+            librosa ml_collections beartype tqdm julius lameenc openunmix \
+            dora-search
     else
         conda env list | awk '{print $1}' | grep -qx "$env_name" ||
             conda create -n "$env_name" python=3.11 -y
