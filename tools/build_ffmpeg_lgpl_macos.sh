@@ -63,6 +63,15 @@ rm -rf "$source_dir" "$build_dir"
 tar -xJf "$tarball" -C "$work"
 mkdir -p "$build_dir"
 
+# Without this, clang stamps the build machine's own OS version into the
+# binary and dyld refuses to load it anywhere older -- so an ffmpeg built on
+# macOS 26 cannot run on macOS 15, and the app fails the moment a file is
+# imported. Everything else in the bundle comes from wheels built years ago;
+# these two are the only binaries this project compiles itself, and they were
+# the only ones demanding the newest OS. 12.0 matches the app's own target and
+# is below every dependency's floor, so this never becomes the limit.
+MACOS_MIN=12.0
+
 configure_args=(
     --prefix="$prefix"
     --enable-static --disable-shared
@@ -71,6 +80,8 @@ configure_args=(
     --disable-autodetect
     --disable-doc --disable-debug
     --disable-programs --enable-ffmpeg --enable-ffprobe
+    --extra-cflags="-mmacosx-version-min=$MACOS_MIN"
+    --extra-ldflags="-mmacosx-version-min=$MACOS_MIN"
 )
 
 # x86 assembly needs nasm; without it FFmpeg still builds, just slower. Decoding
@@ -98,10 +109,20 @@ fi
 ( cd "$build_dir" && "$source_dir/configure" "${configure_args[@]}" )
 ( cd "$build_dir" && make -j"$(sysctl -n hw.ncpu)" && make install )
 
-# --- prove the two things this script exists to guarantee -----------------
+# --- prove the three things this script exists to guarantee ---------------
 for name in ffmpeg ffprobe; do
     binary="$prefix/bin/$name"
     [ -x "$binary" ] || { echo "$name was not built" >&2; exit 1; }
+    # A configure flag that is silently ignored leaves a binary that looks
+    # finished and refuses to start on the machine it was built for. Ask the
+    # binary what it ended up with rather than trusting that the flag landed.
+    minos="$(otool -l "$binary" |
+        awk '/LC_BUILD_VERSION/{found=1} found && /minos/{print $2; exit}')"
+    [ "$minos" = "$MACOS_MIN" ] || {
+        echo "$name reports minimum macOS ${minos:-<none>}, expected $MACOS_MIN." >&2
+        echo "-mmacosx-version-min did not reach the compiler; do not ship this." >&2
+        exit 1
+    }
 done
 if "$prefix/bin/ffmpeg" -hide_banner -version | grep -q -- '--enable-gpl'; then
     echo "built FFmpeg reports --enable-gpl, which must never ship" >&2
