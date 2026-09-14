@@ -104,6 +104,17 @@ GitHub：`bawboo/source-separation-gpu-fx`（**public**）。Release 資產必�
 
 ## Git 操作
 
+- **commit 身分一律用 GitHub 的 noreply 信箱**，不要用真實信箱——這個 repo 是公開的，
+  作者欄位任何人都看得到。在任何新的工作副本（包含 Mac）第一件事先設定：
+
+  ```bash
+  git config user.name "bawboo"
+  git config user.email "42883691+bawboo@users.noreply.github.com"
+  ```
+
+  這是 repo 層級的設定，不會跟著全域設定走，所以每 clone 一份就要設一次。
+  v0.0.8 以前的歷史仍帶著真實信箱，刻意不重寫——那會讓七個已發布的 tag 全部失效。
+
 - 若 Git 回報 dubious ownership，或 `origin does not appear to be a git repository`
   但 remote 設定實際存在，先取得此 repository 的解析後絕對路徑，再只將該路徑加入
   全域 `safe.directory`；不得使用 `safe.directory '*'` 等萬用設定。
