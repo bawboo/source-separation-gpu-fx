@@ -27,6 +27,17 @@
 - **一般面板在分離中沒有取消鍵**，遇到上面那種狀況只能等它跑完。取消鍵現在兩個面板都有
 - **Apple Silicon 上的預估時間顯示的是 NVIDIA 的數字。** 先前只分 CPU 與非 CPU，MPS 被
   歸進「非 CPU」，所以 M1 上的高品質模式寫著「約 3 分鐘」，實測是 41 分鐘
+- **macOS 版包裡有兩個二進位要求 macOS 26，實際上是我們自己建壞的。** 建 FFmpeg 時
+  沒有指定最低系統版本，clang 就把建置機的版本蓋上去，而 macOS 會拒絕載入最低版本
+  比自己新的二進位——使用者一匯入檔案就會失敗。掃過發行包裡全部 441 個執行檔後，
+  那兩個是唯一要求最新系統的
+- **Intel 版的最低系統從 macOS 14 降到 12。** scipy 從 1.14 起的 wheel 被標成最低 14.0，
+  而 macOS 14（Sonoma）砍掉了 2018 年以前的所有 Intel Mac——也就是說這個為「沒有
+  Apple Silicon 的機器」而存在的版本，正好在其中一大半上跑不起來。改釘 scipy 1.13.1
+  （標的是 10.9）之後，Intel 版涵蓋到 macOS 12 Monterey。Apple Silicon 版的下限仍是
+  macOS 14，那是 torch 自己的 wheel 決定的，換不掉
+- **macOS 發行包改成 DMG**，內含 App、Applications 捷徑，以及一份說明第一次開啟要怎麼
+  通過系統安全檢查的中文文件
 - **Apple Silicon 上「自動」會挑一個跑不動這個模型的裝置。** 判斷依據是
   `mps.is_available()`，但可用不等於做得到：Intel Mac 唯一能用的 torch 2.2.2 回報
   MPS 可用，卻缺 RoFormer 需要的 STFT，於是分離直接崩潰。現在改成實際跑一次那個
