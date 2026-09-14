@@ -452,6 +452,39 @@ int run() {
         qualitySummary = "standard/high/snaps-back";
     }
 
+    // The hint has to quote the figure for the runtime that is installed, and
+    // nothing checked that it did. A CPU-only build read the manifest to
+    // decide whether to warn, then ignored it when picking the number, so an
+    // Intel Mac was told the machine was slow and quoted four minutes for a
+    // fifty-minute job -- the warning and the number contradicting each other
+    // in one sentence. Read the flavor the way the editor does and require
+    // both halves to agree with it.
+    juce::String estimateSummary;
+    {
+        const auto flavor = processor->getRuntimeFlavor();
+        const juce::String suffix =
+            flavor == "cpu" ? "Cpu" : flavor == "mps" ? "Mps" : "Gpu";
+        panelSwitch->onClick();  // -> general, where the quality switch lives
+        for (const auto* which : {"standard", "high"}) {
+            (juce::String(which) == "high" ? qualityHigh : qualityStandard)->onClick();
+            require(waitUntil(
+                        [&] {
+                            return qualityHint->getText().contains(
+                                htfx::tr("estimate." + juce::String(which) + suffix));
+                        },
+                        std::chrono::seconds(3)),
+                    "the quality hint quotes an estimate for the wrong runtime");
+        }
+        // Only CUDA is fast enough to mention the time in passing; everything
+        // else gets the warned wording.
+        require(qualityHint->getText().contains(htfx::tr("hint.qualityHighSlowTail")) ==
+                    (flavor != "cuda" && flavor.isNotEmpty()),
+                "the slow-runtime warning does not match the installed runtime");
+        qualityStandard->onClick();
+        panelSwitch->onClick();  // -> advanced
+        estimateSummary = flavor.isEmpty() ? "source-tree" : flavor;
+    }
+
     // Every mode is selectable on every runtime. The list used to grey out the
     // categories a CPU build ran slowly, and the summary line said
     // "separation_mode_gate=true" -- a literal, asserting nothing, which went
@@ -1090,6 +1123,7 @@ int run() {
                  " startup_default_mode=htdemucs4"
                  " stem_slider_relabels=true"
                  " quality_switch=" << qualitySummary <<
+                 " quality_estimates=" << estimateSummary <<
                  " status_hint=" << statusHintSummary <<
                  " no_checkpoint=" << missingModelSummary <<
                  " roformer_stem_labels=" << roformerStemLabelSummary <<

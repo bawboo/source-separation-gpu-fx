@@ -5818,6 +5818,33 @@ private:
         return categoryIndex >= 0 ? categoryIndex + 2 : -1;
     }
 
+    // What is actually going to run this, in one place. It was two: one
+    // predicate asked "is this not CUDA" and the other asked "is this MPS",
+    // treating everything else as CUDA. A cpu-flavor runtime answered yes to
+    // the first and no to the second, so the Intel build warned that the
+    // machine was slow and quoted CUDA's four minutes in the same sentence --
+    // for a job that takes fifty. Two readings of one fact cannot disagree if
+    // there is only one reading.
+    enum class ComputeClass { cuda, mps, cpu };
+
+    [[nodiscard]] ComputeClass computeClassHere() const {
+        // An explicit CPU choice wins, and so does what the last run actually
+        // resolved to; otherwise the installed runtime decides.
+        if (computeBox_.getSelectedItemIndex() == 2 || processor_.resolvedToCpu()) {
+            return ComputeClass::cpu;
+        }
+        const auto flavor = processor_.getRuntimeFlavor();
+        if (flavor == "mps") {
+            return ComputeClass::mps;
+        }
+        if (flavor == "cpu") {
+            return ComputeClass::cpu;
+        }
+        // No installed runtime to ask: a source checkout, where the developer
+        // has a GPU or knows why they do not. Users always have a manifest.
+        return ComputeClass::cuda;
+    }
+
     // True when the RoFormer models will take tens of minutes here rather
     // than a few. Measured against karaoke-gabox, the model High quality
     // runs: 11.56x realtime on this project's x86 CPU, 10.95x on an M1's,
@@ -5826,8 +5853,7 @@ private:
     // Nothing is blocked on the strength of this; it decides whether the user
     // is told the number in passing or warned about it.
     [[nodiscard]] bool roformerIsSlowHere() const {
-        return computeBox_.getSelectedItemIndex() == 2 || processor_.resolvedToCpu() ||
-               processor_.getRuntimeFlavor() != "cuda";
+        return computeClassHere() != ComputeClass::cuda;
     }
 
     [[nodiscard]] bool highQualitySelected() const {
@@ -5943,12 +5969,12 @@ private:
             return;
         }
         const bool high = highQualitySelected();
-        const bool onCpu =
-            computeBox_.getSelectedItemIndex() == 2 || processor_.resolvedToCpu();
         // Apple Silicon is a third case, not a fast one: measured on an M1,
         // HTDemucs takes about a minute and RoFormer about fifty. Folding MPS
         // in with CUDA told a Mac user "3 minutes" for a fifty-minute run.
-        const bool onMps = !onCpu && processor_.getRuntimeFlavor() == "mps";
+        const auto compute = computeClassHere();
+        const bool onCpu = compute == ComputeClass::cpu;
+        const bool onMps = compute == ComputeClass::mps;
         qualityStandardButton_.setColour(
             juce::TextButton::buttonColourId,
             juce::Colour(high ? HtfxLookAndFeel::kSurfaceRaised : HtfxLookAndFeel::kAccent));
@@ -5986,8 +6012,11 @@ private:
     }
 
     void updateCpuWarning() {
-        const bool shouldWarn =
-            computeBox_.getSelectedItemIndex() == 2 || processor_.resolvedToCpu();
+        // Same source of truth as the quality hint. This had the same gap: a
+        // CPU-only install said nothing about being CPU-only until the first
+        // separation had already finished, which is exactly when the warning
+        // was no longer useful.
+        const bool shouldWarn = computeClassHere() == ComputeClass::cpu;
         cpuWarning_.setText(
             shouldWarn
                 ? htfx::tr("status.cpuModeWarning")
