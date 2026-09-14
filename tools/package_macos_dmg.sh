@@ -63,7 +63,19 @@ cp -R "$app" "$stage/"
 ln -s /Applications "$stage/Applications"
 
 arch_label="Apple Silicon"
-[ "$arch" = x86_64 ] && arch_label="Intel"
+standard_estimate="1 分鐘"
+high_estimate="45 分鐘"
+if [ "$arch" = x86_64 ]; then
+    arch_label="Intel"
+    standard_estimate="3 分鐘"
+    high_estimate="50 分鐘"
+fi
+# Written for someone who has never seen this project. Every paragraph here is
+# something that was measured or walked into during the port, and each one is a
+# thing that looks like a defect from the outside: Gatekeeper refusing an
+# unsigned app, a silent first launch, and a High quality button that is not
+# broken, just slow. The instructions deliberately do not mention a Separate
+# button -- the general panel has none, the export buttons start the run.
 cat > "$stage/請先讀我.txt" <<TXT
 Music SSP FX $version（$arch_label 版）
 
@@ -82,10 +94,20 @@ Music SSP FX $version（$arch_label 版）
   只要做這一次，之後雙擊就能開。
   （macOS 14 以前的版本：在「應用程式」裡對它按右鍵，選「打開」。）
 
-第一次按下「分離」會很久
-  Intel 版在 Apple Silicon 上執行時，第一次要花一到兩分鐘才會開始，
-  畫面上不會有動靜。那是系統在翻譯程式碼，不是當掉了，請不要強制結束。
-  第二次之後就正常。
+怎麼分離一首歌
+    1. 按藍色的「匯入音訊 / 影片」，選一個音樂檔或影片檔
+    2. 下面那排保持「一般」就好
+    3. 按「僅匯出人聲」或「僅匯出伴奏」，選要存到哪裡
+
+  按下去之後就會開始跑，進度列會動。沒有「分離」按鈕，匯出就是開始。
+
+  「高品質」那顆可以按，但這台電腦跑它要 $high_estimate 左右
+  （一般是 $standard_estimate）。想試的話請留足時間。
+
+第一次按下去會等很久，那不是當掉
+  第一次可能一到兩分鐘完全沒有動靜：程式要先把模型載進記憶體，
+  而且如果你是在 Apple Silicon 的 Mac 上跑這個 Intel 版，系統還要
+  先翻譯一次程式碼。請不要強制結束，第二次之後就快了。
 
 需要網路
   第一次分離會自動下載模型檔（幾百 MB），下載完就不用再下載。
