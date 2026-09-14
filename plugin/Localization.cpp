@@ -56,15 +56,16 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
                     u8"High quality needs an Apple Silicon GPU. This is an Intel "
                     u8"Mac, where it would take over an hour and a half per song."}},
         // 量測自本專案自己的 runtime，不是估計值。CPU/CUDA 量在 RTX 4050
-        // Laptop 的開發機；MPS 量在 MacBook Air M1，來源是 246.7 秒的檔案，
-        // 已換算成 4 分鐘。highMps 目前是從同家族的 kim-vocals（2.3-2.9x
-        // realtime）換算的暫定值，karaoke-gabox 的直接量測回來後要校準。
+        // Laptop 的開發機；MPS 量在 MacBook Air M1，換算成 4 分鐘的歌。
+        // highMps 量的就是 karaoke-gabox 本人（10.2x realtime，換算 41 分鐘），
+        // 取 45 是留一點餘裕給使用者機器上的其他負載。不要拿同家族的其他模型
+        // 推論這個數字:同為 913 MB 的 kim-vocals 只要 2.3-2.9x,差了四倍。
         {"estimate.standardCpu", StringPair{u8"3 分鐘", u8"3 minutes"}},
         {"estimate.standardGpu", StringPair{u8"10 秒", u8"10 seconds"}},
         {"estimate.standardMps", StringPair{u8"1 分鐘", u8"1 minute"}},
         {"estimate.highCpu", StringPair{u8"97 分鐘", u8"97 minutes"}},
         {"estimate.highGpu", StringPair{u8"3 分鐘", u8"3 minutes"}},
-        {"estimate.highMps", StringPair{u8"10 分鐘", u8"10 minutes"}},
+        {"estimate.highMps", StringPair{u8"45 分鐘", u8"45 minutes"}},
         {"hint.estimatePrefix", StringPair{u8"一首 4 分鐘的歌約 ", u8"About "}},
         {"hint.estimateSuffix", StringPair{u8"", u8" for a 4-minute song"}},
         {"button.exportVocalsOnly", StringPair{u8"僅匯出人聲", u8"Export Vocals only"}},

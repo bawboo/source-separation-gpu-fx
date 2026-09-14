@@ -97,6 +97,38 @@ def _stage_input(source: Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
+def resolve_device(device: str) -> str:
+    """Turn "auto" into something this machine can actually use.
+
+    Upstream's own resolver only ever looks for CUDA::
+
+        if torch.cuda.is_available(): return torch.device("cuda:0")
+        print("CUDA is not available. Falling back to CPU. This will be slow.")
+        return torch.device("cpu")
+
+    On Apple Silicon that means the default -- "auto", which is what the app
+    sends unless the user goes to the advanced panel and picks a device by
+    hand -- silently runs every separation on the CPU while an MPS device sits
+    idle. Resolve it here instead, before the string reaches upstream, so both
+    the frozen runtime and a source checkout behave the same way.
+    """
+    if device not in ("", "auto", None):
+        return device
+    try:
+        import torch
+    except ImportError:
+        # A caller that injected its own session factory need not have torch.
+        # Hand the string back untouched rather than guessing for them.
+        return device
+
+    if torch.cuda.is_available():
+        return "cuda:0"
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_available():
+        return "mps"
+    return "cpu"
+
+
 def separate_file(
     input_path: str | Path,
     output_dir: str | Path,
@@ -116,6 +148,7 @@ def separate_file(
         from mel_band_roformer.clean_api import MelBandRoformerSession
 
         session_factory = MelBandRoformerSession
+    device = resolve_device(device)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     report("load", model_name)
