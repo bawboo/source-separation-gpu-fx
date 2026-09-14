@@ -3252,7 +3252,13 @@ void HTDemucsGpuFXAudioProcessor::quickExportLoop(
                 outputRight[sample] = result->stems[rightPlane * sampleCount + sample];
                 continue;
             }
-            for (int source = 0; source < 4; ++source) {
+            // Every source except the vocal one, not the first four: the
+            // six-source model puts guitar at 4 and piano at 5, and a
+            // guitar-led song leaves almost the whole instrumental in a stem
+            // this loop used to skip (measured -48 dBFS exported against
+            // -17 dBFS for the same song's four-stem accompaniment). A
+            // four-source result has sourceCount == 4, so it is unaffected.
+            for (int source = 0; source < result->sourceCount; ++source) {
                 if (source == vocalsSource) {
                     continue;
                 }
