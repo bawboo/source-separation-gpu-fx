@@ -88,6 +88,14 @@ GitHub：`bawboo/source-separation-gpu-fx`（**public**）。Release 資產必�
   `nested code is modified or invalid`，而 `.app` 本身仍然跑得起來，所以不驗就看不出來。
   交付前務必 `codesign --verify --strict` 確認一次。
   注意 `build_macos.sh` 不會重建這些工具，改完 `plugin/` 要自己 `cmake --build ... --target <工具>`。
+- **改了 `worker/` 就必須重新凍結**，光重建 `.app` 沒有用。
+  `tools/build_macos.sh --bundle-runtime` 只是把**既有的**凍結產物複製進 bundle，
+  Python 端的修改要先跑 `tools/build_standalone_runtime_macos.sh --python <env 的 python>`。
+  這個失敗方式所有靜態檢查都會通過——`.app` 建置成功、`codesign --verify` 有效、
+  `file -b` 架構正確——**只有實際跑一次分離才會錯**，而且錯在 worker 裡，
+  看起來像是產品缺陷而不是用了舊的凍結包。判斷方法：比對
+  `build/standalone-runtime-macos-<arch>-dist/htdemucs-worker/runtime-manifest.json`
+  的時間與 `worker/` 底下檔案的時間。
 - **macOS 交付**：壓縮用 `ditto -c -k --keepParent "<App>" <name>.zip`——`zip` 指令不保留
   簽章與延伸屬性，解開後的 `.app` 會是壞的。
 - **一次只能有一個 `.app`**：arm64 與 Intel 版**同名同路徑**
