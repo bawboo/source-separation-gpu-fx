@@ -5822,10 +5822,13 @@ private:
         return categoryIndex >= 0 ? categoryIndex + 2 : -1;
     }
 
-    // True when this runtime can actually run the category. On the CPU
-    // runtime every RoFormer model is around 24x realtime -- roughly an hour
-    // and a half for a four-minute song -- so the modes are shown but not
-    // selectable.
+    // True when this runtime can actually run the category. Which models the
+    // CPU runtime is allowed to offer is a per-model fact in the catalogue,
+    // not a guess made here: karaoke-gabox measured 11.56x realtime on this
+    // project's own x86 CPU and 10.95x on an M1's, so about 50 minutes for a
+    // four-minute song. The modes stay on screen but are not selectable, so a
+    // CPU user can see the feature exists rather than wondering what is
+    // missing.
     [[nodiscard]] bool categoryUsableHere(const juce::String& category) const {
         for (const auto& model : processor_.getRoformerModels()) {
             if (model.category.equalsIgnoreCase(category) && model.cpuCapable) {

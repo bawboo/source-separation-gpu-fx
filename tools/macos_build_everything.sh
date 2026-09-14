@@ -54,22 +54,56 @@ step 2 "建立 Python 環境"
 env_for_arch() { [ "$1" = arm64 ] && echo htfx-macos-arm64 || echo htfx-macos-x86; }
 python_for_arch() { conda run -n "$(env_for_arch "$1")" python -c 'import sys; print(sys.executable)'; }
 
+# An environment that exists is not an environment that works. The previous
+# check looked only for the name, so an env left half-built by a run that died
+# during pip -- or made by hand -- was skipped with its packages still missing,
+# and the gap did not surface until the freeze failed much later. Ask the
+# interpreter instead.
+# demucs is deliberately absent from this list. The build uses the vendored
+# tree, which only the freeze script puts on sys.path, and the x86_64 env does
+# not install the PyPI package at all -- so importing it here would report
+# "incomplete" on a complete environment and reinstall on every run.
+env_is_ready() {
+    conda run -n "$1" python -c \
+        'import torch, numpy, einops, soundfile, librosa, mel_band_roformer' \
+        >/dev/null 2>&1
+}
+
 for arch in "${arches[@]}"; do
     env_name="$(env_for_arch "$arch")"
     if conda env list | awk '{print $1}' | grep -qx "$env_name"; then
-        echo "$env_name 已存在，略過。"
-        continue
+        if env_is_ready "$env_name"; then
+            echo "$env_name 已存在且套件齊全，略過。"
+            continue
+        fi
+        echo "$env_name 已存在但套件不齊，補裝缺少的部分..."
+    else
+        echo "建立 $env_name（$arch）..."
     fi
-    echo "建立 $env_name（$arch）..."
     if [ "$arch" = x86_64 ]; then
         # 用 Rosetta 跑 x86_64 的 Python；torch 沒有新版的 Intel mac wheel，
         # 所以這裡必須釘在 2.2 這一代，numpy 也要跟著退回 1.x。
-        CONDA_SUBDIR=osx-64 conda create -n "$env_name" python=3.11 -y
+        conda env list | awk '{print $1}' | grep -qx "$env_name" ||
+            CONDA_SUBDIR=osx-64 conda create -n "$env_name" python=3.11 -y
         conda run -n "$env_name" conda config --env --set subdir osx-64
+        # A wheel for the wrong architecture installs without complaint and
+        # only fails once frozen, so make the interpreter say what it is.
+        conda run -n "$env_name" python -c \
+            'import platform, sys; sys.exit(0 if platform.machine() == "x86_64" else 1)' ||
+            die "$env_name 不是 x86_64 環境，CONDA_SUBDIR 沒有生效。先刪掉再重跑：conda env remove -n $env_name"
+        # The PyPI demucs package is NOT installed here, and that is not an
+        # oversight: demucs 4.1.0 requires sphn>=0.1.12, whose newest osx-64
+        # wheel is 0.1.4. sphn is only used by demucs/api.py, which the freeze
+        # does not touch -- it needs pretrained/states/apply/htdemucs from the
+        # vendored tree -- so the dependencies demucs actually uses are listed
+        # directly instead. numba is pinned for the same reason: pip resolves
+        # to versions that have no osx-64 wheel at all.
         conda run -n "$env_name" python -m pip install \
-            'torch<2.3' 'numpy<2' demucs einops soundfile librosa ml_collections beartype
+            'torch<2.3' 'numpy<2' 'numba<0.63' einops soundfile librosa \
+            ml_collections beartype tqdm julius lameenc openunmix dora-search
     else
-        conda create -n "$env_name" python=3.11 -y
+        conda env list | awk '{print $1}' | grep -qx "$env_name" ||
+            conda create -n "$env_name" python=3.11 -y
         conda run -n "$env_name" python -m pip install \
             torch numpy demucs einops soundfile librosa ml_collections beartype
     fi

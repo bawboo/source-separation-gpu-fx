@@ -47,24 +47,30 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
                     u8"Keeps the backing vocals; only the lead is removed."}},
         {"hint.qualityNeedsGpu",
          StringPair{u8"高品質模式需要 NVIDIA 顯示卡；你安裝的是 CPU 版，"
-                    u8"它在 CPU 上一首歌要一個半小時以上。",
+                    u8"它在 CPU 上一首歌要 50 分鐘左右。",
                     u8"High quality needs an NVIDIA GPU. This is the CPU build, "
-                    u8"where it would take over an hour and a half per song."}},
+                    u8"where it would take about 50 minutes per song."}},
         {"hint.qualityNeedsGpuMac",
          StringPair{u8"高品質模式需要 Apple Silicon 的 GPU；這台是 Intel Mac，"
-                    u8"它在 CPU 上一首歌要一個半小時以上。",
+                    u8"它在 CPU 上一首歌要 50 分鐘左右。",
                     u8"High quality needs an Apple Silicon GPU. This is an Intel "
-                    u8"Mac, where it would take over an hour and a half per song."}},
+                    u8"Mac, where it would take about 50 minutes per song."}},
         // 量測自本專案自己的 runtime，不是估計值。CPU/CUDA 量在 RTX 4050
         // Laptop 的開發機；MPS 量在 MacBook Air M1，換算成 4 分鐘的歌。
-        // highMps 量的就是 karaoke-gabox 本人（10.2x realtime，換算 41 分鐘），
-        // 取 45 是留一點餘裕給使用者機器上的其他負載。不要拿同家族的其他模型
-        // 推論這個數字:同為 913 MB 的 kim-vocals 只要 2.3-2.9x,差了四倍。
+        // 兩個 high 的數字量的都是 karaoke-gabox 本人，也就是「高品質」實際會
+        // 跑的那個模型：MPS 10.2x realtime（41 分鐘）、RTX 4050 0.911x
+        // （3.6 分鐘），各自取整往上留餘裕。不要拿同家族的其他模型推論它們：
+        // 同為 913 MB 的 kim-vocals 在 MPS 上只要 2.3-2.9x，差了四倍。
+        // 41 分鐘是冷機值：M1 Air 無風扇，連續分離第二首時同一個工作慢約
+        // 25%（189 秒冷 / 243 秒熱）。取整到 45 留的餘裕就是給這件事的。
+        // highCpu 同樣量的是 karaoke-gabox：本機 x86 CPU 11.56x realtime
+        // （46 分鐘），M1 的 CPU 核心量到 10.95x，兩個不同 ISA 收斂在同一個
+        // 數字上。先前寫的 97 分鐘沒有出處，高估了一倍以上。
         {"estimate.standardCpu", StringPair{u8"3 分鐘", u8"3 minutes"}},
         {"estimate.standardGpu", StringPair{u8"10 秒", u8"10 seconds"}},
         {"estimate.standardMps", StringPair{u8"1 分鐘", u8"1 minute"}},
-        {"estimate.highCpu", StringPair{u8"97 分鐘", u8"97 minutes"}},
-        {"estimate.highGpu", StringPair{u8"3 分鐘", u8"3 minutes"}},
+        {"estimate.highCpu", StringPair{u8"50 分鐘", u8"50 minutes"}},
+        {"estimate.highGpu", StringPair{u8"4 分鐘", u8"4 minutes"}},
         {"estimate.highMps", StringPair{u8"45 分鐘", u8"45 minutes"}},
         {"hint.estimatePrefix", StringPair{u8"一首 4 分鐘的歌約 ", u8"About "}},
         {"hint.estimateSuffix", StringPair{u8"", u8" for a 4-minute song"}},
@@ -84,7 +90,7 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"clip.exportFinishedSuffix", StringPair{u8" 個檔案", u8" files"}},
         {"clip.noneSelected", StringPair{u8"沒有勾選任何檔案", u8"No files selected"}},
         {"clip.exportingPrefix", StringPair{u8"正在匯出 ", u8"Exporting "}},
-        {"status.cpuModeWarning", StringPair{u8"CPU 模式：一首 4 分鐘的歌約 3 分鐘。RoFormer 的高品質模式需要 NVIDIA 顯示卡，在 CPU 上一首歌要一個半小時以上，因此未提供。", u8"CPU mode: about 3 minutes for a 4-minute song. The high-quality RoFormer modes need an NVIDIA GPU -- on CPU they take over an hour and a half per song, so they are not offered."}},
+        {"status.cpuModeWarning", StringPair{u8"CPU 模式：一首 4 分鐘的歌約 3 分鐘。RoFormer 的高品質模式需要 NVIDIA 顯示卡，在 CPU 上一首歌要 50 分鐘左右，因此未提供。", u8"CPU mode: about 3 minutes for a 4-minute song. The high-quality RoFormer modes need an NVIDIA GPU -- on CPU they take about 50 minutes per song, so they are not offered."}},
         {"clip.chooseExportFolder", StringPair{u8"選擇匯出資料夾", u8"Choose export folder"}},
         {"button.import", StringPair{u8"匯入音訊／影片", u8"Import audio/video"}},
         {"status.readyToRecord", StringPair{u8"準備就緒，可以錄音或匯入", u8"Ready to record or import"}},
