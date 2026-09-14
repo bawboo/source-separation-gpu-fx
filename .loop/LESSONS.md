@@ -211,3 +211,32 @@ may degrade」——要看安裝日誌，它已經把答案告訴你了。`-ms=o
   **不是** `docs/MACOS_HANDOFF.md` 寫的 `~/Library/Application Support/Music SSP FX`。
   目前可寫、功能正常，但不符 Apple 慣例；要改成 Application Support 的話記得既有使用者的
   `RoformerModels` 快取需要搬移，否則會整批重新下載。
+
+## macOS 效能量測（2026-09-14，M1 Air 8 GB）
+
+- SIGN (macos): 上游 `mel_band_roformer/inference.py::_resolve_device()` 對 `auto` **只檢查 CUDA**，
+  找不到就 `print("CUDA is not available. Falling back to CPU. This will be slow.")` 回傳 cpu——
+  **它從頭到尾不認得 MPS**。而 `PluginProcessor.cpp` 的 RoFormer device 字串在 `backend == 0`
+  （auto，**預設值**）時傳的就是 `"auto"`，所以 **Apple Silicon 上每一次 RoFormer 分離都跑在 CPU**，
+  使用者得自己去進階面板改成「Apple Metal (MPS)」才會用到 GPU。偵測方法：worker 的 stderr 會直接
+  印出那行 `Falling back to CPU`。修在 `worker/roformer_worker.py`（送進上游之前自己解析 auto），
+  不要修在 C++——凍結 runtime 與原始碼執行才會走同一條路。加速依模型而定，不是齊頭的：
+  整首 246.7 秒檔案上 guitar 461→198 秒（約 2.3×），但 karaoke-gabox 只快 7%。
+  正確性已驗：MPS 與 CPU 輸出相關係數 0.9999999999、逐樣本最大差 2.8e-05（float32 捨入）。
+- SIGN (macos): **效能比較一律用真實長度的檔案，短片段會系統性低估加速比。** 同一個 guitar 模型：
+  30 秒片段量出 CPU 56 s vs MPS 36 s ＝ 1.56×；整首 246.72 秒量出 CPU ~461 s vs MPS 198 s ＝ 2.3×。
+  差距全部來自模型載入與暖機這類**固定成本**——片段越短，固定成本在總時間裡的佔比越大，
+  把兩邊的比值往 1 壓。30 秒片段拿來驗「功能會不會壞」很好用（LESSONS 2026-09-06 已記），
+  但拿來量「快多少」會得到偏保守的錯誤結論。
+- SIGN (2026-09-14): **不可以用「同家族、同檔案大小」去推論一個沒量過的模型要跑多久。**
+  karaoke-gabox 與 melband-roformer-kim-vocals 都是 913 MB、同為 MelBand RoFormer，
+  實測 karaoke **10.2× realtime**、kim-vocals **2.3–2.9× realtime**，差約四倍。
+  2026-09-12 那條「RoFormer 耗時由序列長度決定、與 checkpoint 大小幾乎無關」說的是
+  「**大小不能用來預測速度**」，不是「同大小的模型速度相近」——本輪就是把它誤讀成後者，
+  推出「karaoke 約 10 分鐘」而實際是約 45 分鐘，差點讓 UI 的預估值寫錯四倍。
+  沒量過的模型就去量，不要外推。
+- SIGN (macos, 工具面): 上游在推論開始時印的
+  `Estimated total processing time for this track: <n> seconds` **是可信的**，不必等跑完。
+  驗證方法：取樣兩次 `Estimated time remaining`，比對「估計值下降量 ÷ 牆鐘經過秒數」，
+  比值接近 1.0 就代表估計準確（本輪量到 1.08×）。這讓「要跑 45 分鐘的模型」可以在 90 秒內
+  得到可信的總時長，不必真的等完。
