@@ -9,6 +9,6 @@
   },
   "scope": {
     "allow_paths": ["plugin/", "cpp/", "worker/", "tests/", "tools/", "assets/models/", "docs/", "CMakeLists.txt", "README.md", ".gitignore", "CLAUDE.md"],
-    "deny_paths": ["third_party/", "patches/", "dist/", "build/windows-web/", "assets/models/*.th", "assets/models/*.yaml", "assets/models/model-manifest.json", "AGENTS.md", "CODEX_HANDOFF.md", "THIRD_PARTY_NOTICES.md", "docs/RELEASING_WINDOWS.md", "TRANSFER_BINARY_SHA256.txt", ".gitattributes", ".gitmodules"]
+    "deny_paths": ["third_party/", "patches/", "dist/", "build/windows-web/", "assets/models/*.th", "assets/models/*.yaml", "assets/models/model-manifest.json", "AGENTS.md", "docs/history/CODEX_HANDOFF.md", "THIRD_PARTY_NOTICES.md", "docs/RELEASING_WINDOWS.md", "docs/history/TRANSFER_BINARY_SHA256.txt", ".gitattributes", ".gitmodules"]
   }
 }

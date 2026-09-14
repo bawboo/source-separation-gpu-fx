@@ -10,7 +10,13 @@
 - `packaging/windows/`: Inno Setup source.
 - `third_party/JUCE` and `third_party/demucs`: Git submodule links only.
 - `patches/`: reproducible project-specific changes applied to dependencies.
-- Root documentation, project licence and third-party notices.
+- `docs/`: build, release and porting guides. `docs/history/` holds documents a
+  later one replaced -- kept because they record why something was done, not
+  because they are still accurate. Nothing points readers at them.
+- Root documentation, project licence and third-party notices. The root is
+  deliberately short: README, the rules (`AGENTS.md`, `CLAUDE.md`), the
+  changelog, and the two licence files. Anything longer-lived than a single
+  milestone belongs in `docs/`.
 
 ## Never commit
 

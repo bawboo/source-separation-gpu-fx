@@ -12,17 +12,25 @@ GPU 加速，**不需要安裝 Python、CUDA toolkit 或任何其他東西**，�
 
 前往 **[最新版本](https://github.com/bawboo/source-separation-gpu-fx/releases/latest)**：
 
-| 我想要 | 下載 | 大小 |
+| 我想要 | 下載 | 下載量 |
 |---|---|---|
-| **一般使用（推薦）** | `Music_SSP_FX_Setup_x64.exe` | 5 MB |
+| **一般使用（推薦）** | `Music_SSP_FX_Setup_x64.exe` | 5 MB ＋ 執行時再抓 178 MB（CPU）或 1.6 GB（GPU） |
 | 免安裝，沒有 NVIDIA 顯示卡 | `Music_SSP_FX_Portable_win64_cpu-*.zip` | 268 MB |
 | 免安裝，有 NVIDIA 顯示卡 | `Music_SSP_FX_Portable_win64_cuda-*.part1of3.zip` 等三個檔 | 合計 2.6 GB |
 
-安裝程式只有 5 MB，它會偵測你的顯示卡再下載對應的版本，所以實際下載量等於上表的
-免安裝版大小。安裝時可以自己選：**自動偵測（預設）／CPU／GPU (CUDA)**。
+安裝程式本身只有 5 MB，它會偵測你的顯示卡再下載對應的 runtime。安裝時可以自己選：
+**自動偵測（預設）／CPU／GPU (CUDA)**，選擇頁會直接告訴你這台電腦會裝哪一種、要下載
+多少、大概多久。
 
-免安裝的 GPU 版因為超過 GitHub 單檔上限而分成三個壓縮檔，**三個都要解壓縮到
-同一個資料夾**才完整。嫌麻煩就用安裝程式。
+安裝版的下載量比免安裝版小，是因為 runtime 用 7z/LZMA2 壓縮（免安裝版維持 zip，
+Windows 檔案總管才能直接打開）。**GPU 版完整安裝實測約 4.5 分鐘**。
+
+免安裝的 GPU 版分成三個壓縮檔，**三個都要解壓縮到同一個資料夾**才完整。嫌麻煩就用
+安裝程式。
+
+> runtime 與免安裝包放在 **[Hugging Face](https://huggingface.co/BAM/music-ssp-fx-runtime)**，
+> 不是 GitHub——實測 GitHub 的 release 下載在部分網路環境只有 0.5 MB/s，而 HF 有 8 MB/s。
+> 安裝程式仍逐檔驗證 SHA-256。
 
 > 執行檔沒有經過程式碼簽章，Windows SmartScreen 首次執行會跳警告。
 > 點「其他資訊」→「仍要執行」即可。
@@ -155,27 +163,47 @@ tools\build_windows_installed.cmd
 確認使用 64 位元工具鏈（`/p:PreferredToolArchitecture=x64`）—— `SpscRing` 具現化
 會讓 32 位元的 `cl` 爆掉。
 
-### macOS（Intel ＋ Apple Silicon 通用二進位）
+### macOS（Intel ＋ Apple Silicon）
 
 ```bash
-tools/build_macos.sh
+tools/macos_build_everything.sh              # 從零到可執行的 .app
+tools/macos_build_everything.sh --arm64-only # 只做 Apple Silicon（快很多）
 ```
 
-產物：`build/macos/HTDemucsGpuFX_artefacts/Release/Music SSP FX.app`
-（`lipo -info` 可確認同時含 `x86_64` 與 `arm64`）。需要 Xcode Command Line Tools。
+一支腳本做完六件事：檢查工具、建立 Python 環境、建 LGPL FFmpeg、凍結 runtime、
+封裝、建 `.app` 並 ad-hoc 簽章。缺什麼會直接告訴你要裝什麼，中斷後重跑會跳過已完成的
+部分。完整說明見 **[docs/MACOS_BUILD.md](docs/MACOS_BUILD.md)**。
+
+`.app` 是通用二進位，但 **runtime 必須每個架構各一份**：PyTorch 從 2.3.0 起就不再
+發布 macOS x86_64 的 wheel，所以 Intel 版鎖在 torch 2.1–2.2 ＋ numpy<2，而且只有 CPU、
+沒有加速。兩份都能在同一台 Apple Silicon Mac 上產出（x86_64 走 Rosetta 2）。
 
 ## 打包
 
 發行包用的 frozen runtime 同時含 HTDemucs 與 RoFormer 兩個後端，共用同一份 PyTorch
 （不是兩份 —— 分開凍結會讓下載多出約 2.5 GB）。
 
+Windows：
+
 ```powershell
 tools\build_standalone_runtime.ps1 -Python <python.exe> -Flavor cuda|cpu
 tools\package_windows_runtime.ps1 -Flavor cuda|cpu -Version <ver>
 tools\package_windows_installer_payload.ps1 -Version <ver> -LicenseCollectorPython <python.exe>
-tools\build_windows_web_installer.ps1 -ReleaseBaseUrl <tag url> -Version <ver>
+tools\build_windows_web_installer.ps1 -ReleaseBaseUrl <版本化的 https 路徑> -Version <ver>
 tools\package_portable.ps1 -Flavor cuda|cpu -Version <ver>
 ```
+
+macOS（上面那支 `macos_build_everything.sh` 會依序呼叫這三支）：
+
+```bash
+tools/build_ffmpeg_lgpl_macos.sh --arch arm64|x86_64
+tools/build_standalone_runtime_macos.sh --python <python>
+tools/package_macos_runtime.sh --arch arm64|x86_64 --version <ver> --ffmpeg <dir>
+```
+
+runtime 封存檔用 **7z/LZMA2 且必須 non-solid**（`-ms=off`）：Inno Setup 是一個項目
+一個項目解壓的，solid 封存檔每取一個檔就要重新解壓整個區塊，實測會把 20 秒的下載
+變成 16 分鐘的安裝。
 
 授權通知由 `tools/collect_runtime_licenses.py` 從凍結該 runtime 的直譯器動態收集，
 所以版本不會與實際出貨的套件脫節。
@@ -187,7 +215,9 @@ conda create -n htfx-roformer python=3.11 -y
 conda activate htfx-roformer
 pip install torch            # macOS 用預設 wheel；Windows CUDA 見下行
 # Windows CUDA: pip install torch --index-url https://download.pytorch.org/whl/cu126
-pip install -r requirements-htfx-roformer.txt
+pip install numpy demucs einops soundfile librosa ml_collections beartype
+# RoFormer 推論套件：PyPI 上只到 0.1.5，0.1.6 只在 GitHub 上，釘住 commit 才能重現
+pip install "git+https://github.com/openmirlab/melband-roformer-infer.git@77ff05e6ce533d85439d1e7a52d8316a2987c1b9"
 ```
 
 從原始碼執行時，**工作目錄必須是專案根目錄**，程式才找得到
@@ -225,11 +255,26 @@ build\...\htdemucs_goal_check.exe "<某首歌.wav>"          :: 端到端驗收
 ## 專案結構
 
 ```
-plugin/          JUCE 前端與音訊處理（PluginProcessor、Localization、SpscRing）
-cpp/             HTDemucs frozen worker 的 shared-memory IPC client
-worker/          Python worker（worker_main 分派器、HTDemucs IPC、RoFormer 推論與快取）
-tests/           smoke tests 與端到端驗收工具
-tools/           建置、封裝、驗證腳本
-assets/models/   模型 metadata 與 RoFormer 清單（權重不入版控）
-third_party/     vendored JUCE 8.0.13（已套用 patches/）與 Demucs
+plugin/            JUCE 前端與音訊處理（PluginProcessor、Localization、SpscRing）
+cpp/               HTDemucs frozen worker 的 shared-memory IPC client
+                   （Windows 已驗證；POSIX 版尚未在 macOS 上跑過）
+worker/            Python worker（worker_main 分派器、HTDemucs IPC、RoFormer 推論與快取）
+tests/             smoke tests 與端到端驗收工具
+tools/             建置、封裝、驗證腳本（*.ps1 Windows、*.sh macOS）
+packaging/windows/ Inno Setup 安裝程式原始碼
+assets/models/     模型 metadata 與 RoFormer 清單（權重不入版控）
+third_party/       vendored JUCE 8.0.13（已套用 patches/）與 Demucs
+docs/              建置、發行與移植說明；docs/history/ 是已被取代的歷史文件
 ```
+
+## 文件索引
+
+| 文件 | 內容 |
+|---|---|
+| [AGENTS.md](AGENTS.md) | 專案規則的唯一來源（`CLAUDE.md` 只是轉址） |
+| [CHANGELOG.md](CHANGELOG.md) | 版本紀錄 |
+| [docs/MACOS_BUILD.md](docs/MACOS_BUILD.md) | macOS 建置完整流程、簽章與散布 |
+| [docs/MACOS_HANDOFF.md](docs/MACOS_HANDOFF.md) | macOS 移植的交接說明（設計決定與已知風險） |
+| [docs/RELEASING_WINDOWS.md](docs/RELEASING_WINDOWS.md) | Windows 發行流程 |
+| [docs/REPOSITORY_LAYOUT.md](docs/REPOSITORY_LAYOUT.md) | 什麼該進版控、什麼不該 |
+| [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | 第三方授權與義務 |
