@@ -204,6 +204,26 @@ std::filesystem::path configuredModelsDirectory() {
     }
 
     const auto installedModels = installedDataDirectory().getChildFile("Models");
+#if JUCE_MAC
+    // Checkpoints are downloaded into whatever this returns, so it has to be a
+    // directory the user can write. On macOS the bundled copy sits inside the
+    // signed .app: writing there invalidates the signature, puts undistributable
+    // weights inside a redistributable bundle, and fails outright once the app
+    // is installed somewhere the user does not own. Windows gets this folder
+    // from its installer; with no installer here, the app seeds it from the
+    // bundle the first time it looks. Only the manifests are copied -- weights
+    // are always downloaded, never shipped.
+    if (!installedModels.getChildFile("model-manifest.json").existsAsFile() &&
+        std::filesystem::is_directory(bundled) &&
+        installedModels.createDirectory().wasOk()) {
+        const juce::File bundledModels{
+            juce::String::fromUTF8(bundled.string().c_str())};
+        for (const auto& manifest : bundledModels.findChildFiles(
+                 juce::File::findFiles, false, "*.json;*.yaml")) {
+            manifest.copyFileTo(installedModels.getChildFile(manifest.getFileName()));
+        }
+    }
+#endif
     if (installedModels.getChildFile("model-manifest.json").existsAsFile()) {
         return utf8Path(installedModels.getFullPathName());
     }
