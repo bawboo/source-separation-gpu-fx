@@ -4868,6 +4868,14 @@ public:
             quality.removeFromLeft(8);
             qualityHighButton_.setBounds(quality.removeFromLeft(120));
             quality.removeFromLeft(10);
+            // While something is running this row carries Cancel instead of
+            // the explanation: the general panel's only other way out was Esc,
+            // which nothing on screen mentions, so a run started by accident
+            // had no visible way to stop it.
+            if (cancelButton_.isVisible()) {
+                cancelButton_.setBounds(quality.removeFromRight(96));
+                quality.removeFromRight(8);
+            }
             qualityHint_.setBounds(quality);
             area.removeFromTop(8);
             auto exports = area.removeFromTop(38);
@@ -5510,6 +5518,9 @@ private:
 
     void setAdvancedPanel(bool advanced) {
         advancedPanel_ = advanced;
+        if (!advanced) {
+            snapToExpressibleQuality();
+        }
         updatePanelSwitchButtonText();
         updatePanelVisibility();
         updateVisibility();
@@ -5829,6 +5840,18 @@ private:
         return index >= 0 && separationModeBox_.getSelectedItemIndex() == index;
     }
 
+    // The general panel can only say two things: Standard and High quality.
+    // Anything else chosen on the advanced panel would keep running here with
+    // nothing on screen to show it -- which is how a four-minute song quietly
+    // became a fifty-minute one after a visit to the advanced panel. If the
+    // active mode is not one this panel can express, it goes back to Standard.
+    void snapToExpressibleQuality() {
+        if (separationModeBox_.getSelectedItemIndex() == 0 || highQualitySelected()) {
+            return;
+        }
+        separationModeBox_.setSelectedItemIndex(0, juce::sendNotificationSync);
+    }
+
     void selectQuality(bool high) {
         if (high && !categoryUsableHere(kHighQualityCategory)) {
             return;
@@ -5932,6 +5955,10 @@ private:
         const bool high = highQualitySelected();
         const bool onCpu =
             computeBox_.getSelectedItemIndex() == 2 || processor_.resolvedToCpu();
+        // Apple Silicon is a third case, not a fast one: measured on an M1,
+        // HTDemucs takes about a minute and RoFormer about fifty. Folding MPS
+        // in with CUDA told a Mac user "3 minutes" for a fifty-minute run.
+        const bool onMps = !onCpu && processor_.getRuntimeFlavor() == "mps";
         if (!available) {
             // Shown, not hidden: a CPU user should be able to see the feature
             // exists and what it would take to get it.
@@ -5939,7 +5966,15 @@ private:
                                              juce::Colour(HtfxLookAndFeel::kAccent));
             qualityHighButton_.setColour(juce::TextButton::buttonColourId,
                                          juce::Colour(HtfxLookAndFeel::kSurfaceRaised));
-            const auto reason = htfx::tr("hint.qualityNeedsGpu");
+            // The CPU build's advice is platform-specific: there is no NVIDIA
+            // card to go and get on a Mac.
+            const auto reason = htfx::tr(
+#if JUCE_MAC
+                "hint.qualityNeedsGpuMac"
+#else
+                "hint.qualityNeedsGpu"
+#endif
+            );
             if (reason != qualityHint_.getText()) {
                 qualityHint_.setText(reason, juce::dontSendNotification);
                 qualityHint_.setTooltip(reason);
@@ -5954,8 +5989,12 @@ private:
             juce::Colour(high ? HtfxLookAndFeel::kAccent : HtfxLookAndFeel::kSurfaceRaised));
         auto hint = htfx::tr(high ? "hint.qualityHigh" : "hint.qualityStandard");
         const auto estimate = htfx::tr(
-            high ? (onCpu ? "estimate.highCpu" : "estimate.highGpu")
-                 : (onCpu ? "estimate.standardCpu" : "estimate.standardGpu"));
+            high ? (onCpu   ? "estimate.highCpu"
+                    : onMps ? "estimate.highMps"
+                            : "estimate.highGpu")
+                 : (onCpu   ? "estimate.standardCpu"
+                    : onMps ? "estimate.standardMps"
+                            : "estimate.standardGpu"));
         if (estimate.isNotEmpty()) {
             hint += " " + htfx::tr("hint.estimatePrefix") + estimate +
                     htfx::tr("hint.estimateSuffix");
@@ -6165,7 +6204,8 @@ private:
             recordButton_.setVisible(false);
             separateButton_.setVisible(false);
             exportButton_.setVisible(false);
-            cancelButton_.setVisible(false);
+            // Cancel is owned by the timer on both panels now, so it is not
+            // forced off here -- doing that would hide it mid-run.
             previewGroup_.setVisible(false);
             previewPlayButton_.setVisible(false);
             previewStopButton_.setVisible(false);
@@ -6248,10 +6288,18 @@ private:
         separateButton_.setEnabled(
             !recording && !busy && processor_.getRecordedSeconds() > 0.0);
         exportButton_.setEnabled(!recording && !busy && processor_.hasPreview());
-        // Only the advanced panel lays the Cancel button out; the simple
-        // panel cancels with Esc.
-        cancelButton_.setVisible(advancedPanel_ &&
-                                 ((recordMode && (separationBusy || mediaBusy)) || modelBusy));
+        // Both panels show Cancel while something is running. The general
+        // panel used to rely on Esc alone, which it never mentioned.
+        const bool cancellable =
+            (recordMode && (separationBusy || mediaBusy)) || modelBusy;
+        const bool wantsCancel = advancedPanel_ ? cancellable
+                                                : (cancellable || processor_.isBatchBusy());
+        if (wantsCancel != cancelButton_.isVisible()) {
+            cancelButton_.setVisible(wantsCancel);
+            if (!advancedPanel_) {
+                resized();  // the quality row gives up its hint area for it
+            }
+        }
         const bool configurationEnabled = !recording && !busy;
         const bool modeChosen = separationModeBox_.getSelectedItemIndex() >= 0;
         const bool roformerModeActive = roformerModeSelected();

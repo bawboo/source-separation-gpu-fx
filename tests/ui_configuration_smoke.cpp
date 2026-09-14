@@ -405,7 +405,27 @@ int run() {
         qualityStandard->onClick();
         require(separationMode->getSelectedItemIndex() == 0,
                 "Standard did not select 4-stem separation");
-        qualitySummary = "standard/high";
+
+        // A mode the general panel cannot express must not survive the trip
+        // back from the advanced panel: it would keep running with nothing on
+        // screen to show it, which is how a four-minute song silently became a
+        // fifty-minute one after someone tried Dereverb.
+        const int dereverbMode = [&] {
+            for (int i = 0; i < separationMode->getNumItems(); ++i) {
+                if (separationMode->getItemText(i) == htfx::glossed("Dereverb")) return i;
+            }
+            return -1;
+        }();
+        require(dereverbMode >= 2, "Dereverb mode entry missing from the mode list");
+        // The advanced panel is already showing here.
+        separationMode->setSelectedItemIndex(dereverbMode, juce::sendNotificationSync);
+        require(separationMode->getSelectedItemIndex() == dereverbMode,
+                "the advanced panel could not select Dereverb");
+        panelSwitch->onClick();  // -> general
+        require(separationMode->getSelectedItemIndex() == 0,
+                "returning to the general panel kept a mode it cannot show");
+        panelSwitch->onClick();  // -> advanced, as the rest of this block expects
+        qualitySummary = "standard/high/snaps-back";
     }
 
     juce::String roformerStemLabelSummary;
