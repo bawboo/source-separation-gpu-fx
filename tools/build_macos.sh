@@ -4,6 +4,14 @@
 #   tools/build_macos.sh                   # standalone app only (default)
 #   tools/build_macos.sh --plugin          # also build the VST3
 #   tools/build_macos.sh --bundle-runtime  # self-contained, ad-hoc signed .app
+#   tools/build_macos.sh --bundle-runtime --runtime-arch x86_64
+#                                          # ... carrying the Intel runtime
+#
+# The binary is always universal. --runtime-arch picks which architecture's
+# frozen worker travels inside it, and defaults to this machine's. Building
+# the Intel bundle on an Apple Silicon Mac needs it: without it the build
+# quietly stages the arm64 runtime into an app meant for Intel, and the result
+# looks right until someone presses Separate on a real Intel Mac.
 #
 # Requirements: Xcode Command Line Tools (clang, macOS SDK) and CMake 3.22+.
 # The RoFormer models additionally need a Python environment — see README.
@@ -13,15 +21,25 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build_dir="$repo_root/build/macos"
 standalone_only=ON
 bundle_runtime=OFF
-for arg in "$@"; do
-    case "$arg" in
+runtime_arch="$(uname -m)"
+while [ $# -gt 0 ]; do
+    case "$1" in
         --plugin) standalone_only=OFF ;;
-        # Stage the sidecar resources and the frozen runtime for this Mac's
-        # architecture into the .app, then ad-hoc sign it, so the bundle runs
-        # on a machine that has none of this repository.
+        # Stage the sidecar resources and a frozen runtime into the .app, then
+        # ad-hoc sign it, so the bundle runs on a machine that has none of this
+        # repository.
         --bundle-runtime) bundle_runtime=ON ;;
-        *) echo "unknown option: $arg" >&2; exit 2 ;;
+        --runtime-arch)
+            runtime_arch="${2:-}"
+            case "$runtime_arch" in
+                arm64|x86_64) ;;
+                *) echo "--runtime-arch must be arm64 or x86_64" >&2; exit 2 ;;
+            esac
+            shift
+            ;;
+        *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
+    shift
 done
 
 command -v cmake >/dev/null || {
@@ -90,15 +108,19 @@ if [ "$bundle_runtime" = ON ]; then
     done
     cp "$repo_root"/assets/models/*.yaml "$sidecar/models/" 2>/dev/null || true
 
-    arch="$(uname -m)"
-    staged_runtime="$repo_root/build/macos-runtime-$arch/Resources/sidecar/Runtime"
+    staged_runtime="$repo_root/build/macos-runtime-$runtime_arch/Resources/sidecar/Runtime"
     if [ -d "$staged_runtime" ]; then
-        echo "staging the $arch runtime into the bundle..."
+        echo "staging the $runtime_arch runtime into the bundle..."
         cp -R "$staged_runtime" "$sidecar/Runtime"
+        # The whole point of the flag is that this can now disagree with the
+        # build machine, so say what actually went in rather than what was
+        # asked for.
+        worker="$sidecar/Runtime/htdemucs-worker/htdemucs-worker"
+        [ -f "$worker" ] && file -b "$worker" | head -n 1
     else
-        echo "no staged runtime for $arch; the app will need one before it can" >&2
-        echo "separate. Run tools/build_standalone_runtime_macos.sh and" >&2
-        echo "tools/package_macos_runtime.sh first." >&2
+        echo "no staged runtime for $runtime_arch; the app will need one before" >&2
+        echo "it can separate. Run tools/build_standalone_runtime_macos.sh and" >&2
+        echo "tools/package_macos_runtime.sh --arch $runtime_arch first." >&2
     fi
 
     # Apple Silicon refuses to execute any Mach-O without a signature. The

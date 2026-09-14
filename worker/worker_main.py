@@ -13,7 +13,17 @@ the C++ client needs no change for HTDemucs.
 
 from __future__ import annotations
 
+import os
 import sys
+
+# Both back-ends need this, and it only works before torch is imported -- so it
+# belongs at the single entry point they share. It used to live in
+# gpu_ipc_worker, which the roformer branch never imports, leaving the RoFormer
+# path with no fallback at all. That went unnoticed because the arm64 runtime's
+# torch implements the operations natively; the Intel one, pinned to 2.2.2,
+# does not. The gap was luck, not design.
+if sys.platform == "darwin":
+    os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
 
 def _run_as_multiprocessing_helper() -> int | None:

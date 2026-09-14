@@ -97,6 +97,35 @@ def _stage_input(source: Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
+def _mps_can_run_roformer() -> bool:
+    """Ask the MPS backend to do the two things this model needs.
+
+    is_available() answers "is there a Metal device", not "can it run this".
+    torch 2.2.2 -- the last version with a macOS x86_64 wheel, so the one the
+    Intel runtime is pinned to -- says MPS is available and then dies twice
+    over on RoFormer: aten::_fft_r2c is unimplemented, and with
+    PYTORCH_ENABLE_MPS_FALLBACK set to get past that, the complex64 tensors
+    the STFT produces cannot live on the device at all.
+
+    So probe both, on tensors small enough that the cost is a rounding error
+    against a separation. A version check would be the same kind of guess this
+    replaces; running the operation is the only answer that stays true when
+    torch changes underneath.
+    """
+    import torch
+
+    try:
+        torch.zeros(2, dtype=torch.complex64, device="mps")
+        window = torch.hann_window(64, device="mps")
+        spectrum = torch.stft(
+            torch.zeros(256, device="mps"), n_fft=64, window=window,
+            return_complex=True)
+        # .item() forces the lazy queue to actually run.
+        return bool(torch.isfinite(spectrum.abs().sum()).item())
+    except Exception:  # NotImplementedError, TypeError and RuntimeError seen
+        return False
+
+
 def resolve_device(device: str) -> str:
     """Turn "auto" into something this machine can actually use.
 
@@ -111,6 +140,10 @@ def resolve_device(device: str) -> str:
     hand -- silently runs every separation on the CPU while an MPS device sits
     idle. Resolve it here instead, before the string reaches upstream, so both
     the frozen runtime and a source checkout behave the same way.
+
+    An explicit device is passed through untouched: someone who typed "mps"
+    is asking to find out what happens, and hiding the failure would be worse
+    than the failure.
     """
     if device not in ("", "auto", None):
         return device
@@ -124,7 +157,7 @@ def resolve_device(device: str) -> str:
     if torch.cuda.is_available():
         return "cuda:0"
     mps = getattr(torch.backends, "mps", None)
-    if mps is not None and mps.is_available():
+    if mps is not None and mps.is_available() and _mps_can_run_roformer():
         return "mps"
     return "cpu"
 

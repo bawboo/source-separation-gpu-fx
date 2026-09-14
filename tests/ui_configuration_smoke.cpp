@@ -452,6 +452,16 @@ int run() {
         qualitySummary = "standard/high/snaps-back";
     }
 
+    // Every mode is selectable on every runtime. The list used to grey out the
+    // categories a CPU build ran slowly, and the summary line said
+    // "separation_mode_gate=true" -- a literal, asserting nothing, which went
+    // on reading true after the gate was taken out.
+    juce::String modeSelectabilitySummary = "all";
+    for (int index = 0; index < separationMode->getNumItems(); ++index) {
+        require(separationMode->isItemEnabled(separationMode->getItemId(index)),
+                "a separation mode is not selectable");
+    }
+
     juce::String roformerStemLabelSummary;
     int expectedVocalsMode = -1;
     for (int index = 0; index < separationMode->getNumItems(); ++index) {
@@ -1073,7 +1083,8 @@ int run() {
                  " roformer_stems=2 roformer_seconds=2"
                  " roformer_browser=" << roformerModels.size() << " categories=" << roformerCategoryCount << " search=true"
                  " experimental=none download_status=true"
-                 " separation_mode_gate=true separation_modes=" << (2 + roformerCategoryCount) <<
+                 " separation_modes_selectable=" << modeSelectabilitySummary <<
+                 " separation_modes=" << (2 + roformerCategoryCount) <<
                  " separation_mode_defaults=true separation_mode_stem_gating=true"
                  " separation_mode_all_categories_verified=true"
                  " startup_default_mode=htdemucs4"

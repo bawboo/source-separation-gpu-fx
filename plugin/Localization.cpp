@@ -45,16 +45,15 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"hint.qualityHigh",
          StringPair{u8"保留和聲（只拿掉主唱），品質更好。",
                     u8"Keeps the backing vocals; only the lead is removed."}},
-        {"hint.qualityNeedsGpu",
-         StringPair{u8"高品質模式需要 NVIDIA 顯示卡；你安裝的是 CPU 版，"
-                    u8"它在 CPU 上一首歌要 50 分鐘左右。",
-                    u8"High quality needs an NVIDIA GPU. This is the CPU build, "
-                    u8"where it would take about 50 minutes per song."}},
-        {"hint.qualityNeedsGpuMac",
-         StringPair{u8"高品質模式需要 Apple Silicon 的 GPU；這台是 Intel Mac，"
-                    u8"它在 CPU 上一首歌要 50 分鐘左右。",
-                    u8"High quality needs an Apple Silicon GPU. This is an Intel "
-                    u8"Mac, where it would take about 50 minutes per song."}},
+        // 高品質在沒有 CUDA 的機器上要跑幾十分鐘。它仍然可以按——那是使用者
+        // 自己的取捨——但那種長度不能用「順帶一提」的語氣講，所以警告版另外
+        // 成句，並且把提示文字染成警示色。
+        {"hint.qualityHighSlow",
+         StringPair{u8"保留和聲，品質更好，但這台電腦跑它很慢：",
+                    u8"Keeps the backing vocals, but slow on this machine. "}},
+        {"hint.qualityHighSlowTail",
+         StringPair{u8"，確定等得及再按。",
+                    u8". Only start it if you can wait."}},
         // 量測自本專案自己的 runtime，不是估計值。CPU/CUDA 量在 RTX 4050
         // Laptop 的開發機；MPS 量在 MacBook Air M1，換算成 4 分鐘的歌。
         // 兩個 high 的數字量的都是 karaoke-gabox 本人，也就是「高品質」實際會
@@ -90,7 +89,7 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"clip.exportFinishedSuffix", StringPair{u8" 個檔案", u8" files"}},
         {"clip.noneSelected", StringPair{u8"沒有勾選任何檔案", u8"No files selected"}},
         {"clip.exportingPrefix", StringPair{u8"正在匯出 ", u8"Exporting "}},
-        {"status.cpuModeWarning", StringPair{u8"CPU 模式：一首 4 分鐘的歌約 3 分鐘。RoFormer 的高品質模式需要 NVIDIA 顯示卡，在 CPU 上一首歌要 50 分鐘左右，因此未提供。", u8"CPU mode: about 3 minutes for a 4-minute song. The high-quality RoFormer modes need an NVIDIA GPU -- on CPU they take about 50 minutes per song, so they are not offered."}},
+        {"status.cpuModeWarning", StringPair{u8"CPU 模式：一首 4 分鐘的歌約 3 分鐘。RoFormer 的高品質模式仍然可以用，但在 CPU 上一首歌要 50 分鐘左右。", u8"CPU mode: about 3 minutes for a 4-minute song. The high-quality RoFormer modes still work here, but take about 50 minutes per song on CPU."}},
         {"clip.chooseExportFolder", StringPair{u8"選擇匯出資料夾", u8"Choose export folder"}},
         {"button.import", StringPair{u8"匯入音訊／影片", u8"Import audio/video"}},
         {"status.readyToRecord", StringPair{u8"準備就緒，可以錄音或匯入", u8"Ready to record or import"}},

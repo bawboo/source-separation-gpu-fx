@@ -4449,14 +4449,13 @@ public:
                               category.substring(1)),
                 separationModeBox_.getNumItems() + 1);
         }
-        // A category this runtime cannot run stays in the list, greyed out.
-        // Hiding it made the CPU build look like a different product with
-        // fewer features rather than the same product needing a GPU.
-        for (int index = 0; index < separationModeCategories_.size(); ++index) {
-            if (!categoryUsableHere(separationModeCategories_[index])) {
-                separationModeBox_.setItemEnabled(index + 3, false);
-            }
-        }
+        // Every category stays selectable on every runtime. They were greyed
+        // out on CPU while the cost was believed to be an hour and a half per
+        // song; measured, it is about fifty minutes -- the same order as the
+        // forty-five an Apple Silicon machine takes for the mode that was
+        // never blocked. Blocking one and allowing the other could not be
+        // explained to the person looking at both. What the slow runtimes get
+        // instead is the real number, before they commit to it.
         separationModeBox_.onChange = [this] { onSeparationModeChanged(); };
         addAndMakeVisible(separationModeBox_);
 
@@ -5783,10 +5782,7 @@ private:
         } else if (modeKey.startsWith("category:")) {
             const auto category = modeKey.fromFirstOccurrenceOf(":", false, false);
             const auto categoryIndex = separationModeCategories_.indexOf(category);
-            // A category this runtime cannot run must not come back just
-            // because it was the last one chosen elsewhere -- on the CPU
-            // build that would restore a mode whose own entry is greyed out.
-            if (categoryIndex >= 0 && categoryUsableHere(category)) {
+            if (categoryIndex >= 0) {
                 target = 2 + categoryIndex;
             }
         }
@@ -5822,20 +5818,16 @@ private:
         return categoryIndex >= 0 ? categoryIndex + 2 : -1;
     }
 
-    // True when this runtime can actually run the category. Which models the
-    // CPU runtime is allowed to offer is a per-model fact in the catalogue,
-    // not a guess made here: karaoke-gabox measured 11.56x realtime on this
-    // project's own x86 CPU and 10.95x on an M1's, so about 50 minutes for a
-    // four-minute song. The modes stay on screen but are not selectable, so a
-    // CPU user can see the feature exists rather than wondering what is
-    // missing.
-    [[nodiscard]] bool categoryUsableHere(const juce::String& category) const {
-        for (const auto& model : processor_.getRoformerModels()) {
-            if (model.category.equalsIgnoreCase(category) && model.cpuCapable) {
-                return true;
-            }
-        }
-        return processor_.getRuntimeFlavor() != "cpu";
+    // True when the RoFormer models will take tens of minutes here rather
+    // than a few. Measured against karaoke-gabox, the model High quality
+    // runs: 11.56x realtime on this project's x86 CPU, 10.95x on an M1's,
+    // 10.2x on that M1's GPU -- MPS buys this model about 7%, because the
+    // work is upstream's, not ours. Only CUDA changes the answer, at 0.911x.
+    // Nothing is blocked on the strength of this; it decides whether the user
+    // is told the number in passing or warned about it.
+    [[nodiscard]] bool roformerIsSlowHere() const {
+        return computeBox_.getSelectedItemIndex() == 2 || processor_.resolvedToCpu() ||
+               processor_.getRuntimeFlavor() != "cuda";
     }
 
     [[nodiscard]] bool highQualitySelected() const {
@@ -5856,9 +5848,6 @@ private:
     }
 
     void selectQuality(bool high) {
-        if (high && !categoryUsableHere(kHighQualityCategory)) {
-            return;
-        }
         const int target = high ? highQualityModeIndex() : 0;
         if (target < 0) {
             // The catalogue has no karaoke category on this runtime; leave the
@@ -5953,8 +5942,6 @@ private:
         if (!qualityStandardButton_.isVisible()) {
             return;
         }
-        const bool available = categoryUsableHere(kHighQualityCategory);
-        qualityHighButton_.setEnabled(available);
         const bool high = highQualitySelected();
         const bool onCpu =
             computeBox_.getSelectedItemIndex() == 2 || processor_.resolvedToCpu();
@@ -5962,35 +5949,22 @@ private:
         // HTDemucs takes about a minute and RoFormer about fifty. Folding MPS
         // in with CUDA told a Mac user "3 minutes" for a fifty-minute run.
         const bool onMps = !onCpu && processor_.getRuntimeFlavor() == "mps";
-        if (!available) {
-            // Shown, not hidden: a CPU user should be able to see the feature
-            // exists and what it would take to get it.
-            qualityStandardButton_.setColour(juce::TextButton::buttonColourId,
-                                             juce::Colour(HtfxLookAndFeel::kAccent));
-            qualityHighButton_.setColour(juce::TextButton::buttonColourId,
-                                         juce::Colour(HtfxLookAndFeel::kSurfaceRaised));
-            // The CPU build's advice is platform-specific: there is no NVIDIA
-            // card to go and get on a Mac.
-            const auto reason = htfx::tr(
-#if JUCE_MAC
-                "hint.qualityNeedsGpuMac"
-#else
-                "hint.qualityNeedsGpu"
-#endif
-            );
-            if (reason != qualityHint_.getText()) {
-                qualityHint_.setText(reason, juce::dontSendNotification);
-                qualityHint_.setTooltip(reason);
-            }
-            return;
-        }
         qualityStandardButton_.setColour(
             juce::TextButton::buttonColourId,
             juce::Colour(high ? HtfxLookAndFeel::kSurfaceRaised : HtfxLookAndFeel::kAccent));
         qualityHighButton_.setColour(
             juce::TextButton::buttonColourId,
             juce::Colour(high ? HtfxLookAndFeel::kAccent : HtfxLookAndFeel::kSurfaceRaised));
-        auto hint = htfx::tr(high ? "hint.qualityHigh" : "hint.qualityStandard");
+        const bool warn = high && roformerIsSlowHere();
+        // Tens of minutes is not something to mention in passing, so the warned
+        // form says it plainly and colours the line. It stays a sentence rather
+        // than a dialog: the run has not started, and a modal asking "are you
+        // sure" before every long job is its own kind of rude.
+        qualityHint_.setColour(
+            juce::Label::textColourId,
+            juce::Colour(warn ? HtfxLookAndFeel::kVocals : HtfxLookAndFeel::kTextMuted));
+        auto hint = htfx::tr(warn ? "hint.qualityHighSlow"
+                                  : (high ? "hint.qualityHigh" : "hint.qualityStandard"));
         const auto estimate = htfx::tr(
             high ? (onCpu   ? "estimate.highCpu"
                     : onMps ? "estimate.highMps"
@@ -5998,7 +5972,10 @@ private:
                  : (onCpu   ? "estimate.standardCpu"
                     : onMps ? "estimate.standardMps"
                             : "estimate.standardGpu"));
-        if (estimate.isNotEmpty()) {
+        if (warn) {
+            hint += htfx::tr("hint.estimatePrefix") + estimate +
+                    htfx::tr("hint.estimateSuffix") + htfx::tr("hint.qualityHighSlowTail");
+        } else if (estimate.isNotEmpty()) {
             hint += " " + htfx::tr("hint.estimatePrefix") + estimate +
                     htfx::tr("hint.estimateSuffix");
         }
