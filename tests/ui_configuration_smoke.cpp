@@ -14,6 +14,32 @@
 #include <thread>
 #include <vector>
 
+#ifdef _WIN32
+#include <stdlib.h>
+#else
+#include <cstdlib>
+#endif
+
+namespace {
+
+// _wputenv_s is Microsoft's; setenv is everyone else's. The empty value is not
+// a detail to gloss over: on Windows _wputenv_s with "" REMOVES the variable,
+// so the POSIX side unsets rather than setting it to an empty string, and the
+// two platforms agree about what the app will see.
+void setSmokeEnvironment(const char* name, const juce::String& value) {
+#ifdef _WIN32
+    _wputenv_s(juce::String(name).toWideCharPointer(), value.toWideCharPointer());
+#else
+    if (value.isEmpty()) {
+        ::unsetenv(name);
+    } else {
+        ::setenv(name, value.toRawUTF8(), 1);
+    }
+#endif
+}
+
+}  // namespace
+
 namespace {
 
 // The offered catalog is the curated list, not the whole manifest; read the
@@ -155,11 +181,11 @@ int run() {
     require(fixture.existsAsFile(), "RoFormer fixture is missing");
     require(roformerPython.existsAsFile(), "htfx-roformer Python is missing");
     require(roformerWorker.existsAsFile(), "RoFormer worker script is missing");
-    _wputenv_s(L"HTFX_USE_FAKE_WORKER", L"");
-    _wputenv_s(L"HTFX_ROFORMER_PYTHON", roformerPython.getFullPathName().toWideCharPointer());
-    _wputenv_s(L"HTFX_ROFORMER_WORKER", roformerWorker.getFullPathName().toWideCharPointer());
-    _wputenv_s(L"HTFX_ROFORMER_MODELS_DIR", roformerCache.getFullPathName().toWideCharPointer());
-    _wputenv_s(L"HTFX_ROFORMER_OUTPUT_DIR", roformerOutput.getFullPathName().toWideCharPointer());
+    setSmokeEnvironment("HTFX_USE_FAKE_WORKER", {});
+    setSmokeEnvironment("HTFX_ROFORMER_PYTHON", roformerPython.getFullPathName());
+    setSmokeEnvironment("HTFX_ROFORMER_WORKER", roformerWorker.getFullPathName());
+    setSmokeEnvironment("HTFX_ROFORMER_MODELS_DIR", roformerCache.getFullPathName());
+    setSmokeEnvironment("HTFX_ROFORMER_OUTPUT_DIR", roformerOutput.getFullPathName());
 
     // Isolate the UI language preference from a real user's saved choice —
     // must be set before the first Localization::instance() access, which
@@ -167,13 +193,11 @@ int run() {
     const auto languageSettingsFile =
         juce::File::getSpecialLocation(juce::File::tempDirectory)
             .getChildFile("htfx-ui-language-" + juce::Uuid().toString() + ".txt");
-    _wputenv_s(L"HTFX_UI_LANGUAGE_FILE",
-               languageSettingsFile.getFullPathName().toWideCharPointer());
+    setSmokeEnvironment("HTFX_UI_LANGUAGE_FILE", languageSettingsFile.getFullPathName());
     const auto startupSettingsFile =
         juce::File::getSpecialLocation(juce::File::tempDirectory)
             .getChildFile("htfx-ui-startup-" + juce::Uuid().toString() + ".txt");
-    _wputenv_s(L"HTFX_UI_STARTUP_FILE",
-               startupSettingsFile.getFullPathName().toWideCharPointer());
+    setSmokeEnvironment("HTFX_UI_STARTUP_FILE", startupSettingsFile.getFullPathName());
 
     juce::AudioProcessor::setTypeOfNextNewPlugin(
         juce::AudioProcessor::wrapperType_Standalone);
@@ -987,7 +1011,7 @@ int run() {
         require(emptyModels.createDirectory().wasOk(), "could not stage an empty models dir");
         emptyModels.getChildFile("model-manifest.json")
             .replaceWithText(R"({"models":{},"artifacts":{}})");
-        _wputenv_s(L"HTFX_MODELS_DIR", emptyModels.getFullPathName().toWideCharPointer());
+        setSmokeEnvironment("HTFX_MODELS_DIR", emptyModels.getFullPathName());
 
         juce::AudioProcessor::setTypeOfNextNewPlugin(
             juce::AudioProcessor::wrapperType_Standalone);
@@ -1026,7 +1050,7 @@ int run() {
         bareEditor.reset();
         bare->releaseResources();
         bare.reset();
-        _wputenv_s(L"HTFX_MODELS_DIR", L"");
+        setSmokeEnvironment("HTFX_MODELS_DIR", {});
         emptyModels.deleteRecursively();
         missingModelSummary = "usable";
     }
@@ -1078,6 +1102,7 @@ int runSmoke() {
     }
 }
 
+#ifdef _WIN32
 // An access violation exits the test with 0xC0000005 and nothing else. Catch
 // it here and walk the faulting thread from the exception context, so an
 // intermittent crash leaves a symbolized stack to debug from.
@@ -1129,3 +1154,11 @@ int main() {
         return 5;
     }
 }
+#else
+// StackWalk64/dbghelp and __try/__except are Microsoft extensions. A crash
+// here lands in the usual macOS crash reporter under
+// ~/Library/Logs/DiagnosticReports, which carries the same symbolized stack.
+int main() {
+    return runSmoke();
+}
+#endif
