@@ -51,6 +51,20 @@ xcode-select -p >/dev/null 2>&1 || {
     exit 1
 }
 
+# Checked here, before anything is built or deleted. Staging starts by
+# removing the existing sidecar, so discovering the missing runtime at that
+# point left the previous -- working -- bundle as rubble that still looks like
+# an app: right path, universal binary, no Runtime and a broken seal. A failed
+# run should cost you the run, not what you already had.
+staged_runtime="$repo_root/build/macos-runtime-$runtime_arch/Resources/sidecar/Runtime"
+if [ "$bundle_runtime" = ON ] && [ ! -d "$staged_runtime" ]; then
+    echo "no staged runtime for $runtime_arch, so --bundle-runtime cannot" >&2
+    echo "do what it was asked. Build and stage it first:" >&2
+    echo "    tools/build_standalone_runtime_macos.sh --python <$runtime_arch python>" >&2
+    echo "    tools/package_macos_runtime.sh --arch $runtime_arch --version dev --ffmpeg <dir>" >&2
+    exit 1
+fi
+
 # Patch the vendored JUCE exactly like the Windows build does.
 if [ -f "$repo_root/patches/juce-8.0.13-htfx.patch" ]; then
     juce_dir="$repo_root/third_party/JUCE"
@@ -108,27 +122,20 @@ if [ "$bundle_runtime" = ON ]; then
     done
     cp "$repo_root"/assets/models/*.yaml "$sidecar/models/" 2>/dev/null || true
 
-    staged_runtime="$repo_root/build/macos-runtime-$runtime_arch/Resources/sidecar/Runtime"
-    if [ -d "$staged_runtime" ]; then
-        echo "staging the $runtime_arch runtime into the bundle..."
-        cp -R "$staged_runtime" "$sidecar/Runtime"
-        # The whole point of the flag is that this can now disagree with the
-        # build machine, so say what actually went in rather than what was
-        # asked for.
-        worker="$sidecar/Runtime/htdemucs-worker/htdemucs-worker"
-        [ -f "$worker" ] && file -b "$worker" | head -n 1
-    else
-        # Fatal, not a warning. This used to print to stderr and exit 0, which
-        # meant "you asked me to bundle a runtime, I could not, and I am
-        # calling that success" -- and the app it left behind looks entirely
-        # correct until someone presses Separate. A human running this by hand
-        # might notice the line go past; a script calling it will not.
-        echo "no staged runtime for $runtime_arch, so --bundle-runtime cannot" >&2
-        echo "do what it was asked. Build and stage it first:" >&2
-        echo "    tools/build_standalone_runtime_macos.sh --python <$runtime_arch python>" >&2
-        echo "    tools/package_macos_runtime.sh --arch $runtime_arch --version dev --ffmpeg <dir>" >&2
+    # Its absence was fatal before the sidecar was touched, so by here it
+    # exists -- unless something removed it while cmake was running, which is
+    # worth failing on rather than silently shipping an app that cannot
+    # separate.
+    [ -d "$staged_runtime" ] || {
+        echo "the staged $runtime_arch runtime disappeared during the build" >&2
         exit 1
-    fi
+    }
+    echo "staging the $runtime_arch runtime into the bundle..."
+    cp -R "$staged_runtime" "$sidecar/Runtime"
+    # The whole point of the flag is that this can now disagree with the build
+    # machine, so say what actually went in rather than what was asked for.
+    worker="$sidecar/Runtime/htdemucs-worker/htdemucs-worker"
+    [ -f "$worker" ] && file -b "$worker" | head -n 1
 
     # Apple Silicon refuses to execute any Mach-O without a signature. The
     # frozen runtime's binaries are already ad-hoc signed by PyInstaller; this

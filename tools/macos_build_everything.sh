@@ -48,17 +48,23 @@ fi
 [ -f "$repo_root/third_party/demucs/demucs/__init__.py" ] ||
     die "demucs submodule 沒有取得。請執行：git submodule update --init --recursive"
 
-# Measured on the development Mac: the whole run peaks around 7 GB with both
-# architectures, during the second freeze -- two runtime trees, two staging
-# trees and PyInstaller's work directory, before any DMG exists. Check up
-# front, because running out halfway leaves a half-written dist and a failure
-# that says nothing about disk.
-need_gb=8
-[ ${#arches[@]} -eq 1 ] && need_gb=5
+# Running out halfway leaves a half-written dist behind an error that says
+# nothing about disk, so check first -- but check for what this run will
+# actually build. A flat threshold gets this backwards: the cheapest run,
+# where every expensive artifact is already there to reuse, is the one with
+# the least free space left to satisfy it. These are the same existence tests
+# steps 3 and 4 use to decide what to skip, so the estimate cannot drift away
+# from what the steps do. Sizes measured on the development Mac and rounded up.
+need_gb=2  # the .app, and a DMG per architecture
+for arch in "${arches[@]}"; do
+    [ -x "$repo_root/build/ffmpeg-lgpl-macos-$arch/bin/ffmpeg" ] || need_gb=$((need_gb + 1))
+    [ -f "$repo_root/build/standalone-runtime-macos-$arch-dist/htdemucs-worker/runtime-manifest.json" ] ||
+        need_gb=$((need_gb + 2))
+done
 avail_gb=$(( $(df -k "$repo_root" | awk 'NR==2 {print $4}') / 1024 / 1024 ))
 [ "$avail_gb" -ge "$need_gb" ] ||
-    die "磁碟空間不足：這次需要約 ${need_gb} GB，目前只剩 ${avail_gb} GB。"
-echo "工具齊全，磁碟剩 ${avail_gb} GB。"
+    die "磁碟空間不足：這次要建的東西約需 ${need_gb} GB，目前只剩 ${avail_gb} GB。"
+echo "工具齊全，磁碟剩 ${avail_gb} GB（這次約需 ${need_gb} GB）。"
 
 # ------------------------------------------------------------ 2. Python 環境
 step 2 "建立 Python 環境"
