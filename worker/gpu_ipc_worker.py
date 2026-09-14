@@ -19,6 +19,8 @@ import numpy as np
 # Demucs already routes unsupported complex-number operations through CPU.
 # Allow PyTorch to do the same for any remaining MPS kernels before torch is
 # imported, which is required for this environment variable to take effect.
+# worker_main sets this too, and earlier; this stays for the paths that import
+# this module directly, such as the tests, which never go through worker_main.
 if sys.platform == "darwin":
     os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
@@ -193,6 +195,16 @@ def _canonical_device(device: torch.device) -> torch.device:
 
 
 def resolve_device(device_name: str) -> torch.device:
+    # This trusts is_available(), which the RoFormer worker deliberately does
+    # not: there, "auto" runs a probe first, because torch 2.2.2 reports MPS
+    # available and then cannot do the STFT that model needs. HTDemucs survives
+    # the same assumption on the same runtime because its unsupported kernels
+    # fall back to CPU cleanly with PYTORCH_ENABLE_MPS_FALLBACK, and it has no
+    # complex tensors of its own to move onto the device -- measured: an x86
+    # runtime under Rosetta resolves to mps and matches the arm64 result to the
+    # digit. That is a property of what HTDemucs computes, not a guarantee from
+    # torch, so if this ever starts failing the fix is the RoFormer one: probe
+    # the operations instead of asking whether a device exists.
     if device_name == "auto":
         if torch.cuda.is_available():
             return torch.device("cuda:0")
