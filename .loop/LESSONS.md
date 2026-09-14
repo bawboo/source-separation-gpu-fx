@@ -200,3 +200,14 @@ may degrade」——要看安裝日誌，它已經把答案告訴你了。`-ms=o
   6 軌模型的 guitar(4) 與 piano(5) 永遠不會被加進去。吉他主導的歌實測匯出只有 −48 dBFS，
   而同一首歌的 4 軌伴奏是 −17 dBFS。改成 `source < result->sourceCount`（4 軌結果的
   `sourceCount` 就是 4，行為不變）。這個 bug 與 macOS 無關，Windows 同樣存在。
+- SIGN (macos): `configuredModelsDirectory()` 在「已安裝的 Models 目錄沒有 manifest」時會退回
+  **bundle 內**的 models 目錄，而 macOS 沒有安裝程式去種那個 manifest（Windows 靠安裝程式寫進
+  `%LOCALAPPDATA%`），於是第一次分離就把 139 MB 的 checkpoint 寫進**已簽章的 `.app` 裡**——
+  破壞簽章、把不可散布的權重塞進可散布的產物、而且 App 一旦放到 `/Applications` 就會寫入失敗。
+  修法是第一次解析時從 bundle 把**manifest（只有 json/yaml）**複製到使用者的資料目錄再回傳它。
+  驗證方式：清空重建 bundle 後跑一次分離，`find <app> -name '*.th'` 必須是空的。
+- SIGN (macos): `juce::File::userApplicationDataDirectory` 在 macOS 是 **`~/Library`**，
+  所以 `installedDataDirectory()` 實際是 `~/Library/Music SSP FX`，
+  **不是** `docs/MACOS_HANDOFF.md` 寫的 `~/Library/Application Support/Music SSP FX`。
+  目前可寫、功能正常，但不符 Apple 慣例；要改成 Application Support 的話記得既有使用者的
+  `RoformerModels` 快取需要搬移，否則會整批重新下載。
