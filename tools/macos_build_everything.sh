@@ -10,7 +10,7 @@
 #   3. 建置 LGPL FFmpeg
 #   4. 凍結 worker runtime
 #   5. 封裝 runtime
-#   6. 建置 .app 並放進 runtime、ad-hoc 簽章
+#   6. 建置 .app 並放進 runtime、ad-hoc 簽章，最後壓成可以給別人的 DMG
 #
 # 每一步都會印出「[n/6]」，中斷後重跑會跳過已完成的部分。
 set -euo pipefail
@@ -47,7 +47,18 @@ if [ ${#arches[@]} -gt 1 ] && ! /usr/bin/pgrep -q oahd 2>/dev/null; then
 fi
 [ -f "$repo_root/third_party/demucs/demucs/__init__.py" ] ||
     die "demucs submodule 沒有取得。請執行：git submodule update --init --recursive"
-echo "工具齊全。"
+
+# Measured on the development Mac: the whole run peaks around 7 GB with both
+# architectures, during the second freeze -- two runtime trees, two staging
+# trees and PyInstaller's work directory, before any DMG exists. Check up
+# front, because running out halfway leaves a half-written dist and a failure
+# that says nothing about disk.
+need_gb=8
+[ ${#arches[@]} -eq 1 ] && need_gb=5
+avail_gb=$(( $(df -k "$repo_root" | awk 'NR==2 {print $4}') / 1024 / 1024 ))
+[ "$avail_gb" -ge "$need_gb" ] ||
+    die "磁碟空間不足：這次需要約 ${need_gb} GB，目前只剩 ${avail_gb} GB。"
+echo "工具齊全，磁碟剩 ${avail_gb} GB。"
 
 # ------------------------------------------------------------ 2. Python 環境
 step 2 "建立 Python 環境"
@@ -144,21 +155,37 @@ for arch in "${arches[@]}"; do
         --ffmpeg "$repo_root/build/ffmpeg-lgpl-macos-$arch/bin"
 done
 
-# ----------------------------------------------------------------- 6. .app
-step 6 "建置 .app"
-"$repo_root/tools/build_macos.sh" --bundle-runtime
-
+# ----------------------------------------------------------- 6. .app 與 DMG
 app="$repo_root/build/macos/HTDemucsGpuFX_artefacts/Release/Standalone/Music SSP FX.app"
+dmgs=()
+for arch in "${arches[@]}"; do
+    step 6 "建置 .app 與 DMG（$arch）"
+    # JUCE builds every architecture to the same path, so the previous one has
+    # to go before the next is staged. Leaving that to whoever runs this is how
+    # an "Intel" bundle ends up carrying the arm64 runtime; the DMG script
+    # checks for exactly that, but the check should never be the thing that
+    # catches it.
+    rm -rf "$app"
+    "$repo_root/tools/build_macos.sh" --bundle-runtime --runtime-arch "$arch"
+    "$repo_root/tools/package_macos_dmg.sh" --arch "$arch" --version "$version"
+    dmgs+=("$repo_root/dist/macos/MusicSSPFX-$version-$arch.dmg")
+done
+
 echo
 echo "================================================================"
-echo "完成。App 在這裡："
-echo "  $app"
+echo "完成。要給別人的檔案在這裡："
+for dmg in "${dmgs[@]}"; do
+    echo "  $dmg"
+done
 echo
-echo "直接雙擊就能執行。第一次分離時會自動下載模型。"
+echo "DMG 裡有 App、Applications 捷徑，和一份「請先讀我.txt」，"
+echo "說明第一次開啟要怎麼通過 macOS 的安全檢查。"
 if [ ${#arches[@]} -gt 1 ]; then
     echo
-    echo "註：.app 裡放的是這台機器（$(uname -m)）的 runtime。"
-    echo "另一個架構的 runtime 已封裝在 dist/macos/，要做給 Intel 機器用的"
-    echo "版本時再換進去。"
+    # Not ${arches[-1]}: macOS still ships bash 3.2, where a negative index is
+    # a syntax error, and this script's shebang finds whichever bash is first.
+    echo "註：$app 現在放的是最後做的那個架構"
+    echo "（${arches[$(( ${#arches[@]} - 1 ))]}）。兩種架構共用這個路徑，要單獨重做"
+    echo "其中一個的話用 tools/build_macos.sh --bundle-runtime --runtime-arch <arch>。"
 fi
 echo "================================================================"

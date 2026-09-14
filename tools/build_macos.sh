@@ -118,9 +118,16 @@ if [ "$bundle_runtime" = ON ]; then
         worker="$sidecar/Runtime/htdemucs-worker/htdemucs-worker"
         [ -f "$worker" ] && file -b "$worker" | head -n 1
     else
-        echo "no staged runtime for $runtime_arch; the app will need one before" >&2
-        echo "it can separate. Run tools/build_standalone_runtime_macos.sh and" >&2
-        echo "tools/package_macos_runtime.sh --arch $runtime_arch first." >&2
+        # Fatal, not a warning. This used to print to stderr and exit 0, which
+        # meant "you asked me to bundle a runtime, I could not, and I am
+        # calling that success" -- and the app it left behind looks entirely
+        # correct until someone presses Separate. A human running this by hand
+        # might notice the line go past; a script calling it will not.
+        echo "no staged runtime for $runtime_arch, so --bundle-runtime cannot" >&2
+        echo "do what it was asked. Build and stage it first:" >&2
+        echo "    tools/build_standalone_runtime_macos.sh --python <$runtime_arch python>" >&2
+        echo "    tools/package_macos_runtime.sh --arch $runtime_arch --version dev --ffmpeg <dir>" >&2
+        exit 1
     fi
 
     # Apple Silicon refuses to execute any Mach-O without a signature. The
