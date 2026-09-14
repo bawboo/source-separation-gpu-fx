@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AtomicSharedPtr.h"
 #include "SpscRing.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -485,7 +486,7 @@ private:
     std::atomic<int> resolvedBackend_{0};
     std::atomic<int> activeSourceCount_{4};
     std::atomic<int> activeLatencySamples_{kReportedLatencySamples};
-    std::atomic<std::shared_ptr<const SeparationResult>> previewResult_;
+    htfx::AtomicSharedPtr<const SeparationResult> previewResult_;
     std::vector<float> recordedLeft_;
     std::vector<float> recordedRight_;
 

@@ -67,7 +67,18 @@ GitHub：`bawboo/source-separation-gpu-fx`（**public**）。Release 資產必�
 
 - **Windows**：`tools\build_windows_installed.cmd`；若遇 `C1060 編譯器堆積空間不足`，
   加 `/p:PreferredToolArchitecture=x64`（本機 32 位元 cl 會在 `SpscRing` 具現化時爆掉）。
-- **macOS**：`tools/build_macos.sh`（universal binary：`arm64;x86_64`）。
+- **macOS**：`tools/macos_build_everything.sh --arm64-only`（工具檢查→Python 環境→LGPL FFmpeg→
+  凍結 worker→封裝→建 `.app` 並 ad-hoc 簽章；中斷可重跑）。只建 `.app` 用
+  `tools/build_macos.sh --bundle-runtime`。`.app` 產出在
+  `build/macos/HTDemucsGpuFX_artefacts/Release/Standalone/Music SSP FX.app`——JUCE 每種格式
+  各有子資料夾。`.app` 一律是 universal（`arm64;x86_64`），但裡面放的 runtime 只有本機架構的。
+- **macOS 驗收**：`goal_check`／`full_feature_check`／`format_matrix_check`／`ui_snapshot` 四支都能建。
+  **把它們複製到 `.app/Contents/MacOS/` 再執行**（並 `codesign --force --sign -`），
+  `bundledSidecarPath()` 才會解析到和 App 相同的 worker／ffmpeg／sidecar／模型路徑；
+  注意 `build_macos.sh` 不會重建這些工具，改完 `plugin/` 要自己 `cmake --build ... --target <工具>`。
+  另有 `htdemucs_posix_ipc_check <worker> <models-dir> [model] [auto|mps|cpu]`，
+  單獨驗 `cpp/GpuWorkerClientPosix.cpp` 的共享記憶體 IPC（Windows 的 `gpu_worker_smoke` 用
+  `wmain`＋`<windows.h>`，在 macOS 建不起來）。
 - 執行 CMake target 前，先從 `CMakeLists.txt` 或產生的 `.vcxproj` 確認完整名稱，不可猜測；
   若回報 target 不存在，修正後必須重跑原驗證指令。
 - **Smoke tests**：`.loop\checks\full.cmd`（四個 smoke 全過）。跑之前設
@@ -132,3 +143,10 @@ GitHub：`bawboo/source-separation-gpu-fx`（**public**）。Release 資產必�
 Windows 11（26200）、VS Build Tools 2022（**必須用 x64 工具鏈**）、
 anaconda Python 3.13.5＋torch 2.8.0+cu126、RTX 4050 Laptop 6 GB、
 發行用 FFmpeg 為 `build/ffmpeg-lgpl/`（LGPL build，打包腳本預設值；本機另有 `C:\ffmpeg-master` 的 GPL full build，**不可用於發行**）、RoFormer 環境 `htfx-roformer`（Python 3.11）。
+
+macOS 開發機：MacBook Air M1（arm64）、macOS 26.2、Xcode 17 命令列工具、Homebrew 的
+cmake 與 sevenzip（`7zz`）。conda 是 **miniforge3 4.11.0**，且 shell function 壞掉
+（`CONDA_EXE` 未設）——一律用絕對路徑 `~/miniforge3/bin/conda`，或把 `~/miniforge3/bin`
+放進 `PATH` 再跑腳本（`macos_build_everything.sh` 用 `command -v conda` 檢查）。
+Python 環境 `htfx-macos-arm64`（3.11＋torch 2.14.0，MPS 可用）與 `htfx-macos-x86`。
+**磁碟空間很吃緊**：arm64 單條路徑峰值約 6–7 GB，兩種架構一起做約需 13 GB。

@@ -11,8 +11,10 @@
 
 #include <juce_events/juce_events.h>
 
+#ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#endif
 
 #include <chrono>
 #include <functional>
@@ -182,7 +184,9 @@ int main(int argc, char** argv) {
     }
     // argv on Windows is the ANSI codepage view, which mangles non-ASCII
     // paths (e.g. Chinese folder names). Take the real UTF-16 command line.
+    // Everywhere else argv is already UTF-8 and the fallback below is right.
     juce::String inputPath;
+#ifdef _WIN32
     {
         int wideCount = 0;
         if (auto** wideArgv = CommandLineToArgvW(GetCommandLineW(), &wideCount);
@@ -193,6 +197,7 @@ int main(int argc, char** argv) {
             LocalFree(wideArgv);
         }
     }
+#endif
     if (inputPath.isEmpty()) {
         inputPath = juce::String::fromUTF8(argv[1]);
     }

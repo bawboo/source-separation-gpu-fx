@@ -176,14 +176,30 @@ def set_fixed_text(base: int, offset: int, size: int, message: str) -> None:
         ctypes.memmove(base + offset, encoded, len(encoded))
 
 
+def _canonical_device(device: torch.device) -> torch.device:
+    """Give MPS the explicit index torch stamps on the tensors themselves.
+
+    A tensor allocated on torch.device("mps") reports its device as mps:0, and
+    torch.device compares the index too, so an unindexed MPS device is never
+    equal to anything actually sitting on it. The engine's contract checks
+    ("hop is on mps:0, expected mps") fail on that alone. CUDA never showed
+    this because the auto path already returns cuda:0, and CPU has no index to
+    disagree about.
+    """
+
+    if device.type == "mps" and device.index is None:
+        return torch.device("mps", 0)
+    return device
+
+
 def resolve_device(device_name: str) -> torch.device:
     if device_name == "auto":
         if torch.cuda.is_available():
             return torch.device("cuda:0")
         if torch.backends.mps.is_available():
-            return torch.device("mps")
+            return _canonical_device(torch.device("mps"))
         return torch.device("cpu")
-    device = torch.device(device_name)
+    device = _canonical_device(torch.device(device_name))
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but torch.cuda.is_available() is false")
     if device.type == "mps" and not torch.backends.mps.is_available():

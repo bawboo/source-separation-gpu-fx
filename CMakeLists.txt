@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(htdemucs_gpu_fx_ipc VERSION 0.1.0 LANGUAGES CXX)
+# C belongs here even though this project writes none: on macOS the JUCE
+# modules bring C sources into targets declared in this directory, and a
+# language enabled by the nested project() inside third_party/JUCE only carries
+# compile rules for its own scope. Without it CMake configures happily and then
+# fails to generate with "Missing variable is: CMAKE_C_COMPILE_OBJECT". JUCE
+# declares the same pair for the same reason.
+project(htdemucs_gpu_fx_ipc VERSION 0.1.0 LANGUAGES C CXX)
 
 if(MSVC)
     # Keep the standalone executable independent of a separately installed VC runtime.
@@ -68,6 +74,16 @@ target_compile_definitions(htdemucs_gpu_worker_smoke PRIVATE
 target_link_libraries(htdemucs_gpu_worker_smoke PRIVATE htfx_gpu_worker_client)
 if(MSVC)
     target_compile_options(htdemucs_gpu_worker_smoke PRIVATE /W4 /permissive- /EHsc)
+endif()
+
+# The smoke test above is written against wmain and <windows.h>. This is the
+# POSIX counterpart: the smallest program that drives the whole shared-memory
+# transport, so a fault in GpuWorkerClientPosix.cpp can be seen without the
+# audio engine or the editor in the way.
+if(NOT WIN32)
+    add_executable(htdemucs_posix_ipc_check tests/posix_ipc_check.cpp)
+    target_compile_features(htdemucs_posix_ipc_check PRIVATE cxx_std_20)
+    target_link_libraries(htdemucs_posix_ipc_check PRIVATE htfx_gpu_worker_client)
 endif()
 
 if(WIN32)

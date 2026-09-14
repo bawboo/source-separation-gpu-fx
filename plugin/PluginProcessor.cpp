@@ -204,6 +204,26 @@ std::filesystem::path configuredModelsDirectory() {
     }
 
     const auto installedModels = installedDataDirectory().getChildFile("Models");
+#if JUCE_MAC
+    // Checkpoints are downloaded into whatever this returns, so it has to be a
+    // directory the user can write. On macOS the bundled copy sits inside the
+    // signed .app: writing there invalidates the signature, puts undistributable
+    // weights inside a redistributable bundle, and fails outright once the app
+    // is installed somewhere the user does not own. Windows gets this folder
+    // from its installer; with no installer here, the app seeds it from the
+    // bundle the first time it looks. Only the manifests are copied -- weights
+    // are always downloaded, never shipped.
+    if (!installedModels.getChildFile("model-manifest.json").existsAsFile() &&
+        std::filesystem::is_directory(bundled) &&
+        installedModels.createDirectory().wasOk()) {
+        const juce::File bundledModels{
+            juce::String::fromUTF8(bundled.string().c_str())};
+        for (const auto& manifest : bundledModels.findChildFiles(
+                 juce::File::findFiles, false, "*.json;*.yaml")) {
+            manifest.copyFileTo(installedModels.getChildFile(manifest.getFileName()));
+        }
+    }
+#endif
     if (installedModels.getChildFile("model-manifest.json").existsAsFile()) {
         return utf8Path(installedModels.getFullPathName());
     }
@@ -1230,7 +1250,7 @@ bool HTDemucsGpuFXAudioProcessor::beginRecording() {
         std::shared_ptr<const SeparationResult>{}, std::memory_order_release);
     {
         const juce::ScopedLock lock(mediaMetadataLock_);
-        importedMediaFile_ = {};
+        importedMediaFile_ = juce::File{};
         importedBaseName_ = "recording";
     }
     importedVideo_.store(false, std::memory_order_release);
@@ -1686,11 +1706,16 @@ void HTDemucsGpuFXAudioProcessor::separationLoop(
         workerConfig.readyTimeout = std::chrono::minutes(15);
         workerConfig.processTimeout = std::chrono::minutes(30);
 
+        // This names the device that was *asked* for, before the worker has
+        // resolved one. Auto is its own answer and must not claim CUDA: on a
+        // Mac auto resolves to Metal, so the old three-way mapping told every
+        // Apple Silicon user their model was loading on a CUDA GPU. The
+        // vocabulary matches getResolvedDeviceName().
         const auto requestedDevice =
-            configuration.backend == 2
-                ? juce::String{"CPU"}
-                : configuration.backend == 3 ? juce::String{"MPS"}
-                                             : juce::String{"CUDA GPU"};
+            configuration.backend == 1   ? juce::String{"CUDA GPU"}
+            : configuration.backend == 2 ? juce::String{"CPU"}
+            : configuration.backend == 3 ? juce::String{"Apple Metal (MPS)"}
+                                         : juce::String{"Auto"};
         setSeparationMessage(
             htfx::tr("status.loadingModelPrefix") +
             juce::String(configuration.modelName) +
@@ -1866,10 +1891,9 @@ void HTDemucsGpuFXAudioProcessor::processRecordMode(
         const float wet = wetMix_.getNextValue();
         if (playing && result->sampleCount > 0 &&
             cursor < static_cast<double>(result->sampleCount)) {
-            const auto first = (std::min)(
-                static_cast<std::size_t>(cursor),
-                result->sampleCount - 1);
-            const auto second = (std::min)(first + 1, result->sampleCount - 1);
+            const auto lastIndex = static_cast<std::size_t>(result->sampleCount - 1);
+            const auto first = (std::min)(static_cast<std::size_t>(cursor), lastIndex);
+            const auto second = (std::min)(first + 1, lastIndex);
             const float fraction =
                 static_cast<float>(cursor - static_cast<double>(first));
             const auto interpolate =
@@ -3250,7 +3274,13 @@ void HTDemucsGpuFXAudioProcessor::quickExportLoop(
                 outputRight[sample] = result->stems[rightPlane * sampleCount + sample];
                 continue;
             }
-            for (int source = 0; source < 4; ++source) {
+            // Every source except the vocal one, not the first four: the
+            // six-source model puts guitar at 4 and piano at 5, and a
+            // guitar-led song leaves almost the whole instrumental in a stem
+            // this loop used to skip (measured -48 dBFS exported against
+            // -17 dBFS for the same song's four-stem accompaniment). A
+            // four-source result has sourceCount == 4, so it is unaffected.
+            for (int source = 0; source < result->sourceCount; ++source) {
                 if (source == vocalsSource) {
                     continue;
                 }

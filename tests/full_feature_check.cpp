@@ -26,8 +26,10 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_events/juce_events.h>
 
+#ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#endif
 
 #include <algorithm>
 #include <chrono>
@@ -333,22 +335,39 @@ bool runProcess(const juce::StringArray& command, juce::String& output) {
     return process.waitForProcessToFinish(120'000) && process.getExitCode() == 0;
 }
 
+juce::String executableSuffix() {
+#if JUCE_WINDOWS
+    return ".exe";
+#else
+    return {};
+#endif
+}
+
 juce::File bundledFfmpeg() {
     const auto env = juce::SystemStats::getEnvironmentVariable("HTFX_FFMPEG", {}).trim();
     if (env.isNotEmpty()) {
         return juce::File(env);
     }
-    // The build tree keeps the release FFmpeg beside the runtimes.
+    const auto suffix = executableSuffix();
+    // The staged sidecar comes first because that is the FFmpeg that ships;
+    // running this tool from inside a .app bundle then tests the same binary
+    // the user gets. The build tree is the fallback, and macOS keeps one
+    // prefix per architecture rather than a single ffmpeg-lgpl.
+    const juce::StringArray relatives{
+        "Resources/sidecar/Runtime/ffmpeg/bin/ffmpeg" + suffix,
+        "build/ffmpeg-lgpl/bin/ffmpeg" + suffix,
+        "ffmpeg-lgpl/bin/ffmpeg" + suffix,
+        "build/ffmpeg-lgpl-macos-arm64/bin/ffmpeg" + suffix,
+        "build/ffmpeg-lgpl-macos-x86_64/bin/ffmpeg" + suffix,
+    };
     auto dir = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
     for (int up = 0; up < 5; ++up) {
         dir = dir.getParentDirectory();
-        const auto candidate = dir.getChildFile("build/ffmpeg-lgpl/bin/ffmpeg.exe");
-        if (candidate.existsAsFile()) {
-            return candidate;
-        }
-        const auto atRoot = dir.getChildFile("ffmpeg-lgpl/bin/ffmpeg.exe");
-        if (atRoot.existsAsFile()) {
-            return atRoot;
+        for (const auto& relative : relatives) {
+            const auto candidate = dir.getChildFile(relative);
+            if (candidate.existsAsFile()) {
+                return candidate;
+            }
         }
     }
     return {};
@@ -362,6 +381,7 @@ int main(int argc, char** argv) {
 
     // Read arguments as wide strings so a non-ASCII path survives.
     std::vector<juce::String> args;
+#ifdef _WIN32
     {
         int wideCount = 0;
         if (auto** wideArgv = CommandLineToArgvW(GetCommandLineW(), &wideCount);
@@ -372,6 +392,7 @@ int main(int argc, char** argv) {
             LocalFree(wideArgv);
         }
     }
+#endif
     if (args.empty()) {
         for (int i = 1; i < argc; ++i) {
             args.emplace_back(juce::String::fromUTF8(argv[i]));
@@ -531,7 +552,7 @@ int main(int argc, char** argv) {
                     } else {
                         juce::String probe;
                         const bool has = runProcess(
-                            {ffmpeg.getParentDirectory().getChildFile("ffprobe.exe").getFullPathName(),
+                            {ffmpeg.getSiblingFile("ffprobe" + executableSuffix()).getFullPathName(),
                              "-v", "error", "-select_streams", "a:0", "-show_entries",
                              "stream=codec_name", "-of", "csv=p=0", outVideo.getFullPathName()},
                             probe);

@@ -92,11 +92,25 @@ done
 
 export PYTHONPATH="$tool_root:$repo_root/worker:$repo_root/src:$demucs_root${PYTHONPATH:+:$PYTHONPATH}"
 
+# PyInstaller's torch hook collects the Python tree and the dylibs, but not
+# torch/bin. Off Windows that folder is not optional: torch.__init__ resolves
+# torch/bin/torch_shm_manager while importing and raises if it is absent
+# (_manager_path() returns early only on Windows, which is why the Windows
+# build can ignore this). Without it the frozen worker dies on its first
+# import, long before any model is loaded.
+torch_shm_manager="$("$python_bin" -c \
+    'import os, torch; print(os.path.join(os.path.dirname(torch.__file__), "bin", "torch_shm_manager"))')"
+[ -x "$torch_shm_manager" ] || {
+    echo "torch_shm_manager not found at $torch_shm_manager" >&2
+    exit 1
+}
+
 "$python_bin" -m PyInstaller \
     --noconfirm --clean --onedir --console \
     --name htdemucs-worker \
     --distpath "$dist_root" --workpath "$work_root" --specpath "$spec_root" \
     --additional-hooks-dir "$hook_root" \
+    --add-binary "$torch_shm_manager:torch/bin" \
     --paths "$repo_root/worker" --paths "$repo_root/src" --paths "$demucs_root" \
     --hidden-import yaml \
     --hidden-import demucs.pretrained \
@@ -137,7 +151,11 @@ export PYTHONPATH="$tool_root:$repo_root/worker:$repo_root/src:$demucs_root${PYT
     --exclude-module plotly --exclude-module skimage --exclude-module statsmodels \
     --exclude-module xarray --exclude-module kaleido --exclude-module patsy \
     --exclude-module paramiko --exclude-module selenium --exclude-module bokeh \
-    --exclude-module sqlalchemy --exclude-module h5py --exclude-module cloudpickle \
+    --exclude-module sqlalchemy --exclude-module h5py \
+    `# cloudpickle is excluded on Windows but is reachable here: RoFormer pulls` \
+    `# in librosa, which imports joblib, whose bundled loky does` \
+    `# "from cloudpickle import dumps, loads" at module scope. Excluding it` \
+    `# only breaks RoFormer, and only once frozen.` \
     --exclude-module fsspec --exclude-module lz4 \
     --exclude-module torch.utils.tensorboard --exclude-module torch.onnx \
     --exclude-module torch._dynamo --exclude-module torch._inductor \
@@ -151,9 +169,13 @@ worker="$runtime_root/htdemucs-worker"
 [ -x "$worker" ] || { echo "self-contained worker was not created: $worker" >&2; exit 1; }
 
 # Pulled in by binary probing on broad environments; nothing here imports them.
-for relative in _internal/xformers _internal/torch/bin; do
-    rm -rf "${runtime_root:?}/$relative"
-done
+rm -rf "${runtime_root:?}/_internal/xformers"
+
+# Staged explicitly above, because torch refuses to import without it.
+[ -x "$runtime_root/_internal/torch/bin/torch_shm_manager" ] || {
+    echo "torch_shm_manager did not land in the bundle; torch cannot import" >&2
+    exit 1
+}
 
 # pip records the builder machine's own path in direct_url.json for locally
 # installed dependencies. No runtime code reads it, so drop it before shipping.
@@ -176,6 +198,12 @@ rm -f /tmp/htfx-identity.$$
     echo "self-contained worker import/startup check failed" >&2; exit 1; }
 "$worker" roformer --help | grep -q -- '--models-dir' || {
     echo "RoFormer dispatch check failed" >&2; exit 1; }
+# The two checks above only prove argument parsing works. This one imports what
+# each back-end actually needs, which is where an over-broad --exclude-module
+# shows up; otherwise the gap surfaces on a user's machine, mid-separation,
+# after a model download.
+"$worker" --import-check | grep -q 'import-check ok' || {
+    echo "frozen bundle cannot import the inference dependencies" >&2; exit 1; }
 
 runtime_bytes="$(find "$runtime_root" -type f -exec stat -f %z {} + | awk '{t+=$1} END {print t}')"
 versions="$("$python_bin" -c 'import json,sys,torch,numpy,demucs,einops,mel_band_roformer; print(json.dumps({"python":sys.version.split()[0],"torch":torch.__version__,"cuda":torch.version.cuda,"numpy":numpy.__version__,"demucs":getattr(demucs,"__version__","bundled"),"einops":einops.__version__,"mel_band_roformer":getattr(mel_band_roformer,"__version__","unknown")}))')"

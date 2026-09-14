@@ -56,7 +56,7 @@ echo "building..."
 cmake --build "$build_dir" --config Release \
     --target HTDemucsGpuFX_Standalone -- -j"$(sysctl -n hw.ncpu)"
 
-app="$build_dir/HTDemucsGpuFX_artefacts/Release/Music SSP FX.app"
+app="$build_dir/HTDemucsGpuFX_artefacts/Release/Standalone/Music SSP FX.app"
 if [ ! -d "$app" ]; then
     echo "build finished but the .app was not found under $build_dir" >&2
     exit 1

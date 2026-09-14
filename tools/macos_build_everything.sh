@@ -95,7 +95,11 @@ for arch in "${arches[@]}"; do
     fi
 
     step 4 "凍結 worker runtime（$arch）"
-    if [ -x "$repo_root/build/standalone-runtime-macos-$arch-dist/htdemucs-worker/htdemucs-worker" ]; then
+    # runtime-manifest.json is the only honest completion marker: the freeze
+    # script writes it last, after the import and dispatch checks pass. The
+    # executable appears long before that, so testing for it makes a failed
+    # freeze look finished and hands the next step a broken runtime.
+    if [ -f "$repo_root/build/standalone-runtime-macos-$arch-dist/htdemucs-worker/runtime-manifest.json" ]; then
         echo "已存在，略過。"
     else
         "$repo_root/tools/build_standalone_runtime_macos.sh" --python "$python_bin"
@@ -110,7 +114,7 @@ done
 step 6 "建置 .app"
 "$repo_root/tools/build_macos.sh" --bundle-runtime
 
-app="$repo_root/build/macos/HTDemucsGpuFX_artefacts/Release/Music SSP FX.app"
+app="$repo_root/build/macos/HTDemucsGpuFX_artefacts/Release/Standalone/Music SSP FX.app"
 echo
 echo "================================================================"
 echo "完成。App 在這裡："
