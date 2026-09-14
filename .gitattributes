@@ -2,6 +2,9 @@
 *.cpp text eol=lf
 *.h text eol=lf
 *.py text eol=lf
+# A CRLF in a shebang line makes the kernel look for an interpreter named
+# "bash\r", so the macOS build scripts must never be checked out with them.
+*.sh text eol=lf
 *.md text eol=lf
 *.json text eol=lf
 *.yaml text eol=lf
