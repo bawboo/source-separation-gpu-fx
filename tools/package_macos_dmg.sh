@@ -65,10 +65,19 @@ ln -s /Applications "$stage/Applications"
 arch_label="Apple Silicon"
 standard_estimate="1 分鐘"
 high_estimate="45 分鐘"
+# Measured: an M1 is ready in about six seconds, an Intel build under Rosetta
+# took 58 on its first run and five on every one after. Telling an Apple
+# Silicon user to expect two minutes of silence would have them waiting for
+# something that is not coming, and mentioning Rosetta in a file headed
+# "Apple Silicon 版" reads as a warning they cannot act on.
+first_run_note="程式要先把模型載進記憶體，可能幾十秒沒有動靜。"
 if [ "$arch" = x86_64 ]; then
     arch_label="Intel"
     standard_estimate="3 分鐘"
     high_estimate="50 分鐘"
+    first_run_note="第一次可能一到兩分鐘完全沒有動靜：程式要先把模型載進記憶體，
+  而且如果你是在 Apple Silicon 的 Mac 上跑這個 Intel 版，系統還要先
+  翻譯一次程式碼。"
 fi
 # Written for someone who has never seen this project. Every paragraph here is
 # something that was measured or walked into during the port, and each one is a
@@ -101,13 +110,11 @@ Music SSP FX $version（$arch_label 版）
 
   按下去之後就會開始跑，進度列會動。沒有「分離」按鈕，匯出就是開始。
 
-  「高品質」那顆可以按，但這台電腦跑它要 $high_estimate 左右
-  （一般是 $standard_estimate）。想試的話請留足時間。
+  「高品質」那顆可以按，但這台電腦跑它要 $high_estimate左右（一般是
+  $standard_estimate）。想試的話請留足時間。
 
-第一次按下去會等很久，那不是當掉
-  第一次可能一到兩分鐘完全沒有動靜：程式要先把模型載進記憶體，
-  而且如果你是在 Apple Silicon 的 Mac 上跑這個 Intel 版，系統還要
-  先翻譯一次程式碼。請不要強制結束，第二次之後就快了。
+第一次按下去會等比較久，那不是當掉
+  $first_run_note請不要強制結束，第二次之後就快了。
 
 需要網路
   第一次分離會自動下載模型檔（幾百 MB），下載完就不用再下載。
