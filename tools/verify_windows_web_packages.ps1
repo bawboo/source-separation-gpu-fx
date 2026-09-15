@@ -1,5 +1,9 @@
 param(
-    [string]$Version = '0.1.0'
+    # Mandatory for the same reason as check_public_repo.ps1: every version
+    # ever built is still sitting in dist\windows-web, so a default lets this
+    # verify the wrong release and pass.
+    [Parameter(Mandatory = $true)]
+    [string]$Version
 )
 
 $ErrorActionPreference = 'Stop'

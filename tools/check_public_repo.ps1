@@ -1,5 +1,9 @@
 param(
-    [string]$Version = '0.1.0'
+    # No default. dist\windows-web keeps every version ever built, so a
+    # default meant this could audit an old release's archives, find them
+    # intact, and report PASS for a release it had not looked at.
+    [Parameter(Mandatory = $true)]
+    [string]$Version
 )
 
 $ErrorActionPreference = 'Stop'
