@@ -36,6 +36,12 @@
   Apple Silicon 的機器」而存在的版本，正好在其中一大半上跑不起來。改釘 scipy 1.13.1
   （標的是 10.9）之後，Intel 版涵蓋到 macOS 12 Monterey。Apple Silicon 版的下限仍是
   macOS 14，那是 torch 自己的 wheel 決定的，換不掉
+- **每一份 macOS 發行包宣告的最低系統，改成它自己真的做得到的那個。** 先前兩份都寫
+  12.0，但 Apple Silicon 版做不到——torch 的 arm64 wheel 就是 14.0，換不掉。差別不在
+  數字而在失敗的樣子：停在 Monterey 的 M1 上，App 會開起來、吃得下檔案，然後在背景
+  死掉，看起來像「分離功能壞了」。現在 Intel 版宣告 12.0（實測就是）、Apple Silicon 版
+  宣告 14.0，太舊的系統在啟動時就會被擋下並說明原因。**行為改變**：macOS 12／13 的
+  Apple Silicon Mac 先前開得起來（然後失敗），現在開不起來
 - **macOS 發行包改成 DMG**，內含 App、Applications 捷徑，以及一份說明第一次開啟要怎麼
   通過系統安全檢查的中文文件
 - **Apple Silicon 上「自動」會挑一個跑不動這個模型的裝置。** 判斷依據是

@@ -126,5 +126,5 @@ Applications 資料夾。
 ---
 
 <sub>給寄出的人：要傳的是 `dist/macos/MusicSSPFX-0.0.10-x86_64.dmg`
-（328 MB，sha256 `20d0e79a8496635ec2d9ee5f50116366cd9b8af7b3a1c6516108d9ab7924ab85`）。
+（328 MB，sha256 `ef869509ed2990739d7951cd8e1e102db209ae8e88ff86cb126e23b7a4458826`）。
 arm64 那份是自己用的，不要傳錯。</sub>
