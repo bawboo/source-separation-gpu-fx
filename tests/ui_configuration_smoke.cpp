@@ -345,12 +345,12 @@ int run() {
     // The general panel's quality switch: two ends that drive the same
     // separation mode the advanced panel exposes, so the panels cannot
     // disagree about what is about to run.
-    auto* qualityStandard = findNamedComponent<juce::TextButton>(components, "qualityStandard");
     auto* qualityHigh = findNamedComponent<juce::TextButton>(components, "qualityHigh");
+    auto* qualityUltra = findNamedComponent<juce::TextButton>(components, "qualityUltra");
     auto* qualityHint = findNamedComponent<juce::Label>(components, "qualityHint");
-    require(qualityStandard != nullptr && qualityHigh != nullptr && qualityHint != nullptr,
+    require(qualityHigh != nullptr && qualityUltra != nullptr && qualityHint != nullptr,
             "the general panel is missing its quality switch");
-    require(qualityStandard->isVisible() && qualityHigh->isVisible() &&
+    require(qualityHigh->isVisible() && qualityUltra->isVisible() &&
                 qualityHint->isVisible(),
             "the quality switch is not shown on the general panel");
     require(waitUntil([&] { return qualityHint->getText().isNotEmpty(); },
@@ -415,8 +415,12 @@ int run() {
     require(separationMode != nullptr, "Separation mode selector was not found");
     require(separationMode->isVisible(),
             "Separation mode selector is hidden in the advanced panel");
+    // The general panel's two buttons are its own state. They used to drive
+    // this combo box, which meant a model chosen on the advanced panel came
+    // back with the user to a panel that cannot show it -- someone who looked
+    // around out of curiosity then pressed Export and got a different model
+    // than the one on screen. Neither direction may reach the other now.
     {
-        qualityHigh->onClick();
         const int karaokeMode = [&] {
             for (int i = 0; i < separationMode->getNumItems(); ++i) {
                 if (separationMode->getItemText(i) == htfx::glossed("Karaoke")) return i;
@@ -424,16 +428,15 @@ int run() {
             return -1;
         }();
         require(karaokeMode >= 2, "Karaoke mode entry missing from the mode list");
-        require(separationMode->getSelectedItemIndex() == karaokeMode,
-                "High quality did not select the karaoke separation mode");
-        qualityStandard->onClick();
-        require(separationMode->getSelectedItemIndex() == 0,
-                "Standard did not select 4-stem separation");
 
-        // A mode the general panel cannot express must not survive the trip
-        // back from the advanced panel: it would keep running with nothing on
-        // screen to show it, which is how a four-minute song silently became a
-        // fifty-minute one after someone tried Dereverb.
+        const int before = separationMode->getSelectedItemIndex();
+        qualityUltra->onClick();
+        qualityHigh->onClick();
+        require(separationMode->getSelectedItemIndex() == before,
+                "the general panel's quality buttons moved the advanced mode");
+
+        // ... and the other way: a mode only the advanced panel can express
+        // must not change what the general panel says it will run.
         const int dereverbMode = [&] {
             for (int i = 0; i < separationMode->getNumItems(); ++i) {
                 if (separationMode->getItemText(i) == htfx::glossed("Dereverb")) return i;
@@ -441,48 +444,36 @@ int run() {
             return -1;
         }();
         require(dereverbMode >= 2, "Dereverb mode entry missing from the mode list");
-        // The advanced panel is already showing here.
         separationMode->setSelectedItemIndex(dereverbMode, juce::sendNotificationSync);
-        require(separationMode->getSelectedItemIndex() == dereverbMode,
-                "the advanced panel could not select Dereverb");
         panelSwitch->onClick();  // -> general
-        require(separationMode->getSelectedItemIndex() == 0,
-                "returning to the general panel kept a mode it cannot show");
-        panelSwitch->onClick();  // -> advanced, as the rest of this block expects
-        qualitySummary = "standard/high/snaps-back";
-    }
+        require(waitUntil([&] { return qualityHint->getText() == htfx::tr("hint.qualityHigh"); },
+                          std::chrono::seconds(3)),
+                "the advanced panel's mode changed what the general panel shows");
+        require(separationMode->getSelectedItemIndex() == dereverbMode,
+                "returning to the general panel rewrote the advanced mode");
 
-    // The hint has to quote the figure for the runtime that is installed, and
-    // nothing checked that it did. A CPU-only build read the manifest to
-    // decide whether to warn, then ignored it when picking the number, so an
-    // Intel Mac was told the machine was slow and quoted four minutes for a
-    // fifty-minute job -- the warning and the number contradicting each other
-    // in one sentence. Read the flavor the way the editor does and require
-    // both halves to agree with it.
-    juce::String estimateSummary;
-    {
-        const auto flavor = processor->getRuntimeFlavor();
-        const juce::String suffix =
-            flavor == "cpu" ? "Cpu" : flavor == "mps" ? "Mps" : "Gpu";
-        panelSwitch->onClick();  // -> general, where the quality switch lives
-        for (const auto* which : {"standard", "high"}) {
-            (juce::String(which) == "high" ? qualityHigh : qualityStandard)->onClick();
-            require(waitUntil(
-                        [&] {
-                            return qualityHint->getText().contains(
-                                htfx::tr("estimate." + juce::String(which) + suffix));
-                        },
-                        std::chrono::seconds(3)),
-                    "the quality hint quotes an estimate for the wrong runtime");
+        // Ultra is a GPU feature. On a CPU runtime the button stays visible --
+        // so the feature is discoverable -- but cannot be pressed, and says
+        // why on hover.
+        const bool cpuRuntime = processor->getRuntimeFlavor() == "cpu";
+        require(qualityUltra->isEnabled() == !cpuRuntime,
+                "Ultra quality is selectable on a runtime that cannot run it");
+        require(qualityUltra->getTooltip().isNotEmpty() == cpuRuntime,
+                "the Ultra button explains itself on the wrong runtime");
+        if (!cpuRuntime) {
+            qualityUltra->onClick();
+            require(waitUntil([&] { return qualityHint->getText() == htfx::tr("hint.qualityUltra"); },
+                              std::chrono::seconds(3)),
+                    "choosing Ultra did not change the explanation");
+            qualityHigh->onClick();
         }
-        // Only CUDA is fast enough to mention the time in passing; everything
-        // else gets the warned wording.
-        require(qualityHint->getText().contains(htfx::tr("hint.qualityHighSlowTail")) ==
-                    (flavor != "cuda" && flavor.isNotEmpty()),
-                "the slow-runtime warning does not match the installed runtime");
-        qualityStandard->onClick();
-        panelSwitch->onClick();  // -> advanced
-        estimateSummary = flavor.isEmpty() ? "source-tree" : flavor;
+        panelSwitch->onClick();  // -> advanced, as the rest of this block expects
+        // Put the mode back where startup left it. Nothing does that for us
+        // any more: the general panel used to drag it back to 4-stem on the
+        // way out, which is exactly the coupling this block now forbids.
+        separationMode->setSelectedItemIndex(0, juce::sendNotificationSync);
+        qualitySummary = cpuRuntime ? "high/ultra-blocked/independent"
+                                    : "high/ultra/independent";
     }
 
     // Every mode is selectable on every runtime. The list used to grey out the
@@ -1123,7 +1114,6 @@ int run() {
                  " startup_default_mode=htdemucs4"
                  " stem_slider_relabels=true"
                  " quality_switch=" << qualitySummary <<
-                 " quality_estimates=" << estimateSummary <<
                  " status_hint=" << statusHintSummary <<
                  " no_checkpoint=" << missingModelSummary <<
                  " roformer_stem_labels=" << roformerStemLabelSummary <<

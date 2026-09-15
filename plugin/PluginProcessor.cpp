@@ -4417,13 +4417,13 @@ public:
         // several times that, so what the user is choosing between is quality
         // and waiting -- not "HTDemucs" and "MelBand RoFormer", which mean
         // nothing on this panel.
-        qualityStandardButton_.setButtonText(htfx::tr("button.qualityStandard"));
-        qualityStandardButton_.onClick = [this] { selectQuality(false); };
         qualityHighButton_.setButtonText(htfx::tr("button.qualityHigh"));
-        qualityHighButton_.onClick = [this] { selectQuality(true); };
-        for (auto* button : {&qualityStandardButton_, &qualityHighButton_}) {
-            button->setName(button == &qualityStandardButton_ ? "qualityStandard"
-                                                             : "qualityHigh");
+        qualityHighButton_.onClick = [this] { selectQuality(false); };
+        qualityUltraButton_.setButtonText(htfx::tr("button.qualityUltra"));
+        qualityUltraButton_.onClick = [this] { selectQuality(true); };
+        for (auto* button : {&qualityHighButton_, &qualityUltraButton_}) {
+            button->setName(button == &qualityHighButton_ ? "qualityHigh"
+                                                          : "qualityUltra");
             addAndMakeVisible(*button);
         }
         qualityHint_.setJustificationType(juce::Justification::centredLeft);
@@ -4863,9 +4863,9 @@ public:
             importButton_.setBounds(area.removeFromTop(34));
             area.removeFromTop(8);
             auto quality = area.removeFromTop(30);
-            qualityStandardButton_.setBounds(quality.removeFromLeft(120));
-            quality.removeFromLeft(8);
             qualityHighButton_.setBounds(quality.removeFromLeft(120));
+            quality.removeFromLeft(8);
+            qualityUltraButton_.setBounds(quality.removeFromLeft(120));
             quality.removeFromLeft(10);
             // While something is running this row carries Cancel instead of
             // the explanation: the general panel's only other way out was Esc,
@@ -5307,8 +5307,8 @@ private:
         languageButton_.setButtonText(htfx::tr("button.languageToggle"));
         vocalsOnlyButton_.setButtonText(htfx::tr("button.exportVocalsOnly"));
         accompanyOnlyButton_.setButtonText(htfx::tr("button.exportAccompanyOnly"));
-        qualityStandardButton_.setButtonText(htfx::tr("button.qualityStandard"));
         qualityHighButton_.setButtonText(htfx::tr("button.qualityHigh"));
+        qualityUltraButton_.setButtonText(htfx::tr("button.qualityUltra"));
         qualityHint_.setText({}, juce::dontSendNotification);  // 下一次 tick 重建
         importButton_.setButtonText(htfx::tr("button.import"));
         exportButton_.setButtonText(htfx::tr("button.export"));
@@ -5467,10 +5467,15 @@ private:
             return;
         }
 
-        // Quick export honours whatever separation mode/model the user picked
-        // (this used to force the model back to htdemucs, which silently
-        // fought the mode-first UI and made the general panel unusable for
-        // every RoFormer mode). Only the operating mode has to be Record.
+        // A quick export is a general-panel action, so it runs the general
+        // panel's own quality choice -- not whatever the advanced panel is
+        // showing. If that means changing the model, anything separated
+        // before came from a different one and must not be exported as if it
+        // were this one; the advanced panel is free to show something else
+        // again afterwards.
+        if (!advancedPanel_ && applyGeneralQualityToMode()) {
+            processor_.discardPreview();
+        }
         modeBox_.setSelectedItemIndex(0, juce::dontSendNotification);
         setChoice("operatingMode", 0);
         processor_.applyUserConfiguration();
@@ -5517,9 +5522,6 @@ private:
 
     void setAdvancedPanel(bool advanced) {
         advancedPanel_ = advanced;
-        if (!advanced) {
-            snapToExpressibleQuality();
-        }
         updatePanelSwitchButtonText();
         updatePanelVisibility();
         updateVisibility();
@@ -5761,7 +5763,8 @@ private:
         const auto file = startupSelectionFile();
         file.getParentDirectory().createDirectory();
         file.replaceWithText(
-            modeKey + "\n" + processor_.getSelectedRoformerModel() + "\n");
+            modeKey + "\n" + processor_.getSelectedRoformerModel() + "\n" +
+            (generalUltraQuality_ ? "quality:ultra" : "quality:high") + "\n");
     }
 
     void restoreStartupSelection() {
@@ -5773,6 +5776,12 @@ private:
             file.readLines(lines);
             if (lines.size() > 0) modeKey = lines[0].trim();
             if (lines.size() > 1) modelId = lines[1].trim();
+            // Third line: the general panel's own choice, stored separately
+            // from the mode because the two are independent. Deriving one
+            // from the other is exactly what this panel was fixed to stop.
+            if (lines.size() > 2) {
+                generalUltraQuality_ = lines[2].trim() == "quality:ultra";
+            }
         }
         int target = -1;
         if (modeKey == "htdemucs4") {
@@ -5845,42 +5854,42 @@ private:
         return ComputeClass::cuda;
     }
 
-    // True when the RoFormer models will take tens of minutes here rather
-    // than a few. Measured against karaoke-gabox, the model High quality
-    // runs: 11.56x realtime on this project's x86 CPU, 10.95x on an M1's,
-    // 10.2x on that M1's GPU -- MPS buys this model about 7%, because the
-    // work is upstream's, not ours. Only CUDA changes the answer, at 0.911x.
-    // Nothing is blocked on the strength of this; it decides whether the user
-    // is told the number in passing or warned about it.
-    [[nodiscard]] bool roformerIsSlowHere() const {
-        return computeClassHere() != ComputeClass::cuda;
+    // Ultra needs a GPU. On CPU a four-minute song takes about an hour, which
+    // is not a choice worth offering -- the button stays visible so the
+    // feature is discoverable, with a tooltip saying why it is out of reach.
+    [[nodiscard]] bool ultraAvailableHere() const {
+        return computeClassHere() != ComputeClass::cpu && highQualityModeIndex() >= 0;
     }
 
-    [[nodiscard]] bool highQualitySelected() const {
-        const int index = highQualityModeIndex();
-        return index >= 0 && separationModeBox_.getSelectedItemIndex() == index;
-    }
-
-    // The general panel can only say two things: Standard and High quality.
-    // Anything else chosen on the advanced panel would keep running here with
-    // nothing on screen to show it -- which is how a four-minute song quietly
-    // became a fifty-minute one after a visit to the advanced panel. If the
-    // active mode is not one this panel can express, it goes back to Standard.
-    void snapToExpressibleQuality() {
-        if (separationModeBox_.getSelectedItemIndex() == 0 || highQualitySelected()) {
+    // The general panel owns this outright. It used to read the advanced
+    // panel's mode box, so changing the model there changed what the general
+    // panel was about to run -- with nothing on this screen to show it, since
+    // the panel can only say two things. Someone who wandered into the
+    // advanced panel out of curiosity came back and pressed Export expecting
+    // what they had chosen here. Now the two do not share state at all: this
+    // is applied to the mode box at the moment a general-panel job starts,
+    // and nothing the advanced panel does reaches back.
+    void selectQuality(bool ultra) {
+        if (ultra && !ultraAvailableHere()) {
             return;
         }
-        separationModeBox_.setSelectedItemIndex(0, juce::sendNotificationSync);
+        generalUltraQuality_ = ultra;
+        persistStartupSelection();
+        updateQualityControls();
     }
 
-    void selectQuality(bool high) {
-        const int target = high ? highQualityModeIndex() : 0;
-        if (target < 0) {
-            // The catalogue has no karaoke category on this runtime; leave the
-            // mode alone rather than silently choosing something else.
-            return;
+    // Returns true when the mode actually had to change, which means whatever
+    // was separated before came from a different model and cannot be exported
+    // as if it were this one.
+    bool applyGeneralQualityToMode() {
+        const int target = generalUltraQuality_ && ultraAvailableHere()
+                               ? highQualityModeIndex()
+                               : 0;
+        if (target < 0 || separationModeBox_.getSelectedItemIndex() == target) {
+            return false;
         }
         separationModeBox_.setSelectedItemIndex(target, juce::sendNotificationSync);
+        return true;
     }
 
     void selectRoformerCategoryDefault(const juce::String& category) {
@@ -5965,46 +5974,23 @@ private:
     // guessed, and they are shown on the button row instead of after the fact,
     // because the whole point of the switch is choosing whether to wait.
     void updateQualityControls() {
-        if (!qualityStandardButton_.isVisible()) {
+        if (!qualityHighButton_.isVisible()) {
             return;
         }
-        const bool high = highQualitySelected();
-        // Apple Silicon is a third case, not a fast one: measured on an M1,
-        // HTDemucs takes about a minute and RoFormer about fifty. Folding MPS
-        // in with CUDA told a Mac user "3 minutes" for a fifty-minute run.
-        const auto compute = computeClassHere();
-        const bool onCpu = compute == ComputeClass::cpu;
-        const bool onMps = compute == ComputeClass::mps;
-        qualityStandardButton_.setColour(
-            juce::TextButton::buttonColourId,
-            juce::Colour(high ? HtfxLookAndFeel::kSurfaceRaised : HtfxLookAndFeel::kAccent));
+        const bool ultraAvailable = ultraAvailableHere();
+        // Shown but not selectable rather than hidden: a CPU user should be
+        // able to see the feature exists, and be told what it would take.
+        qualityUltraButton_.setEnabled(ultraAvailable);
+        qualityUltraButton_.setTooltip(
+            ultraAvailable ? juce::String{} : htfx::tr("tooltip.qualityUltraNeedsGpu"));
+        const bool ultra = generalUltraQuality_ && ultraAvailable;
         qualityHighButton_.setColour(
             juce::TextButton::buttonColourId,
-            juce::Colour(high ? HtfxLookAndFeel::kAccent : HtfxLookAndFeel::kSurfaceRaised));
-        const bool warn = high && roformerIsSlowHere();
-        // Tens of minutes is not something to mention in passing, so the warned
-        // form says it plainly and colours the line. It stays a sentence rather
-        // than a dialog: the run has not started, and a modal asking "are you
-        // sure" before every long job is its own kind of rude.
-        qualityHint_.setColour(
-            juce::Label::textColourId,
-            juce::Colour(warn ? HtfxLookAndFeel::kVocals : HtfxLookAndFeel::kTextMuted));
-        auto hint = htfx::tr(warn ? "hint.qualityHighSlow"
-                                  : (high ? "hint.qualityHigh" : "hint.qualityStandard"));
-        const auto estimate = htfx::tr(
-            high ? (onCpu   ? "estimate.highCpu"
-                    : onMps ? "estimate.highMps"
-                            : "estimate.highGpu")
-                 : (onCpu   ? "estimate.standardCpu"
-                    : onMps ? "estimate.standardMps"
-                            : "estimate.standardGpu"));
-        if (warn) {
-            hint += htfx::tr("hint.estimatePrefix") + estimate +
-                    htfx::tr("hint.estimateSuffix") + htfx::tr("hint.qualityHighSlowTail");
-        } else if (estimate.isNotEmpty()) {
-            hint += " " + htfx::tr("hint.estimatePrefix") + estimate +
-                    htfx::tr("hint.estimateSuffix");
-        }
+            juce::Colour(ultra ? HtfxLookAndFeel::kSurfaceRaised : HtfxLookAndFeel::kAccent));
+        qualityUltraButton_.setColour(
+            juce::TextButton::buttonColourId,
+            juce::Colour(ultra ? HtfxLookAndFeel::kAccent : HtfxLookAndFeel::kSurfaceRaised));
+        const auto hint = htfx::tr(ultra ? "hint.qualityUltra" : "hint.qualityHigh");
         if (hint != qualityHint_.getText()) {
             qualityHint_.setText(hint, juce::dontSendNotification);
             qualityHint_.setTooltip(hint);
@@ -6206,10 +6192,10 @@ private:
             status_.setVisible(true);
             // The quality switch only exists here; the advanced panel has the
             // full mode list instead.
-            const bool haveHighQuality = highQualityModeIndex() >= 0;
-            qualityStandardButton_.setVisible(haveHighQuality);
-            qualityHighButton_.setVisible(haveHighQuality);
-            qualityHint_.setVisible(haveHighQuality);
+            const bool haveQualitySwitch = highQualityModeIndex() >= 0;
+            qualityHighButton_.setVisible(haveQualitySwitch);
+            qualityUltraButton_.setVisible(haveQualitySwitch);
+            qualityHint_.setVisible(haveQualitySwitch);
             recordButton_.setVisible(false);
             separateButton_.setVisible(false);
             exportButton_.setVisible(false);
@@ -6223,8 +6209,8 @@ private:
             resetWorker_.setVisible(false);
             return;
         }
-        qualityStandardButton_.setVisible(false);
         qualityHighButton_.setVisible(false);
+        qualityUltraButton_.setVisible(false);
         qualityHint_.setVisible(false);
         const bool recordMode = modeBox_.getSelectedItemIndex() == 0;
         recordButton_.setVisible(recordMode);
@@ -6514,8 +6500,9 @@ private:
     juce::Label simpleFile_;
     juce::TextButton vocalsOnlyButton_;
     juce::TextButton accompanyOnlyButton_;
-    juce::TextButton qualityStandardButton_;
     juce::TextButton qualityHighButton_;
+    juce::TextButton qualityUltraButton_;
+    bool generalUltraQuality_ = false;
     juce::Label qualityHint_;
     juce::Label separationModeLabel_;
     juce::ComboBox separationModeBox_;

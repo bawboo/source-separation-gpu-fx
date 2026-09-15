@@ -190,6 +190,16 @@ public:
     [[nodiscard]] bool hasPreview() const noexcept {
         return previewResult_.load(std::memory_order_acquire) != nullptr;
     }
+    // Throw away a separated result so the next export has to run again.
+    // Changing the model does not invalidate the preview on its own, so
+    // anything that changes which model is about to run has to say so --
+    // otherwise the export quietly ships the previous model's output.
+    void discardPreview() noexcept {
+        previewPlaying_.store(false, std::memory_order_release);
+        previewCursor_.store(0, std::memory_order_release);
+        previewResult_.store(std::shared_ptr<const SeparationResult>{},
+                             std::memory_order_release);
+    }
     [[nodiscard]] bool resolvedToCpu() const noexcept {
         return resolvedBackend_.load(std::memory_order_acquire) == 2;
     }
