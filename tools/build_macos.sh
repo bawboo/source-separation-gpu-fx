@@ -75,11 +75,22 @@ if [ -f "$repo_root/patches/juce-8.0.13-htfx.patch" ]; then
     fi
 fi
 
-echo "configuring (universal: arm64 + x86_64)..."
+# The minimum OS the app claims has to be the minimum the bundle can keep, and
+# that differs by which runtime travels inside it. Measured across every Mach-O
+# in each bundle: the Intel one bottoms out at 12.0, while the Apple Silicon one
+# cannot go below 14.0 because that is what torch's arm64 wheels are stamped
+# with. Declaring 12.0 for both would let the app launch on a Monterey M1 and
+# then die inside the worker on the first separation -- which reads as "the
+# separation is broken", not "this Mac is too old". Better to be refused at
+# launch, by a message that names the reason.
+deployment_target=12.0
+[ "$runtime_arch" = arm64 ] && deployment_target=14.0
+
+echo "configuring (universal: arm64 + x86_64, minimum macOS $deployment_target)..."
 cmake -S "$repo_root" -B "$build_dir" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="$deployment_target" \
     -DHTFX_BUILD_PLUGIN=ON \
     -DHTFX_STANDALONE_ONLY=$standalone_only \
     -DHTFX_PORTABLE_STANDALONE_SETTINGS=OFF
