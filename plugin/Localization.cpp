@@ -45,6 +45,19 @@ const std::unordered_map<std::string, StringPair>& stringTable() {
         {"hint.qualityUltra",
          StringPair{u8"更好的伴奏分離，甚至可以保留和聲。",
                     u8"A cleaner accompaniment, and it can keep the backing vocals."}},
+        // The hint beside the buttons has room for one short line; these say
+        // which model each end actually runs, which is the thing a curious
+        // user goes to the advanced panel to find out.
+        {"tooltip.qualityHigh",
+         StringPair{u8"使用 HTDemucs 模型分離，速度快，品質好，"
+                    u8"一般情況下不需要使用超高品質模式。",
+                    u8"Separates with HTDemucs: fast, and good enough that "
+                    u8"ultra quality is rarely needed."}},
+        {"tooltip.qualityUltra",
+         StringPair{u8"使用卡拉OK模型分離，速度較慢，但能更好的分離伴奏，"
+                    u8"甚至能保留和聲。",
+                    u8"Separates with the karaoke model: slower, but a cleaner "
+                    u8"accompaniment, and it can keep the backing vocals."}},
         {"tooltip.qualityUltraNeedsGpu",
          StringPair{u8"沒有 GPU 時，一首 4 分鐘的歌要跑約 1 小時，"
                     u8"因此 CPU 版本不開放這個模式。",

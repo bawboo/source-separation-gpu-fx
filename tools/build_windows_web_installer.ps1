@@ -38,6 +38,33 @@ if (-not (Test-Path -LiteralPath $payloadRoot -PathType Container)) {
     throw "Installer payload is missing: $payloadRoot"
 }
 
+# "A payload exists" is not "this build's payload exists". This script never
+# stages one -- package_windows_installer_payload.ps1 does -- so a payload left
+# behind by an earlier build is picked up in silence, and the installer ships
+# an app from whenever that was. It happened: 0.0.10 went out carrying a binary
+# from the day before, without the feature the release was named for, and
+# nothing in the build, the checks or the packages said a word. Compare the
+# app the payload holds against the one that was just built.
+$builtStandalone = Join-Path $projectRoot `
+    'build\windows-installed\HTDemucsGpuFX_artefacts\Release\Standalone\Music SSP FX.exe'
+$payloadStandalone = Join-Path $payloadRoot 'Music SSP FX.exe'
+foreach ($required in @($builtStandalone, $payloadStandalone)) {
+    if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
+        throw "Cannot compare payload against the build: $required is missing"
+    }
+}
+$builtHash = (Get-FileHash -LiteralPath $builtStandalone -Algorithm SHA256).Hash
+$payloadHash = (Get-FileHash -LiteralPath $payloadStandalone -Algorithm SHA256).Hash
+if ($builtHash -ne $payloadHash) {
+    throw @"
+The staged payload holds a different app than the one that was just built.
+  built   $builtHash  ($((Get-Item $builtStandalone).LastWriteTime))
+  payload $payloadHash  ($((Get-Item $payloadStandalone).LastWriteTime))
+Re-stage it first:
+  tools\package_windows_installer_payload.ps1 -Version $Version
+"@
+}
+
 $runtime = @{}
 foreach ($flavor in @('cpu', 'cuda')) {
     $manifestPath = Join-Path $distRoot "runtime-win-x64-$flavor-$Version.json"

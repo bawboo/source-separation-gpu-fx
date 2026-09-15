@@ -39,6 +39,28 @@ foreach ($required in @(
     }
 }
 
+# The payload is staged by a separate script that nothing here runs, so an old
+# one sits in place looking exactly like a current one. 0.0.10 shipped that
+# way: an app from the previous day, missing the feature the release was named
+# for, and every check passed because they all read the source tree rather
+# than the package. Compare against what was actually built.
+$builtStandalone = Join-Path $projectRoot `
+    'build\windows-installed\HTDemucsGpuFX_artefacts\Release\Standalone\Music SSP FX.exe'
+if (Test-Path -LiteralPath $builtStandalone -PathType Leaf) {
+    $builtHash = (Get-FileHash -LiteralPath $builtStandalone -Algorithm SHA256).Hash
+    $payloadHash = (Get-FileHash -LiteralPath `
+        (Join-Path $payloadRoot 'Music SSP FX.exe') -Algorithm SHA256).Hash
+    if ($builtHash -ne $payloadHash) {
+        throw @"
+The staged payload holds a different app than the one that was just built.
+  built   $builtHash
+  payload $payloadHash
+Re-stage it first:
+  tools\package_windows_installer_payload.ps1 -Version $Version -LicenseCollectorPython <python.exe>
+"@
+    }
+}
+
 New-Item -ItemType Directory -Path $distRoot -Force | Out-Null
 foreach ($stale in @(Get-ChildItem -LiteralPath $distRoot -Filter "$baseName*" -File -ErrorAction SilentlyContinue)) {
     Remove-Item -LiteralPath $stale.FullName -Force

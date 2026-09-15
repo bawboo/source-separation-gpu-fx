@@ -5981,8 +5981,16 @@ private:
         // Shown but not selectable rather than hidden: a CPU user should be
         // able to see the feature exists, and be told what it would take.
         qualityUltraButton_.setEnabled(ultraAvailable);
+        // Both ends name the model they run. The line beside the buttons has
+        // room for one short sentence, and "which model is this" is exactly
+        // what sent people to the advanced panel to look -- the trip that
+        // used to change what the general panel would run.
+        qualityHighButton_.setTooltip(htfx::tr("tooltip.qualityHigh"));
         qualityUltraButton_.setTooltip(
-            ultraAvailable ? juce::String{} : htfx::tr("tooltip.qualityUltraNeedsGpu"));
+            ultraAvailable
+                ? htfx::tr("tooltip.qualityUltra")
+                : htfx::tr("tooltip.qualityUltra") + " " +
+                      htfx::tr("tooltip.qualityUltraNeedsGpu"));
         const bool ultra = generalUltraQuality_ && ultraAvailable;
         qualityHighButton_.setColour(
             juce::TextButton::buttonColourId,

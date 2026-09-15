@@ -458,7 +458,14 @@ int run() {
         const bool cpuRuntime = processor->getRuntimeFlavor() == "cpu";
         require(qualityUltra->isEnabled() == !cpuRuntime,
                 "Ultra quality is selectable on a runtime that cannot run it");
-        require(qualityUltra->getTooltip().isNotEmpty() == cpuRuntime,
+        // Both buttons name their model on hover, always. Only the Ultra one
+        // adds why it cannot be pressed, and only where that is true.
+        require(qualityHigh->getTooltip() == htfx::tr("tooltip.qualityHigh"),
+                "the High button does not say which model it runs");
+        require(qualityUltra->getTooltip().contains(htfx::tr("tooltip.qualityUltra")),
+                "the Ultra button does not say which model it runs");
+        require(qualityUltra->getTooltip().contains(
+                    htfx::tr("tooltip.qualityUltraNeedsGpu")) == cpuRuntime,
                 "the Ultra button explains itself on the wrong runtime");
         if (!cpuRuntime) {
             qualityUltra->onClick();
