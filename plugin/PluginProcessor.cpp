@@ -4473,12 +4473,6 @@ public:
             updateVisibility();
         };
 
-        updateFullScreenButtonText();
-        fullScreenButton_.onClick = [this] { toggleFullScreen(); };
-        addAndMakeVisible(fullScreenButton_);
-        scaleButton_.setButtonText(htfx::tr("button.scaleUi"));
-        scaleButton_.onClick = [this] { updateResizeMode(); };
-        addAndMakeVisible(scaleButton_);
 
         constexpr std::array<const char*, HTDemucsGpuFXAudioProcessor::kMaxSources>
             stemNames{"Drums", "Bass", "Other", "Vocals", "Guitar", "Piano"};
@@ -4710,7 +4704,7 @@ public:
         }
         addAndMakeVisible(scaledContent_);
         tooltipWindow_ = std::make_unique<juce::TooltipWindow>(this, 500);
-        setResizable(false, false);
+        updateResizeMode();
         applyLocalizedStrings();
         restoreStartupSelection();
         updateSixSourceControls();
@@ -4912,10 +4906,6 @@ public:
         auto modeRow = area.removeFromTop(30);
         modeLabel_.setBounds(modeRow.removeFromLeft(72));
         modeBox_.setBounds(modeRow.removeFromLeft(260));
-        modeRow.removeFromLeft(6);
-        fullScreenButton_.setBounds(modeRow.removeFromLeft(90));
-        modeRow.removeFromLeft(6);
-        scaleButton_.setBounds(modeRow.removeFromLeft(80));
         modeRow.removeFromLeft(6);
         languageButton_.setBounds(modeRow.removeFromLeft(64));
         modeRow.removeFromLeft(6);
@@ -5312,7 +5302,6 @@ private:
         qualityHint_.setText({}, juce::dontSendNotification);  // 下一次 tick 重建
         importButton_.setButtonText(htfx::tr("button.import"));
         exportButton_.setButtonText(htfx::tr("button.export"));
-        scaleButton_.setButtonText(htfx::tr("button.scaleUi"));
         separationModeBox_.setTextWhenNothingSelected(
             htfx::tr("combo.separationModePlaceholder"));
         // changeItemText() only rewrites the menu item; the box keeps showing
@@ -5354,7 +5343,6 @@ private:
             htfx::tr("placeholder.roformerSearch"), juce::Colours::grey);
         updatePanelSwitchButtonText();
         updateAdvancedButtonText();
-        updateFullScreenButtonText();
         openOutputButton_.setButtonText(htfx::tr("button.openOutput"));
         openOutputButton_.setTooltip(htfx::tr("tip.openOutput"));
         importButton_.setTooltip(htfx::tr("tip.import"));
@@ -5528,77 +5516,43 @@ private:
         updateSize();
     }
 
+    // The editor is always user-resizable. Content is laid out at the design
+    // size and scaled uniformly and centred (see resized()), so any window
+    // shape works: a maximised window simply gets letterboxed. A fixed aspect
+    // ratio here would fight the title bar's maximise button and push the
+    // window off screen.
     void updateResizeMode() {
-        const bool enabled = scaleButton_.getToggleState();
-        if (enabled) {
-            const int minimumWidth = 480;
-            const int maximumWidth = 2880;
-            setResizable(true, true);
-            setResizeLimits(
-                minimumWidth,
-                juce::roundToInt(
-                    static_cast<double>(minimumWidth) * designHeight() /
-                    designWidth()),
-                maximumWidth,
-                juce::roundToInt(
-                    static_cast<double>(maximumWidth) * designHeight() /
-                    designWidth()));
-            if (auto* boundsConstraint = getConstrainer()) {
-                boundsConstraint->setFixedAspectRatio(
-                    static_cast<double>(designWidth()) / designHeight());
-            }
-        } else {
-            setResizable(false, false);
-            setSize(designWidth(), designHeight());
+        const int minimumWidth = 480;
+        const int maximumWidth = 3840;
+        setResizable(true, true);
+        setResizeLimits(
+            minimumWidth,
+            juce::roundToInt(
+                static_cast<double>(minimumWidth) * designHeight() / designWidth()),
+            maximumWidth,
+            juce::roundToInt(
+                static_cast<double>(maximumWidth) * designHeight() / designWidth()));
+        if (auto* boundsConstraint = getConstrainer()) {
+            boundsConstraint->setFixedAspectRatio(0.0);
         }
-        resized();
     }
 
-    void toggleFullScreen() {
-        if (processor_.wrapperType == juce::AudioProcessor::wrapperType_Standalone) {
-            if (auto* window = findParentComponentOfClass<juce::ResizableWindow>()) {
-                const bool enter = !window->isFullScreen();
-                window->setFullScreen(enter);
-                updateFullScreenButtonText();
-                return;
+    // Standalone only: give the host window the standard three title-bar
+    // buttons (minimise / maximise / close) and let the user drag its edges.
+    // JUCE's StandaloneFilterWindow asks for minimise+close only, and the
+    // maximise button is what replaced the old in-app full-screen button.
+    void parentHierarchyChanged() override {
+        juce::AudioProcessorEditor::parentHierarchyChanged();
+        if (processor_.wrapperType != juce::AudioProcessor::wrapperType_Standalone) {
+            return;
+        }
+        if (auto* window = findParentComponentOfClass<juce::DocumentWindow>()) {
+            if (window != hostWindow_) {
+                hostWindow_ = window;
+                window->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
+                window->setResizable(true, false);
             }
         }
-
-        if (!editorFullScreen_) {
-            previousEditorSize_ = {getWidth(), getHeight()};
-            const auto* display = juce::Desktop::getInstance()
-                                      .getDisplays()
-                                      .getDisplayForRect(getScreenBounds());
-            if (display != nullptr) {
-                const auto available = display->userBounds.toNearestInt();
-                setSize(available.getWidth(), available.getHeight());
-            }
-            editorFullScreen_ = true;
-        } else {
-            setSize(previousEditorSize_.x, previousEditorSize_.y);
-            editorFullScreen_ = false;
-        }
-        updateFullScreenButtonText();
-    }
-
-    // Mirrors the two independent "are we full screen" representations used
-    // above: a standalone host window queried live, or the in-editor flag
-    // for the plugin/no-parent-window case. Needed so applyLocalizedStrings()
-    // can re-derive the correct label on a language toggle without duplicating
-    // toggleFullScreen()'s branching.
-    bool isEffectivelyFullScreen() {
-        if (processor_.wrapperType == juce::AudioProcessor::wrapperType_Standalone) {
-            if (auto* window = findParentComponentOfClass<juce::ResizableWindow>()) {
-                return window->isFullScreen();
-            }
-        }
-        return editorFullScreen_;
-    }
-
-    void updateFullScreenButtonText() {
-        fullScreenButton_.setButtonText(
-            isEffectivelyFullScreen() ? htfx::tr("button.exitFullScreen")
-                                       : htfx::tr("button.fullScreen"));
     }
 
     void updatePanelSwitchButtonText() {
@@ -5628,17 +5582,43 @@ private:
         }
     }
 
+    // Called whenever the design size changes (panel switch): keep the
+    // current width and follow the new aspect ratio, so the window does not
+    // jump back to the design size every time a panel is toggled.
     void updateSize() {
-        if (scaleButton_.getToggleState()) {
-            const int width = (std::max)(getWidth(), 480);
-            updateResizeMode();
-            setSize(
-                width,
-                juce::roundToInt(
-                    static_cast<double>(width) * designHeight() / designWidth()));
-        } else {
-            setSize(designWidth(), designHeight());
+        // Preserve the user's zoom across panels: a window at 1.5x the old
+        // design width opens the next panel at 1.5x its design width too.
+        // Before the first layout there is no window yet, so use 1x.
+        const double zoom = (getWidth() > 0 && lastDesignWidth_ > 0)
+                                ? static_cast<double>(getWidth()) / lastDesignWidth_
+                                : 1.0;
+        lastDesignWidth_ = designWidth();
+        updateResizeMode();
+        // A maximised window keeps its shape; the content is letterboxed.
+        if (hostWindow_ != nullptr && hostWindow_->isFullScreen()) {
+            resized();
+            return;
         }
+        int width = juce::roundToInt(designWidth() * zoom);
+        int height = juce::roundToInt(
+            static_cast<double>(width) * designHeight() / designWidth());
+        // Never grow past the screen: a taller panel is opened from a zoomed
+        // general window and would otherwise end up below the taskbar.
+        if (const auto* display = juce::Desktop::getInstance()
+                                      .getDisplays()
+                                      .getDisplayForRect(getScreenBounds())) {
+            const auto available = display->userBounds.reduced(0, 60);
+            const double fit = (std::min)(
+                1.0,
+                (std::min)(static_cast<double>(available.getWidth()) / width,
+                           static_cast<double>(available.getHeight()) / height));
+            if (fit < 1.0) {
+                width = (std::max)(480, juce::roundToInt(width * fit));
+                height = juce::roundToInt(
+                    static_cast<double>(width) * designHeight() / designWidth());
+            }
+        }
+        setSize(width, height);
         resized();
     }
 
@@ -5952,9 +5932,9 @@ private:
         vocalsOnlyButton_.setVisible(!advancedPanel_);
         accompanyOnlyButton_.setVisible(!advancedPanel_);
 
-        for (auto* component : std::array<juce::Component*, 13>{
+        for (auto* component : std::array<juce::Component*, 11>{
                  &separationModeLabel_, &separationModeBox_,
-                 &modeLabel_, &modeBox_, &fullScreenButton_, &scaleButton_,
+                 &modeLabel_, &modeBox_,
                  &outputLabel_, &outputSlider_, &bypassButton_, &advancedButton_,
                  &cpuWarning_, &metrics_, &resetWorker_}) {
             component->setVisible(advancedPanel_);
@@ -6523,8 +6503,6 @@ private:
     int shownClipCount_ = -1;
     juce::Label modeLabel_;
     juce::ComboBox modeBox_;
-    juce::TextButton fullScreenButton_;
-    juce::ToggleButton scaleButton_;
     std::array<juce::Label, HTDemucsGpuFXAudioProcessor::kMaxSources> stemLabels_;
     std::array<juce::Slider, HTDemucsGpuFXAudioProcessor::kMaxSources> stemSliders_;
     std::array<std::unique_ptr<SliderAttachment>, HTDemucsGpuFXAudioProcessor::kMaxSources>
@@ -6578,10 +6556,10 @@ private:
     };
     std::optional<PendingQuickExport> pendingQuickExport_;
     std::unique_ptr<juce::FileChooser> mediaChooser_;
-    juce::Point<int> previousEditorSize_{560, 260};
-    bool editorFullScreen_ = false;
     bool advancedPanel_ = false;
     bool advancedVisible_ = false;
+    juce::DocumentWindow* hostWindow_ = nullptr;
+    int lastDesignWidth_ = 0;
     std::unique_ptr<juce::TooltipWindow> tooltipWindow_;  // last: destroyed first
 };
 

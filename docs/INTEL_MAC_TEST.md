@@ -35,7 +35,7 @@ AVX2 這個指令集，而真正的 Intel Mac 有。所以你那台會走到一�
 
 ## 1. 安裝
 
-打開我傳給你的 `MusicSSPFX-0.0.11-x86_64.dmg`，把「Music SSP FX」拖到旁邊的
+打開我傳給你的 `MusicSSPFX-0.0.12-x86_64.dmg`，把「Music SSP FX」拖到旁邊的
 Applications 資料夾。
 
 ## 2. 第一次開啟
@@ -125,6 +125,6 @@ Applications 資料夾。
 
 ---
 
-<sub>給寄出的人：要傳的是 `dist/macos/MusicSSPFX-0.0.11-x86_64.dmg`
+<sub>給寄出的人：要傳的是 `dist/macos/MusicSSPFX-0.0.12-x86_64.dmg`
 （328 MB，sha256 `63fbb6b3795d72d5b84dbe714b6bb9939bbe4f201252cead3fc8b2a5b1b07ef8`）。
 arm64 那份是自己用的，不要傳錯。</sub>

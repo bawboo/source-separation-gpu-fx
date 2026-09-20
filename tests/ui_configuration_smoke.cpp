@@ -327,14 +327,11 @@ int run() {
     auto* exportVocals = findButton(components, htfx::tr("button.exportVocalsOnly"));
     auto* exportAccompany = findButton(components, htfx::tr("button.exportAccompanyOnly"));
     auto* exportMedia = findButton(components, htfx::tr("button.export"));
-    auto* fullScreen = findButton(components, htfx::tr("button.fullScreen"));
-    auto* scaleUi = findButton(components, htfx::tr("button.scaleUi"));
     require(mode != nullptr && segment != nullptr && model != nullptr &&
                 compute != nullptr && advanced != nullptr && panelSwitch != nullptr &&
                 record != nullptr && importMedia != nullptr &&
                 exportVocals != nullptr && exportAccompany != nullptr &&
-                exportMedia != nullptr &&
-                fullScreen != nullptr && scaleUi != nullptr,
+                exportMedia != nullptr,
             "required UI controls were not found");
 
     require(importMedia->isVisible() && exportVocals->isVisible() &&
@@ -885,32 +882,19 @@ int run() {
                 editor->getWidth() == 560 && editor->getHeight() == 306,
             "general panel did not restore");
 
-    auto* scaleToggle = dynamic_cast<juce::ToggleButton*>(scaleUi);
-    require(scaleToggle != nullptr, "Scale UI is not a toggle control");
-    scaleToggle->setToggleState(true, juce::dontSendNotification);
-    scaleToggle->onClick();
-    require(editor->isResizable(), "Scale UI did not enable host/user resizing");
-    require(
-        editor->getConstrainer() != nullptr &&
-            std::abs(editor->getConstrainer()->getFixedAspectRatio() - 560.0 / 306.0) <
-                1.0e-6,
-        "Scale UI did not enforce the general panel design aspect ratio");
+    // The editor is always user-resizable now: no Scale UI toggle, no
+    // full-screen button. The window's own maximise button covers the latter
+    // and the content keeps the design aspect ratio while scaling.
+    require(editor->isResizable(), "editor is not resizable");
+    // No fixed aspect ratio: the content scales uniformly and is centred, so
+    // any window shape (including maximised) is accepted as-is.
     editor->setBoundsConstrained({0, 0, 1120, 520});
-    require(editor->getWidth() == 1120 && editor->getHeight() == 612,
-            "proportional editor resize mismatch");
-    scaleToggle->setToggleState(false, juce::dontSendNotification);
-    scaleToggle->onClick();
-    require(!editor->isResizable(), "Scale UI did not disable resizing");
+    require(editor->getWidth() == 1120 && editor->getHeight() == 520,
+            "free-form editor resize mismatch");
+    editor->setBoundsConstrained({0, 0, 560, 306});
     require(editor->getWidth() == 560 && editor->getHeight() == 306,
-            "Scale UI did not restore design size");
-
-    fullScreen->onClick();
-    require(fullScreen->getButtonText() == htfx::tr("button.exitFullScreen"),
-            "full-screen fallback did not enter");
-    fullScreen->onClick();
-    require(fullScreen->getButtonText() == htfx::tr("button.fullScreen") &&
-                editor->getWidth() == 560 && editor->getHeight() == 306,
-            "full-screen fallback did not restore the editor");
+            "editor did not return to the design size");
+    std::printf("always_resizable=true\n");
 
     // L1: language infrastructure — string table default (zh-TW), the
     // in-editor toggle switching a wired label live, and the choice
